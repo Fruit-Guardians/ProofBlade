@@ -593,7 +593,17 @@ export class EffectJournal {
       if (!registered || registered.origin.registeredBy !== "verifier") throw new Error(`Verifier result Artifact ${staged.id} was not registered by verifier authority`);
       artifact = registered;
     } else {
-      artifact = await this.artifactStore.putText(runId, JSON.stringify({ ...result, operation, args }, null, 2), artifactMeta);
+      // The following effect_finished commit is the durability fence for this
+      // lifecycle.  Keep the artifact event durable immediately (so a crash
+      // after execution can be reconciled), but defer the materialized
+      // projection rewrite until effect_finished.  This removes one lock,
+      // JSON serialization and fsync from every normal executor effect without
+      // changing the event-log recovery semantics or the after_artifact fault
+      // injection point.
+      artifact = await this.artifactStore.putText(runId, JSON.stringify({ ...result, operation, args }, null, 2), {
+        ...artifactMeta,
+        persistProjection: false,
+      });
     }
     await this.injectFault?.("after_artifact", effectId);
     const outcome = result.exitCode === 0 ? "success" : result.exitCode === null ? "timeout" : "error";

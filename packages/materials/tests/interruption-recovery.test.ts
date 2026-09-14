@@ -127,6 +127,17 @@ test("interruption 3: assistant tool call persisted before preflight receives an
   }
 });
 
+test("valid tool transcripts use the read-only repair fast path", () => {
+  const messages = [
+    toolAssistant([{ id: "call-valid", name: "read" }]),
+    toolResult("call-valid", "read", "already complete"),
+  ] as AgentMessage[];
+  const repaired = repairAgentMessages(messages);
+  assert.equal(repaired.messages, messages);
+  assert.deepEqual(repaired.dropped, []);
+  assert.deepEqual(toolPairViolations(repaired.messages), []);
+});
+
 test("interruption 4: partial parallel batch is rebuilt in original call order", () => {
   const messages = [
     toolAssistant([

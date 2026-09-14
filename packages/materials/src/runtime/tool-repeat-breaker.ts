@@ -137,11 +137,10 @@ export class RepeatedToolFailureBreaker {
       .join("\n")
       .trim()
       .replace(/\s+/g, " ");
-    const key = sha256(canonicalJson({
-      toolName: observation.toolName,
-      input: observation.input,
-      error: errorText,
-    }));
+    const structuredError = stableStructuredError(errorText);
+    const key = sha256(canonicalJson(structuredError
+      ? { toolName: observation.toolName, error: structuredError }
+      : { toolName: observation.toolName, input: observation.input, error: errorText }));
     this.count = this.lastKey === key ? this.count + 1 : 1;
     this.lastKey = key;
     return { count: this.count, terminate: this.count >= this.threshold, key };
@@ -150,6 +149,25 @@ export class RepeatedToolFailureBreaker {
   public reset(): void {
     this.lastKey = undefined;
     this.count = 0;
+  }
+}
+
+/**
+ * Evidence contract failures deliberately omit argument values from their
+ * repeat identity. A model correcting an Artifact id must still be stopped
+ * when it keeps sending the same malformed operation/field combination; the
+ * full input would otherwise give every placeholder a fresh retry budget.
+ */
+function stableStructuredError(errorText: string): { schemaVersion: number; code: string; operation: string; retryable: boolean; invalidFields: string[]; missingFields: string[] } | undefined {
+  const match = /^\[ProofBlade evidence error\] (\{.+\})$/.exec(errorText);
+  if (!match) return undefined;
+  try {
+    const parsed = JSON.parse(match[1]!) as Record<string, unknown>;
+    if (parsed.schemaVersion !== 1 || typeof parsed.code !== "string" || typeof parsed.operation !== "string" || typeof parsed.retryable !== "boolean") return undefined;
+    const fields = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").slice(0, 32) : [];
+    return { schemaVersion: 1, code: parsed.code, operation: parsed.operation, retryable: parsed.retryable, invalidFields: fields(parsed.invalidFields), missingFields: fields(parsed.missingFields) };
+  } catch {
+    return undefined;
   }
 }
 

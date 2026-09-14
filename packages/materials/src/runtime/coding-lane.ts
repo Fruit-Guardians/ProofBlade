@@ -14,7 +14,7 @@ import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js"
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
 import { ContextCompiler } from "../context/compiler.js";
-import { latestExternalUserMessage } from "../context/user-task-anchor.js";
+import { latestExternalUserMessage, userMessageText } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
@@ -58,20 +58,24 @@ import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, runToolPreparationFromPreflight, securityProfileForTask, withFirstClassMcpToolExposure, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
-import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
+import { scheduleAgentTools } from "./tool-scheduler.js";
+import { acknowledgeObservationItems, ObservationQueueCache, projectObservationQueue } from "../orchestration/observation-queue.js";
 import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
+import { routeSkillsForTask, type SkillRoute } from "./skill-routing.js";
 const MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS = 10_000;
 /** Hard Provider-facing budget for user-managed project instructions. */
 export const MAX_PROJECT_PROMPT_TOKENS = 2_048;
+/** Bounded body size for each automatically routed specialist Skill. */
+const MAX_ROUTED_SKILL_CHARS = 5_000;
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
 Respond naturally to ordinary conversation. Use workspace tools only when the user's request benefits from inspecting, running, or editing project files. Explain completed work concisely and preserve the user's existing changes.
 
-Tool output you receive is complete unless it says otherwise. Only when a result ends with a ProofBlade artifact anchor (\`A-*\` id, stating how many bytes were withheld) is there more to fetch — then read that id with the evidence tool rather than re-running the command. No anchor means nothing was withheld, so do not go looking for a fuller copy. Every tool output is archived regardless, and \`evidence search\` matches archived text, so a query can recover something that scrolled out of context. The evidence tools (record, annotate, inspect_forest, inspect_tree, search) are optional during an initial pass. If a ProofBlade evidence-curation or experiment-budget message appears, treat it as feedback: preserve the strongest finding when useful, change the hypothesis or tool before repeating a probe, and continue the current turn when another bounded action is still valuable. It does not require ending the current turn or calling another equivalent bash command.
+Tool output you receive is complete unless it says otherwise. Only when a result ends with a ProofBlade artifact anchor (\`A-*\` id, stating how many bytes were withheld) is there more to fetch — then read that id with the evidence tool rather than re-running the command. No anchor means nothing was withheld, so do not go looking for a fuller copy. Every tool output is archived regardless, and \`evidence search\` matches archived text, so a query can recover something that scrolled out of context. Use \`evidence_record\` for a durable conclusion (artifactIds plus summary, with optional claim/tags/dependsOn); use the legacy \`evidence\` proxy for reads, graph inspection, and compatibility with older sessions. Ordinary Tool output is already an Artifact/Observation, so do not record every command. The evidence tools (record, annotate, inspect_forest, inspect_tree, search) are optional during an initial pass. If a ProofBlade evidence-curation or experiment-budget message appears, treat it as feedback: preserve the strongest finding when useful, change the hypothesis or tool before repeating a probe, and continue the current turn when another bounded action is still valuable. It does not require ending the current turn or calling another equivalent bash command.
 
 Anything that will take more than about a minute — a brute force, a wide sweep, a fuzzer, a server you need running — belongs in \`shell_background\`, not \`bash\`. \`bash\` blocks until the command finishes, so a long sweep freezes your whole turn; \`shell_background\` returns a job id immediately and you keep working, then poll with \`shell_job\`. Do not poll in a tight loop: start the job, do other analysis, and check back.
 
@@ -108,6 +112,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Teardown hook for durable shell jobs owned by this lane. */
     private readonly closeShellJobs: () => Promise<void>,
+    /** Explicit session/flush equivalent for queued Pi telemetry. */
+    private readonly flushObservability: () => Promise<void>,
     /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
     private readonly pwnRegistry?: SessionRegistry,
     /** Separate owner-scoped registry for trusted clean-process Pwn reproduction. */
@@ -500,6 +506,11 @@ export class PiCodingLane implements AgentLanePort {
     const externalSubmissionEnabled = Boolean(externalSubmit);
     const phaseCoordinator = new RunCoordinator(options.controlStore);
     const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...activeMcpTools];
+    // Pi 0.83 treats a batch containing one sequential tool as entirely
+    // sequential. Keep the declared contracts for observability/catalogs, but
+    // execute the provider-facing copy through the lane-local rolling barrier
+    // scheduler so independent read-only calls can overlap.
+    const scheduledTools = scheduleAgentTools(tools);
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -528,6 +539,7 @@ export class PiCodingLane implements AgentLanePort {
         const current = await options.controlStore.snapshot(options.runId);
         return { domainPhase: current.domainPhase, phase: current.phase };
       },
+      trustedToolPaths: new Set(toolCatalog.list().map((entry) => entry.path)),
       claimVerifier,
       ...(options.deferClaimAcceptance ? { deferClaimAcceptance: true } : {}),
       continuousRecovery: true,
@@ -616,7 +628,7 @@ export class PiCodingLane implements AgentLanePort {
       session,
       models,
       model,
-      tools,
+      tools: scheduledTools,
       activeToolNames,
       resources: { skills: resources },
       toolContext,
@@ -652,6 +664,21 @@ export class PiCodingLane implements AgentLanePort {
     let lastOmittedItems: ModelContextItem[] = [];
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
+    let compiledContextCache: {
+      snapshotSeq: number;
+      generation: number;
+      queueHash: string;
+      guidance: string;
+      output: ContextBuildOutput;
+    } | undefined;
+    const observationQueueCache = new ObservationQueueCache();
+    const currentObservationQueue = async (current: RunSnapshot) => {
+      const cached = observationQueueCache.get(current);
+      if (cached) return cached;
+      const projection = projectObservationQueue(await options.controlStore.events(options.runId), current);
+      observationQueueCache.set(current, projection);
+      return projection;
+    };
     let persistedContextForTurn = false;
     toolContext.onDomainPhaseChanged = async () => {
       // Pi requests context again after the tool result. Append a new dynamic
@@ -662,27 +689,53 @@ export class PiCodingLane implements AgentLanePort {
     };
     harness.on("context", async ({ messages }) => {
       const current = await options.controlStore.snapshot(options.runId);
-      const queue = projectObservationQueue(await options.controlStore.events(options.runId), current);
+      const queue = await currentObservationQueue(current);
       if (queue.total > 0) {
         const injectedById = new Map(maintenance.injectedObservationItems.map((item) => [item.id, item]));
         for (const item of queue.items.slice(0, 8)) injectedById.set(item.id, item);
         maintenance.injectedObservationItems = [...injectedById.values()];
       }
-      const compiled = contextCompiler.build({
-        runId: options.runId,
-        lane: "main",
-        phase: current.phase,
-        task: current.task,
-        snapshot: current,
-        contextWindow: profile.contextWindow,
-        outputBudget: profile.maxTokens,
-        safetyMargin: providerSafetyTokens,
-        resources: contextResources,
-        observationQueue: queue.items,
-        previousBlocks: previousContextBlocks,
-      });
-      previousContextBlocks = compiled.manifest.blocks;
-      const dynamicProjection = contextProjectionMessage(compiled, turnContext.guidance);
+      const taskPrompt = userMessageText(latestExternalUserMessage(messages));
+      const routingTask = taskPrompt
+        ? { ...current.task, objective: `${current.task.objective}\n${taskPrompt}` }
+        : current.task;
+      const routedSkillGuidance = renderRoutedSkillGuidance(
+        routeSkillsForTask(routingTask, resources.map((skill) => skill.name)),
+        skills,
+      );
+      const dynamicGuidance = [turnContext.guidance, routedSkillGuidance].filter(Boolean).join("\n\n");
+      const queueHash = sha256(canonicalJson(queue.items));
+      const cached = compiledContextCache;
+      const compiled = cached
+        && cached.snapshotSeq === current.lastSeq
+        && cached.generation === current.generation
+        && cached.queueHash === queueHash
+        && cached.guidance === dynamicGuidance
+        ? cached.output
+        : contextCompiler.build({
+          runId: options.runId,
+          lane: "main",
+          phase: current.phase,
+          task: current.task,
+          snapshot: current,
+          contextWindow: profile.contextWindow,
+          outputBudget: profile.maxTokens,
+          safetyMargin: providerSafetyTokens,
+          resources: contextResources,
+          observationQueue: queue.items,
+          previousBlocks: previousContextBlocks,
+        });
+      if (compiled !== cached?.output) {
+        previousContextBlocks = compiled.manifest.blocks;
+        compiledContextCache = {
+          snapshotSeq: current.lastSeq,
+          generation: current.generation,
+          queueHash,
+          guidance: dynamicGuidance,
+          output: compiled,
+        };
+      }
+      const dynamicProjection = contextProjectionMessage(compiled, dynamicGuidance);
       const contextPrefix = forestContext.value
         ? [createCustomMessage(
           "proofblade_reasoning_forest",
@@ -715,7 +768,11 @@ export class PiCodingLane implements AgentLanePort {
         // so persist the bounded ledger checkpoint directly before Pi compacts.
         // The append-only transcript remains the source of truth if this
         // observer-side write is temporarily unavailable.
-        await checkpointService.create(options.runId, "context-prune").catch(() => undefined);
+        // The event is durable immediately, but defer the materialized
+        // projection until the existing turn-end flush barrier. Checkpoint
+        // creation sits on the provider hot path and should not add a second
+        // projection rewrite before the next request.
+        await checkpointService.create(options.runId, "context-prune", undefined, { persistProjection: false }).catch(() => undefined);
       }
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
       return { messages: injectContextForRequest ? [...prepared.messages, ...contextPrefix] : prepared.messages };
@@ -739,21 +796,38 @@ export class PiCodingLane implements AgentLanePort {
       estimateContextTokens: async () => currentContextTokens,
       getContextSnapshot: async () => {
         const current = await options.controlStore.snapshot(options.runId);
-        const observationQueue = projectObservationQueue(await options.controlStore.events(options.runId), current);
-        const compiled = contextCompiler.build({
-          runId: options.runId,
-          lane: "main",
-          phase: current.phase,
-          task: current.task,
-          snapshot: current,
-          contextWindow: profile.contextWindow,
-          outputBudget: profile.maxTokens,
-          safetyMargin: providerSafetyTokens,
-          resources: contextResources,
-          observationQueue: observationQueue.items,
-          previousBlocks: previousContextBlocks,
-        });
-        previousContextBlocks = compiled.manifest.blocks;
+        const observationQueue = await currentObservationQueue(current);
+        const queueHash = sha256(canonicalJson(observationQueue.items));
+        const cached = compiledContextCache;
+        const compiled = cached
+          && cached.snapshotSeq === current.lastSeq
+          && cached.generation === current.generation
+          && cached.queueHash === queueHash
+          && cached.guidance === turnContext.guidance
+          ? cached.output
+          : contextCompiler.build({
+            runId: options.runId,
+            lane: "main",
+            phase: current.phase,
+            task: current.task,
+            snapshot: current,
+            contextWindow: profile.contextWindow,
+            outputBudget: profile.maxTokens,
+            safetyMargin: providerSafetyTokens,
+            resources: contextResources,
+            observationQueue: observationQueue.items,
+            previousBlocks: previousContextBlocks,
+          });
+        if (compiled !== cached?.output) {
+          previousContextBlocks = compiled.manifest.blocks;
+          compiledContextCache = {
+            snapshotSeq: current.lastSeq,
+            generation: current.generation,
+            queueHash,
+            guidance: turnContext.guidance,
+            output: compiled,
+          };
+        }
         const summary = contextSnapshot(compiled.manifest);
         return {
           ...summary,
@@ -793,6 +867,10 @@ export class PiCodingLane implements AgentLanePort {
         return undefined;
       },
       async () => await stopAllShellJobs(toolContext),
+      async () => {
+        await scheduling.flush();
+        await options.controlStore.flushProjection(options.runId).catch(() => undefined);
+      },
       pwnRegistry,
       pwnVerifierRegistry,
       webSession,
@@ -891,6 +969,7 @@ export class PiCodingLane implements AgentLanePort {
     try {
       await this.harness.waitForIdle();
     } finally {
+      await this.flushObservability().catch(() => undefined);
       try {
         await this.closeShellJobs().catch(() => undefined);
         // Tear down live pwn tube sessions first: their docker-exec children are
@@ -1182,6 +1261,25 @@ function codingSystemPrompt(
     ? `\n\nMCP path boundary: shell/read/edit/write operate on the container workspace at \`${workspaceRoot}\`. Host-side MCP tools (for example IDA/JADX) cannot see that virtual path; when an MCP tool asks for a file path, pass the host workspace path \`${options.hostWorkspaceRootForMcp}\` plus the workspace-relative suffix. Never use that host path in bash.`
     : "";
   return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${toolCatalogBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+}
+
+/** Render deterministic specialist guidance without making a Provider/tool call. */
+function renderRoutedSkillGuidance(routes: readonly SkillRoute[], skills: ProofBladeSkillRegistry): string {
+  if (routes.length === 0) return "";
+  const blocks = routes.flatMap((route) => {
+    try {
+      const loaded = skills.loadForModel(route.name, MAX_ROUTED_SKILL_CHARS);
+      return [`### ${route.name} (automatically selected: ${route.reasons.join("; ")})\n${loaded.content}`];
+    } catch {
+      // A catalog can change between preflight and lane construction. The
+      // explicit load_skill tool remains available; automatic guidance is
+      // advisory and must never make the lane unavailable.
+      return [];
+    }
+  });
+  return blocks.length > 0
+    ? `## Automatically routed specialist guidance\nThe following bounded Skill bodies were selected from immutable task metadata and input names. They are methodology only, not evidence; keep all conclusions bound to workspace artifacts and verifier rules.\n\n${blocks.join("\n\n")}`
+    : "";
 }
 
 export function codingHostGuidance(platform: NodeJS.Platform = process.platform): string {

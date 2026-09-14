@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { appendFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
@@ -238,7 +238,7 @@ test("Artifact previews are range-bounded and can be continued without reading t
   }
 });
 
-test("lists migration-tailed Runs from valid projections without replaying full event streams", async () => {
+test("replays Runs when a self-hashed projection is missing its durable seal", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-run-list-projection-"));
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
@@ -249,26 +249,65 @@ test("lists migration-tailed Runs from valid projections without replaying full 
     delete legacyProjection.taskHash;
     legacyProjection.projectionHash = projectionHash(legacyProjection);
     await writeFile(join(root, "runs", runId, "projection.json"), `${JSON.stringify(legacyProjection)}\n`);
-    await appendFile(join(root, "runs", runId, "events.jsonl"), `${JSON.stringify({
-      schemaVersion: 1,
-      runId,
-      streamId: runId,
-      seq: legacyProjection.lastSeq + 1,
-      type: "run_authority_migrated",
-      payload: { taskHash: projection.taskHash, authorityHash: "a".repeat(64), migratedFrom: "legacy-v1" },
-    })}\n`);
-    const control = (data as unknown as {
-      services: { control: { snapshot: (requestedRunId: string) => Promise<RunSnapshot> } };
-    }).services.control;
-    control.snapshot = async () => { throw new Error("listRuns must not replay a current projection"); };
-
     const runs = await data.listRuns();
     const run = runs.find((item) => item.runId === runId);
     assert.ok(run);
     assert.equal(run.kind, "chat");
     assert.equal(run.counts.tools, undefined);
     await data.close();
+    const sealed = JSON.parse(await readFile(join(root, "runs", runId, "projection.json"))) as { proofbladeProjectionSeal?: unknown };
+    assert.ok(sealed.proofbladeProjectionSeal, "the first cold read should backfill a durable projection seal");
+
+    const reopened = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    try {
+      const control = (reopened as unknown as {
+        services: { control: { snapshot: () => Promise<RunSnapshot> } };
+      }).services.control;
+      control.snapshot = async () => { throw new Error("sealed projection should avoid a second full replay"); };
+      const reopenedRuns = await reopened.listRuns();
+      assert.ok(reopenedRuns.some((item) => item.runId === runId));
+    } finally {
+      await reopened.close();
+    }
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("folds a sealed projection tail without reconciling during GUI polling", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-run-list-tail-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "CHAT-PROJECTION-TAIL-001";
+    await data.createConversation({ runId, title: "projection tail", workspacePath: root });
+    const control = (data as unknown as {
+      services: {
+        control: {
+          append: (requestedRunId: string, events: unknown[], options: { persistProjection: boolean }) => Promise<unknown>;
+          reconcileProjection: (requestedRunId: string) => Promise<unknown>;
+        };
+      };
+    }).services.control;
+    const projectionPath = join(root, "runs", runId, "projection.json");
+    const projectionBefore = await readFile(projectionPath, "utf8");
+    const lastProjectedSeq = (JSON.parse(projectionBefore) as { lastSeq: number }).lastSeq;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: `${runId}:telemetry`,
+      actor: "model",
+      type: "model_usage",
+      payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    control.reconcileProjection = async () => { throw new Error("GUI polling must not reconcile a sealed tail"); };
+    const runs = await data.listRuns();
+    const run = runs.find((item) => item.runId === runId);
+    assert.ok(run);
+    assert.equal(run.lastSeq, lastProjectedSeq + 1, "the list must expose the committed telemetry tail");
+    assert.equal(await readFile(projectionPath, "utf8"), projectionBefore, "GUI polling must not rewrite a stale sealed projection");
+  } finally {
+    await data.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });
   }
 });

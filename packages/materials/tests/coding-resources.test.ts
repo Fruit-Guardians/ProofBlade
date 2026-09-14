@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NodeExecutionEnv, type AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
+import { AgentHarness, JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
+import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { canonicalJson, sha256 } from "@proofblade/atoms";
 import type { McpProjectRegistry, McpServerSummary } from "../src/mcp/registry.js";
 import {
@@ -18,6 +19,8 @@ import {
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
 import { codingHostGuidance, createDeclaredExternalSubmitter, taskDeclaresRemotePwnTarget } from "../src/runtime/coding-lane.js";
+import { attachRepeatedToolFailureBreaker, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
+import { RepeatedToolFailureBreaker } from "../src/runtime/tool-repeat-breaker.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -38,7 +41,7 @@ import { join, resolve } from "node:path";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "cc3b092c6b8558371f59d265eb25ab00c27a60dadcd8999ad4381122bdc503c6";
+const CODING_TOOL_CONTRACT_HASH = "daa68256d0cbdb25d9bf99f26162e9ef6da23198df8b19a7672819baca309eb2";
 
 test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
   assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
@@ -46,7 +49,7 @@ test("TaskResultVerifier is the canonical verifier and keeps the legacy class as
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "update_phase", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => tool.name === "verify_claim"), false);
   assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((tool) => tool.name === "submit_flag"), false);
@@ -54,7 +57,7 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "update_phase", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
   // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
@@ -103,6 +106,12 @@ test("update_phase changes the durable phase before later investigation actions"
     await services.sandbox.close();
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("read-only workspace scans do not serialize unrelated Pi tool calls", () => {
+  const tools = createCodingTools();
+  assert.equal(tools.find((tool) => tool.name === "glob")?.executionMode, "parallel");
+  assert.equal(tools.find((tool) => tool.name === "grep")?.executionMode, "parallel");
 });
 
 test("ordinary read follows bounded continuation pages into one complete model result", async () => {
@@ -364,6 +373,149 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
   assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
+test("evidence_record has an exact write contract and legacy record calls are normalized", async () => {
+  const snapshot = codingProviderToolContractSnapshot();
+  const record = snapshot.find((tool) => tool.name === "evidence_record");
+  assert.ok(record, "evidence_record should be exposed to the provider");
+  const parameters = record.parameters as { required?: string[]; properties?: Record<string, unknown>; additionalProperties?: boolean };
+  assert.deepEqual(parameters.required, ["artifactIds", "summary"]);
+  assert.deepEqual(Object.keys(parameters.properties ?? {}).sort(), ["artifactIds", "claim", "dependsOn", "name", "summary", "tags"]);
+  assert.equal(parameters.additionalProperties, false);
+  assert.ok(codingActiveToolNames({ tools: ["read"], skills: [], mcpServers: [] }).includes("evidence_record"));
+
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-evidence-record-contract-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "EVIDENCE-RECORD-CONTRACT";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const artifact = await services.artifacts.putText(runId, "offset=0x20\nlength=8\n", { filename: "analysis.txt" });
+  const context = {
+    evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+  } as unknown as CodingResourceContext;
+  try {
+    const exact = await executeTool("evidence_record", { artifactIds: [artifact.id], summary: "第一行结论\n第二行细节", claim: "目标字段位于固定偏移。" }, context);
+    assert.equal(exact.isError, false);
+    assert.deepEqual((exact.details as { normalization?: unknown }).normalization, { derivedName: true });
+    const exactEvidence = (await services.control.snapshot(runId)).evidence[String((exact.details as { evidenceId: string }).evidenceId)];
+    assert.equal(exactEvidence?.name, "第一行结论");
+
+    const legacy = await executeTool("evidence", {
+      operation: "record",
+      artifactIds: [artifact.id],
+      summary: "兼容旧会话的结论",
+      artifactId: artifact.id,
+      query: "ignored read field",
+      treeId: "ignored tree field",
+      maxChars: 512,
+      role: "supporting",
+    }, context);
+    assert.equal(legacy.isError, false);
+    assert.deepEqual((legacy.details as { normalization: { ignoredFields: string[] } }).normalization.ignoredFields, ["artifactId", "query", "treeId", "maxChars", "role"]);
+
+    await assert.rejects(
+      () => executeTool("evidence", {
+        operation: "read",
+        artifactId: artifact.id,
+        artifactIds: [artifact.id],
+        claim: "mixed record field",
+        dependsOn: [],
+        relation: "supports",
+        rootNodeId: "mixed tree field",
+        status: "ACTIVE",
+      }, context),
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const details = JSON.parse(message.replace(/^\[ProofBlade evidence error\] /, "")) as Record<string, unknown>;
+        assert.equal(details.code, "unknown_field");
+        assert.equal(details.operation, "read");
+        assert.equal(details.retryable, true);
+        assert.deepEqual(details.allowedFields, ["operation", "artifactId", "maxChars"]);
+        assert.deepEqual(details.invalidFields, ["artifactIds", "claim", "dependsOn", "relation", "rootNodeId", "status"]);
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => executeTool("evidence_record", { artifactIds: ["A-MISSING"], summary: "bad reference" }, context),
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.match(message, /^\[ProofBlade evidence error\] /);
+        const details = JSON.parse(message.replace(/^\[ProofBlade evidence error\] /, "")) as Record<string, unknown>;
+        assert.deepEqual({ code: details.code, retryable: details.retryable, invalidFields: details.invalidFields, nextAction: details.nextAction }, {
+          code: "invalid_artifact_reference",
+          retryable: true,
+          invalidFields: ["artifactIds"],
+          nextAction: "Use Artifact ids returned by read/bash or evidence search from the current run; do not use file paths.",
+        });
+        return true;
+      },
+    );
+  } finally {
+    await services.sandbox.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("real AgentHarness projects evidence_record schema failures into structured details", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-evidence-record-harness-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const sessionRepo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await sessionRepo.create({ id: "EVIDENCE-HARNESS-001", cwd: root, metadata: { runId: "EVIDENCE-HARNESS-001", lane: "main" } });
+    const faux = fauxProvider({ provider: "faux-evidence-harness" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence_record", { artifactId: "A-1", summary: "误用单数 artifactId" }, { id: "evidence-call-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("已收到结构化校验错误。"),
+    ]);
+    const record = createCodingTools().find((tool) => tool.name === "evidence_record");
+    assert.ok(record);
+    const harness = new AgentHarness({
+      session,
+      models,
+      model: faux.getModel(),
+      tools: [record],
+      activeToolNames: ["evidence_record"],
+      toolContext: {} as CodingResourceContext,
+      systemPrompt: "Exercise the Evidence record contract.",
+    });
+    const termination: CodingTurnTermination = {};
+    attachRepeatedToolFailureBreaker(harness, new RepeatedToolFailureBreaker(3), termination);
+
+    await harness.prompt("Record the conclusion.");
+
+    const toolResults = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "toolResult");
+    assert.equal(toolResults.length, 1);
+    const result = toolResults[0]!.message;
+    assert.equal(result.isError, true);
+    assert.deepEqual(result.details, {
+      schemaVersion: 1,
+      tool: "evidence_record",
+      operation: "record",
+      code: "unknown_field",
+      retryable: false,
+      receivedFields: ["artifactId", "summary"],
+      invalidFields: ["artifactId"],
+      missingFields: [],
+      allowedFields: ["artifactIds", "summary", "name", "tags", "claim", "dependsOn"],
+      suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+      nextAction: "Remove unsupported fields (artifactId) and retry with only the Evidence record fields.",
+    });
+    assert.match(result.content[0]?.text ?? "", /^\[ProofBlade evidence error\] \{/);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:evidence-inspect-forest-max-chars] generic result verification rejects decoys and persists a matching reproduction", async () => {
   assert.equal(requiresClaimVerification("完成这道题，并得到flag"), true);
   assert.equal(requiresClaimVerification("分析这些文件", "结果是 flag{derived}"), true);
@@ -410,7 +562,18 @@ test("[contract:evidence-inspect-forest-max-chars] generic result verification r
   try {
     await assert.rejects(
       () => executeTool("evidence", { operation: "inspect_forest", query: "unexpected cross-operation field" }, context),
-      /evidence inspect_forest does not accept: query/,
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.match(message, /evidence inspect_forest does not accept: query/);
+        const details = JSON.parse(message.replace(/^\[ProofBlade evidence error\] /, "")) as Record<string, unknown>;
+        assert.deepEqual({ code: details.code, retryable: details.retryable, invalidFields: details.invalidFields, allowedFields: details.allowedFields }, {
+          code: "unknown_field",
+          retryable: true,
+          invalidFields: ["query"],
+          allowedFields: ["operation", "maxChars"],
+        });
+        return true;
+      },
     );
     const analysisArtifact = await services.artifacts.putText(runId, "EF01 offset=0xD4 length=0x26 nonce=fc99899b203e3fb7e7a36312", {
       filename: "ncal-ef01-analysis.txt",
@@ -1524,6 +1687,97 @@ test("failed bash returns structured error feedback and records the real experim
   assert.equal(experiments.length, 2);
   assert.ok(experiments.every((experiment) => experiment.outcome === "failure"));
   assert.equal(experiments[1]?.summary, "Foreground bash exited with code 17.");
+});
+
+test("source scope trusts only catalog-declared external executable paths", async () => {
+  const env = {
+    cwd: "/workspace",
+    async exec(_command: string, options: { onStderr?: (text: string) => void }) {
+      options.onStderr?.("");
+      return { ok: true as const, value: { stdout: "decoded", stderr: "", exitCode: 0 } };
+    },
+  };
+  const context = {
+    env,
+    outputRewrite: {
+      port: {
+        async prepare(request: { toolCallId: string; command: string }) {
+          return { toolCallId: request.toolCallId, command: request.command, provider: "builtin", requestedProvider: "builtin", providerVersion: "1", applied: false, executionEnv: {}, originalCommandHash: "scope", rewrittenCommandHash: "scope" };
+        },
+        async finalize(_ticket: unknown, visible: string) {
+          return { rawOutput: visible, rawBytes: Buffer.byteLength(visible), visibleBytes: Buffer.byteLength(visible), rawTruncated: false, rawCapture: "full" };
+        },
+      },
+      artifactStore: { async putText() { return { id: "A-source-scope", sha256: "scope" }; } },
+      runId: "RUN-source-scope",
+    },
+    runtime: { runId: "RUN-source-scope" },
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+  } as unknown as CodingResourceContext;
+
+  const undeclaredPython = await executeTool("bash", {
+    command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" -c "from PIL import Image; Image.open(\'input.png\').save(\'decoded.png\')"',
+  }, context);
+  assert.deepEqual((undeclaredPython.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe"],
+  });
+
+  const disguisedNode = await executeTool("bash", {
+    command: "C:/tmp/node.exe input.png",
+  }, context);
+  assert.deepEqual((disguisedNode.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/tmp/node.exe"],
+  });
+
+  const toolAndExternalScript = await executeTool("bash", {
+    command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" "C:/tmp/solve.py" input.png',
+  }, context);
+  assert.deepEqual((toolAndExternalScript.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe", "C:/tmp/solve.py"],
+  });
+
+  const arbitraryExecutable = await executeTool("bash", {
+    command: "C:/tmp/solve.exe input.png",
+  }, context);
+  assert.deepEqual((arbitraryExecutable.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/tmp/solve.exe"],
+  });
+
+  context.trustedToolPaths = new Set(["C:/tools/reviewed-solver.exe", "C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe"]);
+  const declaredExecutable = await executeTool("bash", {
+    command: "C:/tools/reviewed-solver.exe input.png",
+  }, context);
+  assert.deepEqual((declaredExecutable.details as { sourceScope: unknown }).sourceScope, {
+    status: "workspace",
+    authoritativeForTaskResult: true,
+    outsidePaths: [],
+  });
+
+  const declaredPython = await executeTool("bash", {
+    command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" input.png',
+  }, context);
+  assert.deepEqual((declaredPython.details as { sourceScope: unknown }).sourceScope, {
+    status: "workspace",
+    authoritativeForTaskResult: true,
+    outsidePaths: [],
+  });
+  const declaredPythonWithExternalScript = await executeTool("bash", {
+    command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" "C:/tmp/solve.py" input.png',
+  }, context);
+  assert.deepEqual((declaredPythonWithExternalScript.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/tmp/solve.py"],
+  });
 });
 
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {

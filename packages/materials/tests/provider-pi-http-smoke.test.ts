@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -525,6 +525,8 @@ test("PiCodingLane persists tool preparation before the first Provider request a
   } satisfies SessionRuntimeCreateBroker;
   try {
     services = createServices(root, config);
+    await mkdir(join(root, "skills", "ctf-web"), { recursive: true });
+    await writeFile(join(root, "skills", "ctf-web", "SKILL.md"), "---\nname: ctf-web\ndescription: Minimal web specialist fixture for routing coverage.\nmetadata:\n  user-invocable: \"false\"\n---\nUse the prepared HTTP evidence and keep conclusions tied to verifier rules.\n", "utf8");
     const runId = "PI-HTTP-PREFLIGHT";
     const task = fixtureTask(runId, "web-source-1", root, config);
     task.target = `REMOTE:http://127.0.0.1:${address.port}`;
@@ -593,6 +595,7 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
     assert.doesNotMatch(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
     const projectionText = messageText((firstRequest.messages ?? []).at(-1) ?? {});
+    assert.match(projectionText, /## Automatically routed specialist guidance[\s\S]*<skill name="ctf-web"/, "the lane must inject the selected specialist Skill without requiring a model load_skill call");
     const projectionMatch = projectionText.match(/<proofblade-context[^>]*dynamic-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/proofblade-context>/);
     assert.ok(projectionMatch, "the serialized context projection must expose its visible suffix hash");
     assert.equal(projectionMatch?.[1], sha256(projectionMatch?.[2] ?? ""), "dynamicSuffixHash must hash the bounded text sent to the Provider");

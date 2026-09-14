@@ -160,7 +160,13 @@ export class ProofBladeToolRuntime {
    * synthetic effect id is derived from the immutable artifact id, so retries
    * are idempotent and the observer never emits duplicate evidence.
    */
-  public async observeArtifact(input: { operation: string; artifactId: string; exitCode?: number | null }): Promise<ObservationOutcome & { progressKey: string }> {
+  public async observeArtifact(input: {
+    operation: string;
+    artifactId: string;
+    exitCode?: number | null;
+    persistProjection?: boolean;
+    annotation?: { name: string; summary: string; tags?: string[]; role?: "supporting" | "intermediate" | "debug" | "result"; relatedIds?: string[] };
+  }): Promise<ObservationOutcome & { progressKey: string }> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[input.artifactId];
     if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
@@ -175,7 +181,7 @@ export class ProofBladeToolRuntime {
         exitCode: input.exitCode ?? 0,
         durationMs: 0,
       },
-    });
+    }, { persistProjection: input.persistProjection, annotation: input.annotation });
     return { ...observed, progressKey: progressKey(input.operation, artifact.sha256) };
   }
 

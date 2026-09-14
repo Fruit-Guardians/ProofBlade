@@ -6,7 +6,6 @@ import type { HarnessEvent, PrimaryFailureCategory, TargetKind, TaskContract } f
 import { assertRunId } from "../domain/run-id.js";
 import { canonicalJson, isTerminal, sha256 } from "../domain/utils.js";
 import { createServices, type AppServices } from "../app/demo.js";
-import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
 import { SingleAgentLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
@@ -461,7 +460,7 @@ export class RealModelEvaluationRunner {
       const snapshot = await services.control.snapshot(runId);
       const eventLog = await services.control.events(runId);
       const replayed = await services.control.replay(runId);
-      const persisted = await new JsonlControlStore(services.runsRoot).loadProjection(runId);
+      const persisted = await services.control.loadProjection(runId);
       // A deadline or Provider error may interrupt `lane.prompt` before the
       // loop can return its normal outcome. The WorkItem claim is durable and
       // therefore remains the authoritative count of model turns attempted;

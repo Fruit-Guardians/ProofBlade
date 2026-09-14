@@ -1,5 +1,7 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { watch } from "node:fs";
-import { mkdir, open, readFile } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { HarnessEvent, RunEventEnvelope, RunSnapshot, RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
@@ -13,11 +15,46 @@ export interface JsonlRunWriter {
   saveProjection(snapshot: RunSnapshot, authoritySecret: string): Promise<void>;
 }
 
+/**
+ * Cheap identity for the append-only event stream.  Consumers use this to
+ * avoid reparsing an unchanged stream; size is included with mtime because
+ * Windows filesystems may coalesce timestamp updates.
+ */
+export interface JsonlRunRevision {
+  /** Event-stream identity. */
+  readonly size: number;
+  readonly mtimeMs: number;
+  /** Persisted task-contract identity. */
+  readonly taskSize: number;
+  readonly taskMtimeMs: number;
+}
+
+interface EventCacheEntry {
+  readonly revision: JsonlRunRevision;
+  readonly events: HarnessEvent[];
+}
+
+interface ProjectionSeal {
+  schemaVersion: 1;
+  eventPrefixHash: string;
+  authorityProof: string;
+}
+
+type StoredProjection = RunSnapshot & {
+  proofbladeProjectionSeal?: ProjectionSeal;
+};
+
+const EVENT_CACHE_LIMIT = 64;
+
 export class JsonlControlStore {
   private readonly runsRoot: string;
   private readonly writes = new KeyedOperationQueue();
   private readonly authorityHashes = new Map<string, string>();
   private readonly lockOptions: FileLockOptions;
+  /** Parsed event streams are shared by snapshot, telemetry and GUI reads. */
+  private readonly eventCache = new Map<string, EventCacheEntry>();
+  /** Coalesce concurrent cold reads for the same Run. */
+  private readonly eventLoads = new Map<string, Promise<HarnessEvent[]>>();
 
   public constructor(runsRoot: string, options: { lock?: FileLockOptions } = {}) {
     this.runsRoot = runsRoot;
@@ -26,6 +63,28 @@ export class JsonlControlStore {
 
   public runPath(runId: string): string {
     return join(this.runsRoot, runId, "events.jsonl");
+  }
+
+  /** Return the current event-stream revision without reading or parsing it. */
+  public async revision(runId: string): Promise<JsonlRunRevision> {
+    try {
+      const events = await stat(this.runPath(runId));
+      let task: Stats | undefined;
+      try {
+        task = await stat(join(this.runsRoot, runId, "task.json"));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      return {
+        size: events.size,
+        mtimeMs: events.mtimeMs,
+        taskSize: task?.size ?? -1,
+        taskMtimeMs: task?.mtimeMs ?? -1,
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`Run not found: ${runId}`);
+      throw error;
+    }
   }
 
   public async create(runId: string, task: RunSnapshot["task"], versionSnapshot: RunVersionSnapshot | undefined, authorityHash: string, authoritySecret?: string): Promise<RunSnapshot> {
@@ -74,18 +133,58 @@ export class JsonlControlStore {
   }
 
   public async events(runId: string): Promise<HarnessEvent[]> {
+    const revision = await this.revision(runId);
+    const cached = this.eventCache.get(runId);
+    if (cached && sameEventRevision(cached.revision, revision)) {
+      this.eventCache.delete(runId);
+      this.eventCache.set(runId, cached);
+      return cached.events.slice();
+    }
+    const inFlight = this.eventLoads.get(runId);
+    if (inFlight) return (await inFlight).slice();
+    const load = this.#loadEvents(runId, revision);
+    this.eventLoads.set(runId, load);
+    try {
+      return (await load).slice();
+    } finally {
+      if (this.eventLoads.get(runId) === load) this.eventLoads.delete(runId);
+    }
+  }
+
+  async #loadEvents(runId: string, initialRevision: JsonlRunRevision): Promise<HarnessEvent[]> {
     try {
       const content = await readFile(this.runPath(runId), "utf8");
-      return content
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line, index) => {
-          try {
-            return JSON.parse(line) as HarnessEvent;
-          } catch (error) {
-            throw new Error(`Invalid event at ${runId}:${index + 1}: ${String(error)}`);
-          }
-        });
+      const lines = content.split(/\r?\n/);
+      const events: HarnessEvent[] = [];
+      for (let index = 0; index < lines.length; index += 1) {
+        // A JSONL record is committed only once its terminating newline is
+        // durable. Ignore an unterminated tail even when it happens to be
+        // valid JSON, because the next append will repair that same tail.
+        if (index === lines.length - 1 && !content.endsWith("\n")) continue;
+        const line = lines[index];
+        if (!line) continue;
+        try {
+          events.push(JSON.parse(line) as HarnessEvent);
+        } catch (error) {
+          // A process can be terminated after an append has written part of
+          // the final UTF-8 record but before the newline reaches durable
+          // storage. The event stream is append-only, so the incomplete
+          // tail is safe to discard; malformed records in the middle remain
+          // a hard corruption signal.
+          throw new Error(`Invalid event at ${runId}:${index + 1}: ${String(error)}`);
+        }
+      }
+      const finalRevision = await this.revision(runId);
+      if (sameEventRevision(initialRevision, finalRevision)) {
+        this.eventCache.delete(runId);
+        this.eventCache.set(runId, { revision: finalRevision, events });
+        while (this.eventCache.size > EVENT_CACHE_LIMIT) {
+          const oldest = this.eventCache.keys().next().value as string | undefined;
+          if (oldest === undefined) break;
+          this.eventCache.delete(oldest);
+        }
+      }
+      return events;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`Run not found: ${runId}`);
       throw error;
@@ -211,8 +310,11 @@ export class JsonlControlStore {
       });
       // Defense-in-depth: reducer validation happens before the durable append.
       reduce(legacy, migration);
-      const current = await readFile(this.runPath(runId), "utf8");
-      await atomicWriteFile(this.runPath(runId), `${current}${canonicalJson(migration)}\n`);
+      // Use the normal append primitive so a crashed legacy writer's
+      // unterminated tail is repaired before the authority event is added.
+      // Concatenating onto the raw file would glue the migration JSON onto
+      // that tail and corrupt the complete Run.
+      await this.#appendUnchecked([migration]);
       this.authorityHashes.set(runId, authorityHash);
       return "migrated";
     });
@@ -243,13 +345,48 @@ export class JsonlControlStore {
       throw new Error("Projection write authority does not match the immutable Run anchor");
     }
     const path = join(this.runsRoot, snapshot.runId, "projection.json");
-    const content = { ...snapshot, projectionHash: projectionHash(snapshot) };
+    const events = await this.events(snapshot.runId);
+    const snapshotHash = projectionHash(snapshot);
+    const eventPrefixHash = hashEventPrefix(events, snapshot.runId, snapshot.lastSeq);
+    const sealPayload = projectionSealPayload(snapshot.runId, snapshot.lastSeq, snapshotHash, eventPrefixHash);
+    const content: StoredProjection = {
+      ...snapshot,
+      projectionHash: snapshotHash,
+      proofbladeProjectionSeal: {
+        schemaVersion: 1,
+        eventPrefixHash,
+        authorityProof: createHmac("sha256", authoritySecret).update(sealPayload).digest("hex"),
+      },
+    };
     await atomicWriteFile(path, `${canonicalJson(content)}\n`);
   }
 
-  public async loadProjection(runId: string): Promise<RunSnapshot | undefined> {
+  public async loadProjection(
+    runId: string,
+    verification?: { events: HarnessEvent[]; authoritySecret: string },
+  ): Promise<RunSnapshot | undefined> {
+    // A projection hash only detects accidental corruption. Without the
+    // event-prefix seal and authority proof, callers must not treat the file
+    // as a trusted snapshot (GUI and evaluation paths are untrusted readers).
+    if (verification === undefined) return undefined;
     try {
-      return JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as RunSnapshot;
+      const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
+      const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
+      const snapshot = snapshotFields as RunSnapshot;
+      if (snapshot.runId !== runId || snapshot.projectionHash !== projectionHash(snapshot) || seal?.schemaVersion !== 1) {
+        return undefined;
+      }
+      let eventPrefixHash: string;
+      try {
+        eventPrefixHash = hashEventPrefix(verification.events, runId, snapshot.lastSeq);
+      } catch {
+        return undefined;
+      }
+      if (seal.eventPrefixHash !== eventPrefixHash || !/^[a-f0-9]{64}$/i.test(seal.authorityProof)) return undefined;
+      const expected = createHmac("sha256", verification.authoritySecret)
+        .update(projectionSealPayload(runId, snapshot.lastSeq, snapshot.projectionHash, eventPrefixHash))
+        .digest();
+      return timingSafeEqual(expected, Buffer.from(seal.authorityProof, "hex")) ? snapshot : undefined;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
       throw error;
@@ -276,23 +413,30 @@ export class JsonlControlStore {
   async #appendUnchecked(events: HarnessEvent[]): Promise<void> {
     if (events.length === 0) return;
     const path = this.runPath(events[0]!.runId);
+    const runId = events[0]!.runId;
+    const cached = this.eventCache.get(runId);
+    const cacheCanExtend = cached !== undefined
+      && (cached.events.at(-1)?.seq ?? 0) + 1 === events[0]!.seq
+      && events.every((event, index) => event.seq === events[0]!.seq + index);
     await mkdir(dirname(path), { recursive: true });
+    // Repair a torn final record left by an interrupted append before adding
+    // new data. This is a cheap last-byte check in the normal case and only
+    // scans backwards when a crash left an unterminated JSON line.
+    await repairTrailingRecord(path);
     const serialized = events.map((event) => `${canonicalJson(event)}\n`).join("");
-    if (events.length === 1) {
-      // The common single-event path keeps append-only throughput and the
-      // established one-event-per-line JSONL format.
-      await durableAppendFile(path, serialized);
-      return;
+    // One append + one fsync for both single events and validated batches.
+    // The lock and pre-validated reducer state preserve ordering, while the
+    // append path avoids reading and rewriting the complete history on every
+    // tool turn. A torn final line is discarded by the reader/repaired above.
+    await durableAppendFile(path, serialized);
+    // Keep a warm reader cache coherent with our own append. Without this,
+    // the next context/GUI read would parse the entire long event stream again
+    // even though the writer already knows the exact new suffix.
+    if (cacheCanExtend && cached) {
+      const revision = await this.revision(runId);
+      this.eventCache.delete(runId);
+      this.eventCache.set(runId, { revision, events: [...cached.events, ...events] });
     }
-    // Replacing the complete JSONL file makes a multi-command dispatchBatch
-    // atomic from the replayer's perspective. A process may die before the
-    // rename, in which case the previous complete stream remains; it cannot
-    // expose a half of a multi-event batch.
-    const current = await readFile(path, "utf8").catch((error: unknown) => {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
-      throw error;
-    });
-    await atomicWriteFile(path, `${current}${serialized}`);
   }
 
   async #authorityHashFor(runId: string): Promise<string> {
@@ -314,6 +458,10 @@ export class JsonlControlStore {
   }
 }
 
+function sameEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
+  return left.size === right.size && left.mtimeMs === right.mtimeMs;
+}
+
 function authorityAnchor(events: HarnessEvent[]): string | undefined {
   const anchors = events.flatMap((event) => {
     if (event.type !== "run_started" && event.type !== "run_authority_migrated") return [];
@@ -325,10 +473,65 @@ function authorityAnchor(events: HarnessEvent[]): string | undefined {
   return anchors[0];
 }
 
+function hashEventPrefix(events: HarnessEvent[], runId: string, lastSeq: number): string {
+  if (!Number.isInteger(lastSeq) || lastSeq < 1) throw new Error("Projection lastSeq must identify a committed event prefix");
+  const prefix = events.filter((event) => event.seq <= lastSeq);
+  if (prefix.length !== lastSeq || prefix.some((event, index) => event.runId !== runId || event.streamId !== runId || event.seq !== index + 1)) {
+    throw new Error("Projection does not identify a contiguous event prefix");
+  }
+  return sha256(canonicalJson(prefix));
+}
+
+function projectionSealPayload(runId: string, lastSeq: number, snapshotHash: string, eventPrefixHash: string): string {
+  return canonicalJson({ schemaVersion: 1, runId, lastSeq, snapshotHash, eventPrefixHash });
+}
+
 async function writeExclusive(path: string, content: string): Promise<void> {
   const handle = await open(path, "wx", 0o600);
   try {
     await handle.writeFile(content, "utf8");
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Remove an unterminated final JSONL record left by a crashed append.
+ *
+ * All ProofBlade writers terminate records with a newline. Checking the last
+ * byte keeps the hot path O(1); the backwards scan is only used for recovery.
+ */
+async function repairTrailingRecord(path: string): Promise<void> {
+  let handle: Awaited<ReturnType<typeof open>>;
+  try {
+    handle = await open(path, "r+");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  try {
+    const size = (await handle.stat()).size;
+    if (size === 0) return;
+    const last = Buffer.alloc(1);
+    await handle.read(last, 0, 1, size - 1);
+    if (last[0] === 0x0a) return;
+
+    const chunkSize = 64 * 1024;
+    let cursor = size;
+    while (cursor > 0) {
+      const length = Math.min(chunkSize, cursor);
+      cursor -= length;
+      const chunk = Buffer.alloc(length);
+      const result = await handle.read(chunk, 0, length, cursor);
+      for (let index = result.bytesRead - 1; index >= 0; index -= 1) {
+        if (chunk[index] !== 0x0a) continue;
+        await handle.truncate(cursor + index + 1);
+        await handle.sync();
+        return;
+      }
+    }
+    await handle.truncate(0);
     await handle.sync();
   } finally {
     await handle.close();

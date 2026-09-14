@@ -222,6 +222,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       details: event.details,
       effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
     };
+    const structuredEvidenceError = extractStructuredEvidenceError(event.content);
     const experiment = experimentBudgetBreaker?.observe(observation);
     if (experiment?.terminate) {
       // Advisory, non-terminating (same as the success path): append the nudge
@@ -286,7 +287,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         terminate: true,
       };
     }
-    if (!decision.terminate) return cognitiveAdvice.length === 0 ? undefined : { content: withCognitiveAdvice(event.content) };
+    if (!decision.terminate) {
+      if (structuredEvidenceError) return {
+        content: withCognitiveAdvice(event.content),
+        details: structuredEvidenceError,
+        isError: true,
+      };
+      return cognitiveAdvice.length === 0 ? undefined : { content: withCognitiveAdvice(event.content) };
+    }
     if (termination.continuousRecovery) {
       repeatBreaker.reset();
       return {
@@ -405,6 +413,18 @@ function matchesFirstActionTool(toolName: string, allowedToolNames: readonly str
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractStructuredEvidenceError(content: Array<{ type: string; text?: string }>): Record<string, unknown> | undefined {
+  const text = content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n").trim().replace(/\s+/g, " ");
+  const match = /^\[ProofBlade evidence error\] (\{.+\})$/.exec(text);
+  if (!match) return undefined;
+  try {
+    const details = JSON.parse(match[1]!) as Record<string, unknown>;
+    return details.schemaVersion === 1 && typeof details.code === "string" && typeof details.operation === "string" ? details : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function stopSuggestionMessage(mode: string): string {

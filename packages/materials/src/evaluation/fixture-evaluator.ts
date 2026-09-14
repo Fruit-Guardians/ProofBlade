@@ -3,7 +3,6 @@ import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import { fixtureTask } from "../app/fixture-task.js";
-import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
 import { listFixtureProfiles, type FixtureProfile } from "../sandbox/fixture-catalog.js";
 import { SingleAgentLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
@@ -221,7 +220,7 @@ export class FixtureEvaluationRunner {
     try {
       const snapshot = await services.control.snapshot(runId);
       const replayed = await services.control.replay(runId);
-      const persisted = await new JsonlControlStore(services.runsRoot).loadProjection(runId);
+      const persisted = await services.control.loadProjection(runId);
       replayParity = Boolean(persisted) && projectionHash(replayed) === projectionHash(persisted!);
       eventCount = replayed.lastSeq;
       evidenceBacked = snapshot.status === "SUCCEEDED" && Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length >= snapshot.task.verification.required_reproductions;
