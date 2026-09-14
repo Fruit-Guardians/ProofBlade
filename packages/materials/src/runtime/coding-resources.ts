@@ -41,7 +41,6 @@ export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_s
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 /** Maximum size of an implicit complete read returned in one model turn. */
 const MAX_COMPLETE_READ_BYTES = 256 * 1024;
-
 /** Provider-facing bounds for untrusted MCP `tools/list` metadata. */
 export const MAX_MCP_FIRST_CLASS_TOOLS = 24;
 export const MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER = 16;
@@ -98,6 +97,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   /** Skill bodies already injected into this lane, keyed by stable skill name. */
   loadedSkillContent?: Map<string, { contentHash: string; coverageChars: number }>;
   enabledMcpServers: Set<string>;
+  /** Exact host executable paths admitted by the reviewed tool catalog. */
+  trustedToolPaths?: ReadonlySet<string>;
   /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
   claimVerifier: TaskResultVerifier;
   /**
@@ -1842,7 +1843,7 @@ export function bashEscapeHatchViolation(command: string): string | undefined {
   return undefined;
 }
 
-function shellSourceScope(command: string, cwd: string): {
+function shellSourceScope(command: string, cwd: string, trustedToolPaths: ReadonlySet<string> = new Set()): {
   status: "workspace" | "outside_workspace";
   authoritativeForTaskResult: boolean;
   outsidePaths: string[];
@@ -1851,10 +1852,7 @@ function shellSourceScope(command: string, cwd: string): {
   const roots = new Set([normalizedCwd, "/workspace"]);
   const windowsRoot = /^([a-z]):\/(.*)$/i.exec(normalizedCwd);
   if (windowsRoot) roots.add(`/mnt/${windowsRoot[1]!.toLowerCase()}/${windowsRoot[2]}`.replace(/\/$/, ""));
-  const candidates = [
-    ...[...command.matchAll(/(?:^|[\s"'=:(])((?:\/(?!\/)|\.\.\/)[^\s"'`;|&<>()[\]{}]*)/g)].map((match) => match[1] ?? ""),
-    ...[...command.matchAll(/(?:^|[\s"'=:(])([a-z]:[\\/][^\s"'`;|&<>()[\]{}]*)/gi)].map((match) => match[1] ?? ""),
-  ].map((value) => value.replace(/[,:]+$/, "")).filter((value) => value.length > 1 && !/^\/dev\/(?:null|stdin|stdout|stderr)$/.test(value));
+  const candidates = shellPathCandidates(command).filter((candidate) => !isCommandExecutablePath(command, candidate, trustedToolPaths));
   const outsidePaths = [...new Set(candidates.filter((candidate) => {
     if (candidate.startsWith("../")) return true;
     const normalized = candidate.replaceAll("\\", "/").replace(/\/$/, "");
@@ -1867,6 +1865,62 @@ function shellSourceScope(command: string, cwd: string): {
   return outsidePaths.length > 0
     ? { status: "outside_workspace", authoritativeForTaskResult: false, outsidePaths }
     : { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] };
+}
+
+/**
+ * Extract path-shaped arguments without treating the shell's command itself
+ * as task data. Quoted paths are scanned first so `C:/Program Files/...` is
+ * kept intact; the unquoted pass covers ordinary Unix and drive-letter paths.
+ */
+function shellPathCandidates(command: string): string[] {
+  const quotedRanges: Array<[number, number]> = [];
+  const candidates: string[] = [];
+  for (const match of command.matchAll(/(["'])(.*?)\1/g)) {
+    const value = match[2] ?? "";
+    const start = match.index ?? 0;
+    quotedRanges.push([start, start + match[0].length]);
+    if (isPathCandidate(value)) candidates.push(value.replace(/[,:]+$/, ""));
+  }
+  const unquoted = /(?:^|[\s"'=:(])((?:\/(?!\/)|\.\.\/)[^\s"'`;|&<>()[\]{}]*)|(?:^|[\s"'=:(])([a-z]:[\\/][^\s"'`;|&<>()[\]{}]*)/gi;
+  for (const match of command.matchAll(unquoted)) {
+    const start = match.index ?? 0;
+    if (quotedRanges.some(([from, to]) => start >= from && start < to)) continue;
+    const value = (match[1] ?? match[2] ?? "").replace(/[,:]+$/, "");
+    if (isPathCandidate(value)) candidates.push(value);
+  }
+  return [...new Set(candidates)];
+}
+
+function isPathCandidate(value: string): boolean {
+  return value.length > 1
+    && /^(?:\/|\.\.\/|[a-z]:[\\/])/i.test(value)
+    && !/^\/dev\/(?:null|stdin|stdout|stderr)$/.test(value);
+}
+
+/**
+ * An absolute path used as the first word of a shell command is a runtime
+ * executable, not task evidence, only when its exact path appears in the
+ * harness-owned Tool catalog. Basenames are not identities: an arbitrary
+ * `C:/tmp/python.exe` must not inherit trust merely by imitating Python. A
+ * path supplied after a catalog executable remains task source and is checked
+ * normally.
+ */
+function isCommandExecutablePath(command: string, candidate: string, trustedToolPaths: ReadonlySet<string>): boolean {
+  const index = command.indexOf(candidate);
+  if (index < 0) return false;
+  const before = command.slice(0, index);
+  const segment = before
+    .slice(Math.max(before.lastIndexOf(";"), before.lastIndexOf("|"), before.lastIndexOf("&"), before.lastIndexOf("\n")) + 1)
+    .trim()
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+  if (segment.length > 0 && !/^(?:env|sudo|command|exec|nohup|timeout)(?:\s|$)/i.test(segment)) return false;
+  const normalized = candidate.replaceAll("\\", "/");
+  const comparable = /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
+  return [...trustedToolPaths].some((path) => {
+    const declared = path.replaceAll("\\", "/").replace(/\/$/, "");
+    return comparable === (/^[a-z]:\//i.test(declared) ? declared.toLowerCase() : declared);
+  });
 }
 
 function renderShellSourceScope(scope: ReturnType<typeof shellSourceScope>): string | undefined {
@@ -1894,7 +1948,7 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
-      const sourceScope = shellSourceScope(input.command, context.env.cwd);
+      const sourceScope = shellSourceScope(input.command, context.env.cwd, context.trustedToolPaths);
       const sourceScopeNotice = renderShellSourceScope(sourceScope);
       const escapeHatchViolation = bashEscapeHatchViolation(input.command);
       if (escapeHatchViolation) throw new Error(escapeHatchViolation);
