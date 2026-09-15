@@ -421,6 +421,14 @@ export class JsonlControlStore {
       // remain in loadProjection() for detail and repair paths.
       const snapshotHash = snapshot.projectionHash;
       if (snapshot.runId !== runId || typeof snapshotHash !== "string" || !/^[a-f0-9]{64}$/i.test(snapshotHash)) return undefined;
+      // Preserve the immutable task-contract guard without loading the full
+      // event stream. task.json is small; comparing its canonical hash with
+      // the projection's taskHash catches on-disk contract tampering before a
+      // fast hint is exposed to readers.
+      if (typeof snapshot.taskHash === "string") {
+        const task = JSON.parse(await readFile(join(this.runsRoot, runId, "task.json"), "utf8")) as RunSnapshot["task"];
+        if (snapshot.taskHash !== sha256(canonicalJson(task))) return undefined;
+      }
       if (seal?.schemaVersion !== 1) return options.allowUnsealed ? snapshot : undefined;
       if (!seal || !Number.isInteger(snapshot.lastSeq) || snapshot.lastSeq < 1 || !/^[a-f0-9]{64}$/i.test(seal.eventPrefixHash) || !/^[a-f0-9]{64}$/i.test(seal.authorityProof)) return undefined;
       const expected = createHmac("sha256", authoritySecret)
