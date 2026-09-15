@@ -9,6 +9,7 @@ import { createInitialSnapshot, projectionHash, reduce } from "../control/reduce
 import { atomicWriteFile, durableAppendFile, KeyedOperationQueue, withFileLock } from "@proofblade/atoms";
 import type { FileLockOptions } from "@proofblade/atoms";
 import { EventProjector } from "@proofblade/molecules";
+import { resolveControlAuthority } from "./control-authority.js";
 
 export interface JsonlRunWriter {
   append(events: HarnessEvent[], authoritySecret: string): Promise<void>;
@@ -392,6 +393,46 @@ export class JsonlControlStore {
       throw error;
     }
   }
+
+  /**
+   * Read a current projection without loading the event stream.
+   *
+   * Sealed projections are authenticated by their HMAC; callers can opt into
+   * legacy unsealed projections for display-only reads. We still require the
+   * projection file to be at least as new as the event stream; when the stream
+   * has a newer tail callers must fall back to the authoritative replay path.
+   * This keeps large run listings O(number of projection bytes) instead of
+   * O(number of event bytes).
+   */
+  public async loadProjectionHint(runId: string, authoritySecret = resolveControlAuthority(), options: { allowUnsealed?: boolean } = {}): Promise<RunSnapshot | undefined> {
+    try {
+      const [projectionStat, eventsStat] = await Promise.all([
+        stat(join(this.runsRoot, runId, "projection.json")),
+        stat(this.runPath(runId)),
+      ]);
+      if (projectionStat.mtimeMs < eventsStat.mtimeMs) return undefined;
+      const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
+      const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
+      const snapshot = snapshotFields as RunSnapshot;
+      // Avoid re-hashing the complete snapshot here: listRuns only needs
+      // display metadata and this path is intentionally optimized for
+      // thousands of historical Runs. The HMAC still authenticates the
+      // projection hash and event-prefix identity; full hash/prefix checks
+      // remain in loadProjection() for detail and repair paths.
+      const snapshotHash = snapshot.projectionHash;
+      if (snapshot.runId !== runId || typeof snapshotHash !== "string" || !/^[a-f0-9]{64}$/i.test(snapshotHash)) return undefined;
+      if (seal?.schemaVersion !== 1) return options.allowUnsealed ? snapshot : undefined;
+      if (!seal || !Number.isInteger(snapshot.lastSeq) || snapshot.lastSeq < 1 || !/^[a-f0-9]{64}$/i.test(seal.eventPrefixHash) || !/^[a-f0-9]{64}$/i.test(seal.authorityProof)) return undefined;
+      const expected = createHmac("sha256", authoritySecret)
+        .update(projectionSealPayload(runId, snapshot.lastSeq, snapshotHash, seal.eventPrefixHash))
+        .digest();
+      return timingSafeEqual(expected, Buffer.from(seal.authorityProof, "hex")) ? snapshot : undefined;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      return undefined;
+    }
+  }
+
 
   public async projectionDigest(runId: string): Promise<string> {
     return sha256(canonicalJson(await this.replay(runId)));

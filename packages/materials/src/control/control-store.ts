@@ -315,6 +315,15 @@ export class ControlStore {
     });
   }
 
+  /**
+   * Fast projection read used by list views. It authenticates the persisted
+   * projection and checks its file revision without parsing events; callers
+   * must fall back to snapshot() when it returns undefined.
+   */
+  public async loadProjectionHint(runId: string, options?: { allowUnsealed?: boolean }): Promise<RunSnapshot | undefined> {
+    return await this.eventStore.loadProjectionHint(runId, this.#authoritySecret, options);
+  }
+
   /** Drop process-local read shortcuts without changing durable Run state. */
   public clearReadCaches(): void {
     this.snapshotCache.clear();
@@ -693,6 +702,18 @@ export class ControlStore {
       this.snapshotCache.delete(runId);
       this.snapshotCache.set(runId, cached);
       return cached.snapshot;
+    }
+
+    // A large portion of the on-disk corpus predates durable projection
+    // seals. If its materialized projection is current, use it directly for
+    // read paths and avoid replaying thousands of JSONL events. The hint
+    // method still checks projection/event revisions; sealed projections also
+    // receive HMAC validation there. Any stale or malformed projection falls
+    // through to the authoritative event replay below.
+    const hinted = await this.eventStore.loadProjectionHint(runId, this.#authoritySecret, { allowUnsealed: true });
+    if (hinted) {
+      await this.#cacheSnapshot(runId, hinted);
+      return hinted;
     }
 
     const events = await this.eventStore.events(runId);
