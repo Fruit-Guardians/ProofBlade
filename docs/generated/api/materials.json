@@ -33,7 +33,7 @@
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "6be0c85d69b28efd4cd597e6e71eec1a0b0c16ed5d0de3946c298a890a727c22",
     "src/context/checkpoint.ts": "afae1dc4d38a8e1288dd78f36c68b43e8b0af5928e49e076431b6e7ec214c497",
-    "src/context/compiler.ts": "a2d5257d19524f4f5c502606e48d987125be7d35054c9c31fdae0c6dd2a8d50f",
+    "src/context/compiler.ts": "644420b42c4fceb2f35f5a6044439e9c22e1afe64c9f26c855f8db1521221ca7",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
     "src/context/model-context-frame.ts": "2b9465991409ffa8fab2c5b4075e8b82373ac531408faccd86c643c41762ee17",
@@ -76,12 +76,12 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "025f88efa208cf52cdb1a9f51809348935e33b6a839003c09df6164ca4d0ca10",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "33cf17172be742c5df061ba5975367865a4d2d81b849b8ee55fc2d001639f85a",
+    "src/index.ts": "034a56562eaaf474acde106c48f14293a851d545ecd8ecd19edc8311c2cca266",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/deterministic-index.ts": "a36e021f0858cb540e1751b566afbd502d75dfa53f3d254eb5e6d128c2619cda",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
-    "src/knowledge/evidence-graph.ts": "3fc38ca81d3e277907c467bc72b446c9c637de3ff55fc2813248a46ee0ef0526",
+    "src/knowledge/evidence-graph.ts": "fab372313ce3674863e1d3689767294773d6bd621b04d442f05d97c014a9ba3d",
     "src/knowledge/observer.ts": "5a2abc66cc888e30026a969d5db5928587500423450313192f39f92234b85fa0",
     "src/knowledge/projection.ts": "ecd4a9ab8a1552439ba659d3ed8c90cc788d43b7df19780df3d9612b8dccc5be",
     "src/mcp/registry.ts": "f6c41569f7f1ec28072ae5a834e0447bade03e45a3dd6b941c8807518741e2a9",
@@ -106,7 +106,8 @@
     "src/pwn/leak.ts": "b67fc75908ae4c4ddaee4efd58731525dc0bcb1e741d53e94dba5aca137415c2",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
     "src/pwn/pwn-session.ts": "f8b58bead54d35cd7281e6787bb0f7173c7adb83339765c1c204901a65baa726",
-    "src/pwn/pwn-tools.ts": "be9c4c491236a35907dc068a3cd583875d1582f608fc29220daaa05c9a0db154",
+    "src/pwn/pwn-tools.ts": "d078f2317b295fd9fbe4245a06373c6fa92028547529ea6009a8e28a123ed66b",
+    "src/pwn/workflow.ts": "e0ca1662fbb86e11ef58f04d22a8348a2998c5ae40e8474d04fe04995a9b386d",
     "src/recovery/binding-transaction-coordinator.ts": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
     "src/recovery/binding-transaction.ts": "95a0a2e4cdc5a5cd71ab265ef482f79ded99378a800f7b3f735396e3f481d4fd",
     "src/recovery/external-resource-registry.ts": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
@@ -121,8 +122,8 @@
     "src/recovery/session-runtime-wire.ts": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
-    "src/runtime/coding-lane.ts": "4fe4e5ba04c45f8da153e0557f2bb1f80180768b396a7df25d96e270b4e5ee1b",
-    "src/runtime/coding-resources.ts": "74005584cad44195e41e1c3217632b552a1fb25383aaba9e2fa177319b2fc464",
+    "src/runtime/coding-lane.ts": "eaed40ee0225ca08e6ee3d7aa6026893f3417407ec82437d6bdf119d6ebda2ca",
+    "src/runtime/coding-resources.ts": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
     "src/runtime/coding-turn-projection.ts": "9634c98b8440e19dc694ed92ed2521b54ba50c1b7974e338416441154586af22",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -132,10 +133,10 @@
     "src/runtime/provider-native.ts": "58b941e0c710aa193f370425ab926bb77adb5b5588c09f02fb879ab40fcd3092",
     "src/runtime/provider-scheduler.ts": "e4f36a666b297dd0dccf81f1fccaae7bf06f65cb4176ec24a8f592402b5dfaa5",
     "src/runtime/provider-transport.ts": "0c1652999beba307d5a760f294935fd85bee8c402f8cff3dfc0f61c477d891b3",
-    "src/runtime/pwn-coding-tools.ts": "dbfa7618fed1e9c10ff81c0ccfaf79274194d9e564bdbfe9dcbaeef0e1de1b6d",
+    "src/runtime/pwn-coding-tools.ts": "c3b2ed78b732e89633adde70d4613389807bbde63fe833bcebab8c16ee709b9e",
     "src/runtime/request-epoch.ts": "9b65d21be6256333066c62607579cab240d8ffdaaa61aa88db8a45960ef13c28",
     "src/runtime/scope.ts": "da8b245ede1e086b979fdd90e7c9bc3050abda0d4af9fa7e4f48dff513af5ca0",
-    "src/runtime/security-tool-profile.ts": "77fce423ad49cd6f68476d782276855e43eb210ff190c240523e4813b17ee229",
+    "src/runtime/security-tool-profile.ts": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
     "src/runtime/skill-routing.ts": "60b2aef35624046d9658cb4a90971f247a2ee1e20c512077058916413b62b97d",
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
@@ -901,7 +902,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 22,
+      "line": 24,
       "signature": "ContextCompiler",
       "summary": "Inferred summary: context compiler class used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -912,6 +913,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -1938,7 +1940,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 66,
+      "line": 67,
       "signature": "PwnToolHandler",
       "summary": "Inferred summary: pwn tool handler class used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -1961,7 +1963,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -2295,7 +2298,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 88,
+      "line": 90,
       "signature": "PiCodingLane",
       "summary": "Inferred summary: pi coding lane class used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3320,7 +3323,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 8,
+      "line": 9,
       "signature": "\"proofblade-context@8\"",
       "summary": "Inferred summary: context compiler version constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3331,6 +3334,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": []
@@ -3342,7 +3346,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 9,
+      "line": 10,
       "signature": "2",
       "summary": "Inferred summary: context manifest version constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3353,6 +3357,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": []
@@ -3364,7 +3369,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 13,
+      "line": 14,
       "signature": "10000",
       "summary": "Inferred summary: max ledger block tokens constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3375,6 +3380,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -3388,7 +3394,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 12,
+      "line": 13,
       "signature": "2048",
       "summary": "Inferred summary: max phase layer tokens constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3399,6 +3405,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -3412,7 +3419,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 10,
+      "line": 11,
       "signature": "4096",
       "summary": "Inferred summary: max standing layer tokens constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3423,6 +3430,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -3436,7 +3444,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 11,
+      "line": 12,
       "signature": "4096",
       "summary": "Inferred summary: max task layer tokens constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3447,6 +3455,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -3460,7 +3469,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 15,
+      "line": 16,
       "signature": "string",
       "summary": "Inferred summary: proofblade standing instructions constant used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -3471,6 +3480,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": []
@@ -4222,7 +4232,7 @@
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
       "line": 40,
-      "signature": "readonly [\"pwn_open\", \"pwn_send\", \"pwn_recv\", \"pwn_signal\", \"pwn_close\", \"pwn_list\", \"pwn_cyclic\", \"pwn_crash_analyze\", \"pwn_record_leak\", \"pwn_derive_base\", \"pwn_record_primitive\", \"pwn_reproduce\"]",
+      "signature": "readonly [\"pwn_open\", \"pwn_send\", \"pwn_recv\", \"pwn_signal\", \"pwn_close\", \"pwn_list\", \"pwn_workflow\", \"pwn_cyclic\", \"pwn_crash_analyze\", \"pwn_record_leak\", \"pwn_derive_base\", \"pwn_record_primitive\", \"pwn_reproduce\"]",
       "summary": "Inferred summary: coding pwn tool names constant used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
@@ -4348,7 +4358,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1738,
+      "line": 1739,
       "signature": "2",
       "summary": "How many times identical image CONTENT is re-injected into context before the",
       "summarySource": "tsdoc",
@@ -5790,7 +5800,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 634,
+      "line": 647,
       "signature": "(output: ContextBuildOutput, maxTokens?: number): string",
       "summary": "Render the compiler output for providers that accept one system prompt.",
       "summarySource": "tsdoc",
@@ -5801,6 +5811,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -5817,7 +5828,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 639,
+      "line": 652,
       "signature": "(snapshot: RunSnapshot, runId: string): ContextBuildOutput",
       "summary": "Inferred summary: snapshot context operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -5828,6 +5839,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [],
@@ -7387,7 +7399,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 616,
+      "line": 623,
       "signature": "(snapshot: RunSnapshot): ReasoningForestIndex",
       "summary": "Inferred summary: build reasoning forest operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -7415,7 +7427,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 663,
+      "line": 670,
       "signature": "(index: ReasoningForestIndex): string",
       "summary": "Inferred summary: format reasoning forest context operation used to produce a deterministic value.",
       "summarySource": "inferred",
@@ -8211,7 +8223,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 745,
+      "line": 766,
       "signature": "(host: string, pattern: string): boolean",
       "summary": "Host allow-match: exact, \"*\" wildcard-all, or \"*.suffix\" subdomain wildcard.",
       "summarySource": "tsdoc",
@@ -8234,7 +8246,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [],
       "structureHash": "dfadfce9e3324cb6d659e2aec8c3078e89a3042fd7136920d8d32cb6ac46fc7b"
@@ -8246,7 +8259,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 735,
+      "line": 756,
       "signature": "(endpoint: string): { host: string; port: number; } | undefined",
       "summary": "Parse \"host:port\" (rejecting IPv6/garbage) for scope checks.",
       "summarySource": "tsdoc",
@@ -8269,10 +8282,49 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [],
       "structureHash": "05c09135df196faa7e76de1df4ab1d5f3a9fc5885e64c1ac515f243063e0616d"
+    },
+    {
+      "id": "@proofblade/materials::function::derivePwnWorkflow",
+      "name": "derivePwnWorkflow",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 112,
+      "signature": "(snapshot: RunSnapshot): PwnWorkflowState",
+      "summary": "Derive the next Pwn step from durable state only.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": [],
+      "structureHash": "accde8c2ef2bd958af2588a1e6fda06b71969e9be7c05105951e2b4ad654b009"
+    },
+    {
+      "id": "@proofblade/materials::function::pwnWorkflowContext",
+      "name": "pwnWorkflowContext",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 357,
+      "signature": "(state: PwnWorkflowState): Record<string, unknown>",
+      "summary": "Return the bounded provider-facing form of a workflow state.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": [],
+      "structureHash": "0b763168d8f53c40bbe3331e97913066b18af216a70c7c3e6be94f752f414922"
     },
     {
       "id": "@proofblade/materials::function::bindingTransactionIdentityHash",
@@ -8604,7 +8656,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1287,
+      "line": 1289,
       "signature": "(platform?: NodeJS.Platform): string",
       "summary": "Inferred summary: coding host guidance operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -8681,7 +8733,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1119,
+      "line": 1121,
       "signature": "(deps: { targets: readonly string[]; submit: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>",
       "summary": "Bind a host-owned submission adapter to the immutable logical destinations",
       "summarySource": "tsdoc",
@@ -8758,7 +8810,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1030,
+      "line": 1032,
       "signature": "(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, \"verify\">; artifactStore: ArtifactStore; mode?: () => \"auto\" | \"assist\"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>",
       "summary": "Build the generic external submission path for a task with a trusted",
       "summarySource": "tsdoc",
@@ -8836,7 +8888,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1172,
+      "line": 1174,
       "signature": "(messages: AgentMessage[], forestContext: string): AgentMessage[]",
       "summary": "Inferred summary: inject reasoning forest context operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -8913,7 +8965,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1326,
+      "line": 1328,
       "signature": "(task: Pick<TaskContract, \"target\">): boolean",
       "summary": "Competition tasks can be labelled misc/crypto/reverse while still exposing",
       "summarySource": "tsdoc",
@@ -8990,7 +9042,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1872,
+      "line": 1873,
       "signature": "(command: string): string | undefined",
       "summary": "Bash is intentionally an analysis escape hatch, not a second control-plane",
       "summarySource": "tsdoc",
@@ -9034,7 +9086,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1624,
+      "line": 1625,
       "signature": "(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]",
       "summary": "Inferred summary: coding active tool names operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -9080,7 +9132,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1645,
+      "line": 1646,
       "signature": "(options?: CodingToolOptions): Array<{ name: string; description: string; parameters: unknown; }>",
       "summary": "Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -9342,7 +9394,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1752,
+      "line": 1753,
       "signature": "(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>[\"execute\"]>>, imagesSeen: Map<string, number> | undefined): typeof result",
       "summary": "Deduplicate repeated image reads within one run, keyed by the image's CONTENT",
       "summarySource": "tsdoc",
@@ -9386,7 +9438,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1856,
+      "line": 1857,
       "signature": "(command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.",
       "summarySource": "tsdoc",
@@ -9430,7 +9482,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1846,
+      "line": 1847,
       "signature": "(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "When a bash command TIMED OUT and the command looks like it was holding a",
       "summarySource": "tsdoc",
@@ -9559,7 +9611,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1506,
+      "line": 1507,
       "signature": "(context: CodingResourceContext): Promise<void>",
       "summary": "Stop every current-generation shell job owned by this lane during teardown.",
       "summarySource": "tsdoc",
@@ -19626,7 +19678,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 30,
+      "line": 31,
       "signature": "PwnOpenInput",
       "summary": "Model-facing bridge for pwn interaction.  The model tracks a durable session",
       "summarySource": "tsdoc",
@@ -19649,7 +19701,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": []
     },
@@ -19660,7 +19713,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 44,
+      "line": 45,
       "signature": "PwnReproductionPolicy",
       "summary": "Immutable verifier inputs supplied by the task/runtime, never by the model.",
       "summarySource": "tsdoc",
@@ -19683,7 +19736,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": []
     },
@@ -19694,7 +19748,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 51,
+      "line": 52,
       "signature": "PwnScope",
       "summary": "The task's target boundary, used to reject a model-supplied remote endpoint outside scope.",
       "summarySource": "tsdoc",
@@ -19717,7 +19771,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": []
     },
@@ -19728,7 +19783,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 56,
+      "line": 57,
       "signature": "PwnViewport",
       "summary": "Inferred summary: pwn viewport type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -19751,7 +19806,98 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PwnWorkflowAction",
+      "name": "PwnWorkflowAction",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 32,
+      "signature": "PwnWorkflowAction",
+      "summary": "Inferred summary: pwn workflow action type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PwnWorkflowAttempt",
+      "name": "PwnWorkflowAttempt",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 42,
+      "signature": "PwnWorkflowAttempt",
+      "summary": "Inferred summary: pwn workflow attempt type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PwnWorkflowBasis",
+      "name": "PwnWorkflowBasis",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 51,
+      "signature": "PwnWorkflowBasis",
+      "summary": "Inferred summary: pwn workflow basis type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PwnWorkflowCurrentView",
+      "name": "PwnWorkflowCurrentView",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 58,
+      "signature": "PwnWorkflowCurrentView",
+      "summary": "Inferred summary: pwn workflow current view type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PwnWorkflowState",
+      "name": "PwnWorkflowState",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 76,
+      "signature": "PwnWorkflowState",
+      "summary": "Inferred summary: pwn workflow state type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
       ],
       "testRefs": []
     },
@@ -31539,7 +31685,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 23,
+      "line": 25,
       "signature": "(input: ContextBuildInput): ContextBuildOutput",
       "summary": "Inferred summary: build operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -31550,6 +31696,7 @@
         "../domain/text-bounds.js",
         "../domain/types.js",
         "../domain/utils.js",
+        "../pwn/workflow.js",
         "@proofblade/molecules"
       ],
       "testRefs": [
@@ -31582,7 +31729,7 @@
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
       ],
-      "structureHash": "1fe4fd9458db23bf402b5840383d93b94ace446c2aa60cc254c03b6afecbc23a",
+      "structureHash": "bd99ceecc3c06dd0b27f7641623a46c3b04d2c479430a7edc14b6a94e747bb30",
       "parentId": "@proofblade/materials::class::ContextCompiler"
     },
     {
@@ -32278,6 +32425,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -32678,6 +32826,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
@@ -34447,6 +34596,7 @@
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts"
@@ -34592,6 +34742,7 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
@@ -36596,7 +36747,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 405,
+      "line": 412,
       "signature": "(input: CreateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>",
       "summary": "Inferred summary: create tree operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -36625,7 +36776,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 456,
+      "line": 463,
       "signature": "(): Promise<ReasoningForestIndex>",
       "summary": "Inferred summary: inspect forest operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -36654,7 +36805,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 460,
+      "line": 467,
       "signature": "(treeId: string): Promise<Record<string, unknown>>",
       "summary": "Inferred summary: inspect tree operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -36683,7 +36834,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 355,
+      "line": 362,
       "signature": "(input: LinkReasoningNodesInput): Promise<{ edge: ReasoningEdge; }>",
       "summary": "Inferred summary: link nodes operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -36712,7 +36863,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 374,
+      "line": 381,
       "signature": "(inputs: LinkReasoningNodesInput[]): Promise<{ edges: ReasoningEdge[]; }>",
       "summary": "Commit a graph expansion in one ControlStore transaction.",
       "summarySource": "tsdoc",
@@ -36739,7 +36890,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 563,
+      "line": 570,
       "signature": "(artifactId: string, maxChars?: number): Promise<Record<string, unknown>>",
       "summary": "Inferred summary: read artifact operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -36822,7 +36973,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ],
-      "structureHash": "d19310e86a77444fed1c650270c03fd158d607ba6a56b46dcc4f2c8b80eac6f3",
+      "structureHash": "5e8f27a872f8a1a2cf92c538c9342fb54009b50db3022e460dff403a4782957d",
       "parentId": "@proofblade/materials::class::CodingEvidenceGraph"
     },
     {
@@ -36832,7 +36983,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 476,
+      "line": 483,
       "signature": "(query?: string, tags?: string[]): Promise<Array<Record<string, unknown>>>",
       "summary": "Inferred summary: search operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -36873,7 +37024,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 520,
+      "line": 527,
       "signature": "(query?: string, tags?: string[]): Promise<{ results: Array<Record<string, unknown>>; trace: RetrievalTrace; }>",
       "summary": "Return the same deterministic results plus a provenance-only retrieval trace.",
       "summarySource": "tsdoc",
@@ -36902,7 +37053,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 429,
+      "line": 436,
       "signature": "(input: UpdateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>",
       "summary": "Inferred summary: update tree operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -37618,6 +37769,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -40546,7 +40698,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 94,
+      "line": 95,
       "signature": "(session: PwnSession): void",
       "summary": "Register a broker-reconnected session without emitting a new open event.",
       "summarySource": "tsdoc",
@@ -40569,7 +40721,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
@@ -40609,7 +40762,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 409,
+      "line": 430,
       "signature": "(input: { transcript: string; pattern?: string; patternLength?: number; alphabet?: string; n?: number; endian?: \"little\" | \"big\"; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<PwnCrashReport & { recordId: string; artifactId: string; }>",
       "summary": "Parse a bounded debugger transcript and persist its crash facts as a Pwn record.",
       "summarySource": "tsdoc",
@@ -40632,7 +40785,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/pwn-tools.test.ts"
@@ -40647,7 +40801,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 277,
+      "line": 278,
       "signature": "(sessionId: string): Promise<{ exitCode: number | null; }>",
       "summary": "Inferred summary: close operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -40670,7 +40824,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
@@ -40737,7 +40892,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 521,
+      "line": 542,
       "signature": "(input: { sourceLeakId: string; knownOffset: string; label?: string; confidence?: number; id?: string; tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ leakId: string; recordId: string; value: string; reused: boolean; pageAligned: boolean; }>",
       "summary": "Derive a base from a previously recorded leak and persist the formula.",
       "summarySource": "tsdoc",
@@ -40760,7 +40915,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/pwn-layer.test.ts",
@@ -40776,7 +40932,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 288,
+      "line": 289,
       "signature": "(): Array<{ sessionId: string; kind: string; }>",
       "summary": "Inferred summary: list operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -40799,7 +40955,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
@@ -40850,7 +41007,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 104,
+      "line": 105,
       "signature": "(input: PwnOpenInput): Promise<{ sessionId: string; kind: string; endpoint?: string; }>",
       "summary": "Inferred summary: open operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -40873,7 +41030,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
@@ -40948,7 +41106,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 436,
+      "line": 457,
       "signature": "(input: { report: PwnCrashReport; transcript: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ recordId: string; artifactId: string; }>",
       "summary": "Persist a crash analysis without treating it as exploit success.",
       "summarySource": "tsdoc",
@@ -40971,7 +41129,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [],
       "structureHash": "44bd81d018560f127ba58630fa1ed1b234f4e03bc1bd384db52a1c7c4b029b84",
@@ -40984,7 +41143,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 487,
+      "line": 508,
       "signature": "(input: { sourceHex: string; format: LeakFormat; addressKind: AddressKind; confidence: number; id?: string; symbol?: string; derivation?: { expression: string; sourceLeakIds: string[]; }; tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ leakId: string; recordId: string; value: string; reused: boolean; }>",
       "summary": "Parse and persist one leak, reusing the existing reasoning/evidence graph.",
       "summarySource": "tsdoc",
@@ -41007,7 +41166,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/pwn-layer.test.ts",
@@ -41023,7 +41183,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 373,
+      "line": 393,
       "signature": "(input: { primitive: string; confidence: number; preconditionRecordIds?: string[]; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ recordId: string; }>",
       "summary": "Record a bounded, non-verifier primitive hypothesis with explicit provenance.",
       "summarySource": "tsdoc",
@@ -41046,10 +41206,13 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
-      "testRefs": [],
-      "structureHash": "7bf1445b02a4c876eb5dd18a85b1dc6bdab6bf9fe1e502e8369e000bd6a4f76e",
+      "testRefs": [
+        "packages/materials/tests/pwn-tools.test.ts"
+      ],
+      "structureHash": "d47df36aac6ede44266580b649485d6428777e18de62093c98927c26e5b94441",
       "parentId": "@proofblade/materials::class::PwnToolHandler"
     },
     {
@@ -41059,7 +41222,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 216,
+      "line": 217,
       "signature": "(sessionId: string, until: string, maxReads?: number): Promise<PwnViewport>",
       "summary": "Inferred summary: recv operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -41082,7 +41245,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
@@ -41101,7 +41265,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 304,
+      "line": 315,
       "signature": "(stages: ExploitStage[]): Promise<PwnReproduceOutcome>",
       "summary": "Open a FRESH session and run the barrier-gated reproduce; the ONLY success",
       "summarySource": "tsdoc",
@@ -41124,7 +41288,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -41154,7 +41319,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 188,
+      "line": 189,
       "signature": "(sessionId: string, data: string | Uint8Array, line?: boolean): Promise<PwnViewport>",
       "summary": "Inferred summary: send operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -41177,7 +41342,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
@@ -41200,7 +41366,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 258,
+      "line": 259,
       "signature": "(sessionId: string): Promise<{ ok: boolean; marker: string; }>",
       "summary": "Inferred summary: shell probe operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -41223,7 +41389,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -41240,7 +41407,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 238,
+      "line": 239,
       "signature": "(sessionId: string, signal: NodeJS.Signals): Promise<{ delivered: boolean; }>",
       "summary": "Inferred summary: signal operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -41263,7 +41430,8 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
       ],
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
@@ -41300,6 +41468,49 @@
         "packages/materials/tests/web-tools.test.ts"
       ],
       "structureHash": "54cffd9a73fe8503aed8e060cd08c6bc97c21afb01570823e9da9ec1af28936c",
+      "parentId": "@proofblade/materials::class::PwnToolHandler"
+    },
+    {
+      "id": "@proofblade/materials::method::PwnToolHandler.workflow",
+      "name": "PwnToolHandler.workflow",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/pwn/pwn-tools.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 300,
+      "signature": "(): Promise<PwnWorkflowState>",
+      "summary": "Return the deterministic next-step view for the current target",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../competition/experiment-gate.js",
+        "../container/contracts.js",
+        "../container/session-registry.js",
+        "../control/control-store.js",
+        "../domain/candidate.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js",
+        "../knowledge/evidence-graph.js",
+        "../recovery/external-resource-registry.js",
+        "../recovery/session-resource-adapter.js",
+        "../recovery/session-runtime-wire.js",
+        "../verification/pwn-reproducer.js",
+        "../verification/pwn-reproduction-verifier.js",
+        "./analysis.js",
+        "./bytes.js",
+        "./leak.js",
+        "./pwn-session.js",
+        "./workflow.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts"
+      ],
+      "structureHash": "50fcd6765ac1bb3311fcc58f5149ce28acc20725807286a80108638a98f98077",
       "parentId": "@proofblade/materials::class::PwnToolHandler"
     },
     {
@@ -44924,7 +45135,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 958,
+      "line": 960,
       "signature": "(_reason: string): Promise<void>",
       "summary": "Inferred summary: abort operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -45020,7 +45231,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 970,
+      "line": 972,
       "signature": "(): Promise<void>",
       "summary": "Inferred summary: close operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -45150,7 +45361,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 962,
+      "line": 964,
       "signature": "(reason: string): Promise<void>",
       "summary": "Inferred summary: compact operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -45237,7 +45448,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 127,
+      "line": 129,
       "signature": "(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: TaskResultVerifier; platformVerifier?: IndependentVerifier; externalSubmission?: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; securityProfile?: SecurityToolProfile; mode?: () => \"auto\" | \"assist\"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; projectPrompt?: string; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; ablationPolicy?: AblationPolicyBinding; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>",
       "summary": "Inferred summary: create operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -45395,7 +45606,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 966,
+      "line": 968,
       "signature": "(): Promise<boolean>",
       "summary": "Inferred summary: is idle operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -45478,7 +45689,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 882,
+      "line": 884,
       "signature": "(text: string): Promise<AgentOutcome>",
       "summary": "Inferred summary: prompt operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -47496,6 +47707,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -55340,6 +55552,7 @@
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
@@ -56932,7 +57145,7 @@
       "visibility": "public",
       "module": "src/pwn/pwn-tools.ts",
       "exportPath": "@proofblade/materials",
-      "line": 39,
+      "line": 40,
       "signature": "PwnReproduceTarget",
       "summary": "Inferred summary: pwn reproduce target type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -56955,7 +57168,62 @@
         "./analysis.js",
         "./bytes.js",
         "./leak.js",
-        "./pwn-session.js"
+        "./pwn-session.js",
+        "./workflow.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::PwnWorkflowPhase",
+      "name": "PwnWorkflowPhase",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 13,
+      "signature": "PwnWorkflowPhase",
+      "summary": "Inferred summary: pwn workflow phase type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::PwnWorkflowRoute",
+      "name": "PwnWorkflowRoute",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 15,
+      "signature": "PwnWorkflowRoute",
+      "summary": "Inferred summary: pwn workflow route type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::PwnWorkflowStatus",
+      "name": "PwnWorkflowStatus",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/pwn/workflow.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 23,
+      "signature": "PwnWorkflowStatus",
+      "summary": "Inferred summary: pwn workflow status type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "./leak.js"
       ],
       "testRefs": []
     },

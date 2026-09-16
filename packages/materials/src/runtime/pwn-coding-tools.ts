@@ -20,7 +20,7 @@ import { generateCyclicPattern } from "../pwn/analysis.js";
  * the same as claiming a shell.
  */
 export function createPwnCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
-  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnCyclicTool, pwnCrashAnalyzeTool, pwnRecordLeakTool, pwnDeriveBaseTool, pwnRecordPrimitiveTool, pwnReproduceTool];
+  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnWorkflowTool, pwnCyclicTool, pwnCrashAnalyzeTool, pwnRecordLeakTool, pwnDeriveBaseTool, pwnRecordPrimitiveTool, pwnReproduceTool];
 }
 
 function requireHandler(context: CodingResourceContext): PwnToolHandler {
@@ -125,6 +125,17 @@ const pwnListTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, _params, _signal, _onUpdate, context) {
     return pwnResult({ sessions: requireHandler(context).list() });
+  },
+};
+
+const pwnWorkflowTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_workflow",
+  label: "pwn_workflow",
+  description: "Read the deterministic Pwn workflow for the current target generation: route, phase transition, validated basis, blockers, and one bounded next action. This is read-only and does not open, read, or modify a live session.",
+  parameters: Type.Object({}, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, _params, _signal, _onUpdate, context) {
+    return pwnResult(await requireHandler(context).workflow());
   },
 };
 

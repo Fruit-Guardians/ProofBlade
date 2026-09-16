@@ -69,6 +69,7 @@ export * from "./web/playwright-browser-verifier.js";
 export * from "./web/web-tools.js";
 export * from "./pwn/leak.js";
 export * from "./pwn/analysis.js";
+export * from "./pwn/workflow.js";
 export * from "./pwn/pwn-session.js";
 export * from "./pwn/pwn-tools.js";
 export * from "./orchestration/single-agent-loop.js";

@@ -323,6 +323,13 @@ export class CodingEvidenceGraph {
           },
         } : {}),
       };
+      const existingDomainRecord = snapshot.domainRecords[domainRecordId];
+      if (existingDomainRecord && (existingDomainRecord.runId !== snapshot.runId || existingDomainRecord.generation !== snapshot.generation)) {
+        throw new Error(`Leak domain record ${domainRecordId} belongs to generation ${existingDomainRecord.generation}; use a fresh leak id for generation ${snapshot.generation}`);
+      }
+      if (existingDomainRecord && existingDomainRecord.kind !== "pwn_leak") {
+        throw new Error(`Domain record id is already used by ${existingDomainRecord.kind}: ${domainRecordId}`);
+      }
       const existing = snapshot.reasoningNodes[node.id];
       if (existing) {
         if (existing.generation !== snapshot.generation) {

@@ -8,6 +8,7 @@ import { PwnSession } from "./pwn-session.js";
 import { appendByte } from "./bytes.js";
 import { analyzeGdbTranscript, type PwnCrashReport } from "./analysis.js";
 import { deriveBaseRecord, parseLeakHex, toHex, type AddressKind, type LeakFormat, type LeakRecord } from "./leak.js";
+import { derivePwnWorkflow, type PwnWorkflowState } from "./workflow.js";
 import type { PwnReproducer, ExploitRecipe, ExploitStage, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
 import type { PwnTrustedReproducer } from "../verification/pwn-reproduction-verifier.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
@@ -291,6 +292,16 @@ export class PwnToolHandler {
       .map((session) => ({ sessionId: session.sessionId, kind: session.record.kind }));
   }
 
+  /**
+   * Return the deterministic next-step view for the current target
+   * generation. This is read-only and deliberately does not inspect a live
+   * tube, so asking for guidance cannot block an active Pwn session.
+   */
+  public async workflow(): Promise<PwnWorkflowState> {
+    if (!this.controlStore) throw new Error("[ProofBlade tool unavailable: pwn_workflow]\nReason: the durable Control Store is not attached to this run. The workflow was not computed.\nNext: restart the task with a Control Store-enabled pwn profile.");
+    return derivePwnWorkflow(await this.controlStore.snapshot(this.runId));
+  }
+
   private async runExperiment<T>(operation: () => Promise<T>): Promise<T> {
     if (!this.experimentGate) return await operation();
     return await this.experimentGate.runExclusive(this.runId, operation);
@@ -307,6 +318,15 @@ export class PwnToolHandler {
 
   private async reproduceInternal(stages: ExploitStage[]): Promise<PwnReproduceOutcome> {
     if (!this.reproductionPolicy) throw new Error("pwn reproduction is unavailable because this task has no immutable target and flag verifier configuration");
+    if (this.controlStore) {
+      const workflow = derivePwnWorkflow(await this.controlStore.snapshot(this.runId));
+      if (workflow.retryBlocked) {
+        throw new Error(pwnRequestRefusal(
+          "the latest Pwn reproduction failed and no new material evidence has changed the path",
+          "call pwn_workflow, run one bounded experiment that records a new crash, leak, transcript, primitive, or experiment result, then retry",
+        ));
+      }
+    }
     const { target, flagPath, flagPattern } = this.reproductionPolicy;
     if (target.kind === "remote") this.assertEndpointAllowed(target.endpoint);
     const recipe: ExploitRecipe = { stages, flagPath, flagPattern };
@@ -381,12 +401,13 @@ export class PwnToolHandler {
     const primitive = redactCtfCandidates(input.primitive.replace(/[\u0000\r\n]/g, " ").trim(), () => "[candidate]").slice(0, 256);
     if (!primitive) throw new Error(pwnRequestRefusal("pwn primitive requires a non-empty description", "provide a short hypothesis grounded in the observed behavior"));
     if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence >= 1) throw new Error(pwnRequestRefusal("pwn primitive confidence must be in [0,1)", "use a finite confidence from 0 (inclusive) up to but excluding 1"));
-    const artifactIds = [...new Set(input.artifactIds ?? [])].slice(0, 32);
-    const evidenceIds = [...new Set(input.evidenceIds ?? [])].slice(0, 32);
+    const artifactIds = uniqueIds(input.artifactIds ?? []);
+    const evidenceIds = uniqueIds(input.evidenceIds ?? []);
     if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error(pwnRequestRefusal("pwn primitive requires supporting artifactIds or evidenceIds", "read or inspect a supporting Artifact/Evidence first, then pass its A-* or EV-* id"));
     const preconditionRecordIds = [...new Set(input.preconditionRecordIds ?? [])].slice(0, 32);
     const snapshot = await this.controlStore.snapshot(this.runId);
     if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) throw new Error(pwnRequestRefusal(`Pwn primitive is not allowed for target kind ${snapshot.task.target_kind}`, "use the task's target-appropriate tools, or run this primitive on a pwn/mixed target"));
+    assertCurrentReferences(snapshot, artifactIds, evidenceIds);
     const recordId = id("PWN-PRIMITIVE");
     await this.controlStore.dispatch(this.runId, {
       type: "domain_record",
