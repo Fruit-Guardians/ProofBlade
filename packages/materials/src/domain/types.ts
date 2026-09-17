@@ -389,6 +389,7 @@ export type DomainRecordKind =
   | "pwn_protocol_transcript"
   | "pwn_primitive"
   | "pwn_leak"
+  | "pwn_crash"
   | "pwn_exploit_stage";
 
 export interface DomainRecordBase {
@@ -459,8 +460,21 @@ export interface PwnLeakRecord extends DomainRecordBase {
   format: "le64" | "le32" | "be64" | "be32";
   value: string;
   addressKind: "stack" | "heap" | "libc" | "pie" | "code" | "unknown";
+  /** Optional for replaying schema-1 records; new leak tools always write it. */
+  confidence?: number;
   symbol?: string;
   derivation?: { expression: string; sourceRecordIds: string[] };
+}
+
+export interface PwnCrashRecord extends DomainRecordBase {
+  kind: "pwn_crash";
+  classification: "crash" | "timeout" | "exit" | "unknown";
+  signal?: string;
+  controlRegister?: "rip" | "eip" | "pc";
+  faultAddress?: string;
+  cyclicOffset?: number;
+  ripControlled: boolean;
+  transcriptTruncated: boolean;
 }
 
 export interface PwnExploitStageRecord extends DomainRecordBase {
@@ -481,6 +495,7 @@ export type DomainRecord =
   | PwnProtocolTranscriptRecord
   | PwnPrimitiveRecord
   | PwnLeakRecord
+  | PwnCrashRecord
   | PwnExploitStageRecord;
 
 export type DomainRecordInput = {

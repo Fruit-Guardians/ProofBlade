@@ -118,6 +118,35 @@ test("pwn tools fail closed with a clear message when no container is attached",
   );
 });
 
+test("pwn_workflow is a read-only current-generation view and never touches a live tube", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-workflow-tool-"));
+  try {
+    const runId = "PWN-WORKFLOW-TOOL";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    let openCalls = 0;
+    const runtime = {
+      async openSession(): Promise<never> {
+        openCalls += 1;
+        throw new Error("pwn_workflow must not open a session");
+      },
+    } as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => ({ ...REF, runId, generation: 0 }), "executor", undefined, undefined, undefined, undefined, control);
+    const before = await control.snapshot(runId);
+    const result = await toolByName("pwn_workflow").execute!("t-workflow", {}, new AbortController().signal, () => {}, contextWith(handler));
+    const details = result.details as { generation: number; status: string; current: { recordIds: Record<string, string[]> } };
+    assert.equal(result.isError, false);
+    assert.equal(details.generation, 0);
+    assert.equal(details.status, "recon");
+    assert.deepEqual(details.current.recordIds, { binaryProfiles: [], protocolTranscripts: [], primitives: [], crashes: [], leaks: [], bases: [], exploitStages: [] });
+    assert.equal(openCalls, 0);
+    assert.equal((await control.snapshot(runId)).lastSeq, before.lastSeq);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("pwn_open explains how to repair a missing remote endpoint", async () => {
   await assert.rejects(
     toolByName("pwn_open").execute!("t-endpoint", { kind: "remote", command: ["tube"] }, new AbortController().signal, () => {}, contextWith()),

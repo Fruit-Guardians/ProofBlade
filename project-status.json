@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-12T13:45:00+08:00",
+  "updatedAt": "2026-09-16T00:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -1421,6 +1421,26 @@
         "npm run typecheck passed",
         "162/162 Materials tests passed",
         "component documentation check passed (25 components, 6 affected)"
+      ]
+    },
+    {
+      "id": "UPDATE-20260916-001",
+      "occurredAt": "2026-09-16T00:00:00+08:00",
+      "summary": "隔离 Pwn leak 与 base 推导的 fixture generation，避免 reset 后重新绑定历史地址事实。",
+      "branch": "codex/pwn-generation-isolation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-220"
+      ],
+      "changes": [
+        "自动 Pwn leak ID 将当前 fixture generation 纳入稳定哈希，相同源字节在新 generation 产生新记录。",
+        "pwn_derive_base 校验源 leak 的 runId 和 generation，并拒绝将旧 leak 与当前 Artifact/Evidence 重新绑定。",
+        "EvidenceGraph 拒绝显式复用旧 generation 的 leak reasoning node，同时保留同 generation 幂等复用。",
+        "新增 reset 后旧 leak 失败、新 leak 成功、自动 ID 变化和旧 reasoning ID 拒绝的回归测试。"
+      ],
+      "validation": [
+        "Pwn analysis, Pwn layer, Pwn tools, Pwn coding tools, and coding resource targeted tests passed",
+        "Generation isolation regression passed"
       ]
     }
   ],
