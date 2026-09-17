@@ -704,18 +704,13 @@ export class ControlStore {
       return cached.snapshot;
     }
 
-    // A large portion of the on-disk corpus predates durable projection
-    // seals. If its materialized projection is current, use it directly for
-    // read paths and avoid replaying thousands of JSONL events. The hint
-    // method still checks projection/event revisions; sealed projections also
-    // receive HMAC validation there. Any stale or malformed projection falls
-    // through to the authoritative event replay below.
-    const hinted = await this.eventStore.loadProjectionHint(runId, this.#authoritySecret, { allowUnsealed: true });
-    if (hinted) {
-      await this.#cacheSnapshot(runId, hinted);
-      return hinted;
-    }
-
+    // The authoritative snapshot must not trust a materialized projection
+    // hint here: an unsealed projection carries no HMAC (a tamperer can
+    // recompute its self-hash), and even a sealed hint skips the
+    // event-prefix revalidation that loadProjection() performs. GUI list and
+    // detail reads may use loadProjectionHint directly as an isolated,
+    // display-only DTO; the control read path stays on authoritative
+    // replay/repair below.
     const events = await this.eventStore.events(runId);
     const streamLastSeq = events.at(-1)?.seq ?? 0;
     let snapshot: RunSnapshot | undefined;

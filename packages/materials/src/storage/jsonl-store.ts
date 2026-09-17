@@ -414,13 +414,16 @@ export class JsonlControlStore {
       const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
       const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
       const snapshot = snapshotFields as RunSnapshot;
-      // Avoid re-hashing the complete snapshot here: listRuns only needs
-      // display metadata and this path is intentionally optimized for
-      // thousands of historical Runs. The HMAC still authenticates the
-      // projection hash and event-prefix identity; full hash/prefix checks
-      // remain in loadProjection() for detail and repair paths.
+      // Recompute the projection content hash before trusting any stored hash.
+      // Without this a tampered snapshot body that keeps the original
+      // projectionHash + seal (or, when unsealed, a freshly recomputed hash)
+      // would pass validation and be cached as authoritative state. This
+      // mirrors loadProjection(); it costs one canonical hash of the
+      // projection, still far cheaper than replaying the full event stream for
+      // thousands of historical Runs.
       const snapshotHash = snapshot.projectionHash;
       if (snapshot.runId !== runId || typeof snapshotHash !== "string" || !/^[a-f0-9]{64}$/i.test(snapshotHash)) return undefined;
+      if (snapshotHash !== projectionHash(snapshot)) return undefined;
       // Preserve the immutable task-contract guard without loading the full
       // event stream. task.json is small; comparing its canonical hash with
       // the projection's taskHash catches on-disk contract tampering before a
