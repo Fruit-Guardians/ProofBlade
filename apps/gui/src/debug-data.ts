@@ -89,7 +89,10 @@ interface ContentLike {
 const runDetailCacheCapacity = 32;
 const runDetailCacheMaxBytes = 64 * 1024 * 1024;
 const runDetailCacheMaxEntryBytes = 8 * 1024 * 1024;
+const largeRunDetailCacheMaxEntryBytes = 32 * 1024 * 1024;
 export const ARTIFACT_PREVIEW_MAX_BYTES = 64 * 1024;
+/** Keep detail responses responsive; telemetry and session projections retain full history server-side. */
+const clientEventLimit = 600;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -204,7 +207,7 @@ export class DebugDataService {
           const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
           const cached = this.runListCache.get(entry.name);
           if (cached?.mtimeMs === eventsStat.mtimeMs) return { ...cached.item, active: this.active.get(entry.name) };
-          const snapshot = await this.runListSnapshot(entry.name, eventsStat);
+          const snapshot = await this.runListSnapshot(entry.name, eventsStat, entries.length > 64);
           const item: RunListItem = {
             runId: snapshot.runId,
             kind: runKind(snapshot.task),
@@ -231,9 +234,14 @@ export class DebugDataService {
     return items.filter((item): item is RunListItem => Boolean(item)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  private async runListSnapshot(runId: string, eventsStat: Stats): Promise<RunSnapshot> {
+  private async runListSnapshot(runId: string, eventsStat: Stats, allowUnsealedHint = false): Promise<RunSnapshot> {
     let verified: RunSnapshot | undefined;
     try {
+      // Most Runs have a current materialized projection (older Runs may be
+      // unsealed). Read it directly so the sidebar does not parse every
+      // historical events.jsonl on each cold start.
+      const hinted = await this.services.control.loadProjectionHint(runId, { allowUnsealed: allowUnsealedHint });
+      if (hinted) return hinted;
       const [snapshot, projectionStat] = await Promise.all([
         this.services.control.loadProjection(runId),
         stat(join(this.services.runsRoot, runId, "projection.json")),
@@ -291,20 +299,54 @@ export class DebugDataService {
   }
 
   private async loadRunDetail(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
+    const snapshotPromise = this.loadSnapshotForDetail(runId);
+    const eventsPromise = this.services.control.events(runId);
     const [snapshot, events, telemetry, sessionRead] = await Promise.all([
-      this.services.control.snapshot(runId),
-      this.services.control.events(runId),
-      new RunTelemetry(this.services.control).report(runId),
-      this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
+      snapshotPromise,
+      eventsPromise,
+      this.telemetryReport(runId, snapshotPromise, eventsPromise),
+      this.loadStableSessions(runId, sessionsRoot, sessionsVersion, eventsPromise, snapshotPromise),
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
-    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
+    const clientEvents = events.length > clientEventLimit ? events.slice(-clientEventLimit) : events;
+    const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
-    const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
-    if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
+    // `detail` contains the raw session entries plus derived message/tool
+    // projections that intentionally repeat parts of that data. Walking the
+    // whole object to estimate JSON size turns large histories into an
+    // accidental O(n²) cold-read. The event stream is the dominant payload;
+    // use its durable size as a conservative cache admission estimate.
+    const bytes = currentVersion
+      ? (eventsStat.size <= 8 * 1024 * 1024
+        ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes)
+        : Math.min(eventsStat.size, largeRunDetailCacheMaxEntryBytes))
+      : runDetailCacheMaxEntryBytes + 1;
+    const cacheLimit = eventsStat.size > 8 * 1024 * 1024 ? largeRunDetailCacheMaxEntryBytes : runDetailCacheMaxEntryBytes;
+    if (!this.closing && currentVersion && bytes <= cacheLimit) {
       this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
     }
     return detail;
+  }
+
+  private async loadSnapshotForDetail(runId: string): Promise<RunSnapshot> {
+    // Historical Runs created before projection seals still contain a complete
+    // materialized snapshot. Use it for read-only GUI details when it is
+    // current; replay remains the fallback for stale/corrupt projections.
+    const hinted = await this.services.control.loadProjectionHint(runId, { allowUnsealed: true });
+    return hinted ?? await this.services.control.snapshot(runId);
+  }
+
+  private async telemetryReport(runId: string, snapshotPromise: Promise<RunSnapshot>, eventsPromise: Promise<HarnessEvent[]>): Promise<import("@proofblade/materials").RunTelemetryReport> {
+    const [snapshot, events] = await Promise.all([snapshotPromise, eventsPromise]);
+    // RunTelemetry normally asks ControlStore for both values, which invokes
+    // legacy migration on every cold read. Reuse the already loaded values so
+    // a historical GUI view never performs a migration replay just to render
+    // telemetry.
+    const readOnlyControl = {
+      snapshot: async () => snapshot,
+      events: async () => events,
+    } as unknown as import("@proofblade/materials").ControlStore;
+    return await new RunTelemetry(readOnlyControl).report(runId);
   }
 
   private async isCurrentRunVersion(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
@@ -614,14 +656,14 @@ export class DebugDataService {
     await this.services.control.dispatch(runId, { type: "pause", reason, lane: "main" });
   }
 
-  private async loadSessions(runId: string): Promise<PiSessionDebug[]> {
+  private async loadSessions(runId: string, eventsPromise?: Promise<HarnessEvent[]>, snapshotPromise?: Promise<RunSnapshot>): Promise<PiSessionDebug[]> {
     const runDir = join(this.services.runsRoot, runId);
     const env = new NodeExecutionEnv({ cwd: runDir });
     try {
       const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
       const metadata = await repo.list();
-      const events = await this.services.control.events(runId);
-      const snapshot = await this.services.control.snapshot(runId);
+      const events = await (eventsPromise ?? this.services.control.events(runId));
+      const snapshot = await (snapshotPromise ?? this.services.control.snapshot(runId));
       return await Promise.all(metadata.map(async (item): Promise<PiSessionDebug> => {
         const session = await repo.open(item);
         const [entries, branch, stats] = await Promise.all([session.getEntries(), session.getBranch(), session.getSessionStats()]);
@@ -649,10 +691,12 @@ export class DebugDataService {
     runId: string,
     sessionsRoot: string,
     initialVersion: string,
+    eventsPromise?: Promise<HarnessEvent[]>,
+    snapshotPromise?: Promise<RunSnapshot>,
   ): Promise<{ sessions: PiSessionDebug[]; version: string; stable: boolean }> {
     let version = initialVersion;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const sessions = await this.loadSessions(runId);
+      const sessions = await this.loadSessions(runId, eventsPromise, snapshotPromise);
       const nextVersion = await filesystemVersion(sessionsRoot);
       if (version === nextVersion) return { sessions, version, stable: true };
       version = nextVersion;
@@ -934,17 +978,29 @@ export function correlateToolCalls(
         callIndex,
         arguments: call.arguments ?? {},
         call,
-        result: matched?.message,
+        result: matched?.message ? compactDebugValue(matched.message) : undefined,
         completedAt: matched?.entry.timestamp,
         presentation: toolPresentation(call.name ?? matched?.message.toolName ?? "unknown", call.arguments ?? {}, matched?.message),
         assistantEntry,
-        resultEntry: matched?.entry,
+        resultEntry: matched?.entry ? compactDebugValue(matched.entry) as SessionEntryLike : undefined,
         telemetry: { call: callEvents.get(callId), result: resultEvents.get(callId) },
         links: { artifacts, evidence, effects },
       });
     });
   }
   return output;
+}
+
+/** Keep oversized tool payloads from duplicating the raw Pi session in every call. */
+function compactDebugValue(value: unknown, maxChars = 16_000): unknown {
+  let serialized: string;
+  try { serialized = JSON.stringify(value); } catch { return value; }
+  if (serialized.length <= maxChars) return value;
+  return {
+    truncated: true,
+    originalChars: serialized.length,
+    preview: `${serialized.slice(0, maxChars)}\n… [完整内容保留在 Pi Session 原始记录]`,
+  };
 }
 
 export function codingWorkspace(task: Pick<TaskContract, "mode" | "target" | "scope">, preferred: string | undefined, fallback: string): string {
