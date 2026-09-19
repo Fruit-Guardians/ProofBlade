@@ -85,6 +85,7 @@ export function validateDomainRecordShape(record: DomainRecord): void {
       if (!Number.isInteger(record.stageIndex) || record.stageIndex < 0 || record.stageIndex > 128) throw new Error(`Domain record ${record.id} stage index is invalid`);
       boundedText(record.stageName, `Domain record ${record.id} stage name`, 160);
       if (!["proposed", "observed", "passed", "failed"].includes(record.status)) throw new Error(`Domain record ${record.id} stage status is invalid`);
+      if (record.attemptStatus !== undefined && !["passed", "failed"].includes(record.attemptStatus)) throw new Error(`Domain record ${record.id} attempt status is invalid`);
       if (record.inputArtifactId !== undefined) boundedText(record.inputArtifactId, `Domain record ${record.id} input artifact`, 96);
       if (record.expectedAnchor !== undefined) boundedText(record.expectedAnchor, `Domain record ${record.id} expected anchor`, 256);
       break;

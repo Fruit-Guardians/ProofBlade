@@ -323,7 +323,7 @@ export class PwnToolHandler {
       if (workflow.retryBlocked) {
         throw new Error(pwnRequestRefusal(
           "the latest Pwn reproduction failed and no new material evidence has changed the path",
-          "call pwn_workflow, run one bounded experiment that records a new crash, leak, transcript, primitive, or experiment result, then retry",
+          "call pwn_workflow, run one bounded experiment that records a new current-generation crash, leak/base derivation, primitive, or binary profile, then retry",
         ));
       }
     }
@@ -671,6 +671,7 @@ export class PwnToolHandler {
         stageIndex: stage.index,
         stageName: stage.name,
         status: stage.ok ? "passed" : "failed",
+        attemptStatus: outcome.reproduced ? "passed" : "failed",
         inputArtifactId: artifact.id,
       },
       lane: this.ownerLane,

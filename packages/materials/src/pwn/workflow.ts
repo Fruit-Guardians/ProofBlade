@@ -148,7 +148,7 @@ export function derivePwnWorkflow(snapshot: RunSnapshot): PwnWorkflowState {
   const latestCrash = last(crashes);
   const latestBase = last(bases);
   const lastAttempt = latestAttempt(stages);
-  const retryBlocked = Boolean(lastAttempt?.status === "failed" && !hasMaterialAfter(lastAttempt.lastSeq, pwnRecords, currentExperiments));
+  const retryBlocked = Boolean(lastAttempt?.status === "failed" && !hasMaterialAfter(lastAttempt.lastSeq, pwnRecords));
   const primitiveText = latestPrimitive?.primitive.toLowerCase() ?? "";
   const route = chooseRoute(primitiveText, profiles, leaks, latestCrash);
   const routeConfidence = confidenceForRoute(route, latestPrimitive, latestCrash, latestBase);
@@ -390,7 +390,7 @@ function recoveryAction(route: PwnWorkflowRoute, basis: PwnWorkflowBasis, record
   const tools = route === "leak-base-rop"
     ? ["pwn_send", "pwn_recv", "pwn_record_leak", "pwn_derive_base"]
     : ["pwn_send", "pwn_recv", "pwn_crash_analyze", "pwn_record_primitive"];
-  return action("experiment.recover-failed-reproduction", "EXPERIMENT", tools, "Change one material exploit assumption, run one bounded probe, and preserve the new result.", "A new current-generation crash, leak, transcript, primitive, or experiment that explains the previous failure.", "Do not call pwn_reproduce again until new material evidence exists.", [
+  return action("experiment.recover-failed-reproduction", "EXPERIMENT", tools, "Change one material exploit assumption, run one bounded probe, and preserve the new result.", "A new current-generation crash, leak/base derivation, primitive, or binary profile that changes the exploit basis.", "Do not call pwn_reproduce again until new material evidence exists.", [
     ...recordIds,
     ...(basis.primitiveId ? [basis.primitiveId] : []),
   ]);
@@ -464,10 +464,20 @@ function latestAttempt(stages: PwnExploitStageRecord[]): PwnWorkflowAttempt | un
   const attempts = [...groups.entries()].map(([artifactId, records]) => {
     const ordered = records.sort(bySeq);
     const passedStageCount = ordered.filter((record) => record.status === "passed").length;
+    const attemptStatuses = ordered.map((record) => record.attemptStatus);
+    const persistedStatuses = attemptStatuses.filter((status): status is "passed" | "failed" => status !== undefined);
+    // New records carry the verifier's final whole-attempt verdict. If a
+    // record set is mixed or incomplete, fail closed instead of reconstructing
+    // success from only the stage rows we happened to persist.
+    const status = persistedStatuses.length === 0
+      ? passedStageCount === ordered.length ? "passed" as const : "failed" as const
+      : persistedStatuses.length !== ordered.length || new Set(persistedStatuses).size !== 1
+        ? "failed" as const
+        : persistedStatuses[0]!;
     return {
       artifactId,
       recordIds: ordered.map((record) => record.id).slice(0, 64),
-      status: passedStageCount === ordered.length ? "passed" as const : "failed" as const,
+      status,
       stageCount: ordered.length,
       passedStageCount,
       lastSeq: Math.max(...ordered.map((record) => record.createdSeq)),
@@ -476,9 +486,18 @@ function latestAttempt(stages: PwnExploitStageRecord[]): PwnWorkflowAttempt | un
   return attempts.sort((left, right) => left.lastSeq - right.lastSeq).at(-1);
 }
 
-function hasMaterialAfter(seq: number, records: DomainRecord[], experiments: RunSnapshot["experiments"][string][]): boolean {
-  if (records.some((record) => record.createdSeq > seq && record.kind !== "pwn_exploit_stage")) return true;
-  return experiments.some((experiment) => experiment.createdSeq > seq && !["pwn_open", "pwn_list", "pwn_close"].includes(experiment.action));
+function hasMaterialAfter(seq: number, records: DomainRecord[]): boolean {
+  // Only observations that can change the exploit basis unblock a failed
+  // clean reproduction. Interaction telemetry and experiment journal rows
+  // are intentionally excluded: pwn_signal/send/recv or a repeated probe do
+  // not by themselves justify spending another clean reproduction attempt.
+  const materialKinds = new Set<DomainRecord["kind"]>([
+    "pwn_binary_profile",
+    "pwn_crash",
+    "pwn_leak",
+    "pwn_primitive",
+  ]);
+  return records.some((record) => record.createdSeq > seq && materialKinds.has(record.kind));
 }
 
 function phaseReasonFor(status: PwnWorkflowStatus, route: PwnWorkflowRoute, blockers: string[]): string {

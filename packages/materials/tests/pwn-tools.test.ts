@@ -516,6 +516,50 @@ test("failed pwn reproduction requires new material evidence before retry", asyn
   }
 });
 
+test("pwn interaction telemetry does not unblock a failed reproduction retry", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-workflow-telemetry-"));
+  try {
+    const runId = "PWN-WORKFLOW-TELEMETRY";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const task = {
+      ...demoTask(runId, root, config),
+      target_kind: "pwn" as const,
+      target: "LOCAL:chall",
+      verification: {
+        kind: "reproduction" as const,
+        command: "proofblade-pwn-verifier-policy",
+        required_reproductions: 1,
+        pwn: { target: { kind: "remote" as const, command: ["tube"], endpoint: "10.0.0.9:1337" }, flag_path: "/flag", flag_pattern: "flag\\{[^}]+\\}" },
+      },
+    };
+    await control.createRun(runId, task);
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const recon = await artifacts.putText(runId, "stack overflow candidate", { filename: "recon.txt" });
+    const runtime = new EchoTubeRuntime("flag{never-reached}", "/flag", true) as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => ({ ...REF, runId, generation: 0 }), "executor", undefined, REPRODUCTION_POLICY, undefined, artifacts, control);
+    await handler.recordPrimitive({ primitive: "stack buffer overflow with direct ret2win control", confidence: 0.8, artifactIds: [recon.id] });
+
+    const first = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(first.reproduced, false);
+    assert.equal((await handler.workflow()).retryBlocked, true);
+
+    const opened = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    await handler.signal(opened.sessionId, "SIGINT");
+    await handler.close(opened.sessionId);
+
+    const afterSignal = await handler.workflow();
+    assert.equal(afterSignal.retryBlocked, true, "pwn_signal and its transcript are not material exploit evidence");
+    assert.equal(afterSignal.status, "experiment");
+    await assert.rejects(
+      () => handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]),
+      /no new material evidence/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("handler rejects operations on an unknown session", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-unknown-"));
   try {

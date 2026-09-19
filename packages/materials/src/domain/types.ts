@@ -482,6 +482,8 @@ export interface PwnExploitStageRecord extends DomainRecordBase {
   stageIndex: number;
   stageName: string;
   status: "proposed" | "observed" | "passed" | "failed";
+  /** Final verdict for the complete fresh reproduction that produced these stages. */
+  attemptStatus?: "passed" | "failed";
   inputArtifactId?: string;
   expectedAnchor?: string;
 }
