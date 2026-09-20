@@ -48,26 +48,60 @@ export class WorkspaceSettingsStore {
     return this.resolve(this.conversations[runId] ?? {}, defaults);
   }
 
-  public async saveConversation(runId: string, input: Partial<ConversationPreferences>, defaults: ConversationPreferences): Promise<ConversationPreferences> {
-    const current = this.preferences(runId, defaults);
-    const next: ConversationPreferences = {
+  /**
+   * The stored fields of one conversation, with nothing invented for it.
+   *
+   * The persisted surface already excludes the capability-derived lists, so a
+   * caller that has not loaded the workspace catalog can still merge correctly
+   * over stored values.
+   */
+  public storedConversation(runId: string): Partial<ConversationPreferences> {
+    return { ...(this.conversations[runId] ?? {}) };
+  }
+
+  /**
+   * Persist one conversation's preferences, merging over whatever is already
+   * stored.
+   *
+   * `defaults` supplies the capability-derived lists for a conversation that has
+   * none stored yet. Omit it when the caller has not loaded the workspace
+   * capability catalog: creating a conversation must not require that scan, and
+   * a conversation with no stored lists resolves against the *current* defaults
+   * at read time rather than a stale create-time copy.
+   *
+   * @param runId - conversation id.
+   * @param input - the fields to write.
+   * @param defaults - capability-derived fallbacks, or `undefined` to leave stored lists untouched.
+   * @returns the stored preferences, with no capability-derived list invented.
+   */
+  public async saveConversation(runId: string, input: Partial<ConversationPreferences>, defaults?: ConversationPreferences): Promise<Partial<ConversationPreferences>> {
+    const current: Partial<ConversationPreferences> = defaults === undefined
+      ? this.storedConversation(runId)
+      : this.preferences(runId, defaults);
+    const next: Partial<ConversationPreferences> = {
       ...current,
       ...input,
       ...(input.contextCompactionThreshold === undefined ? {} : { contextCompactionThreshold: clampThreshold(input.contextCompactionThreshold) }),
-      workspacePath: input.workspacePath?.trim() || current.workspacePath,
-      enabledTools: normalizeList(input.enabledTools ?? current.enabledTools),
-      enabledSkills: normalizeList(input.enabledSkills ?? current.enabledSkills),
-    enabledMcpServers: normalizeList(input.enabledMcpServers ?? current.enabledMcpServers),
+      ...(input.workspacePath?.trim() ? { workspacePath: input.workspacePath.trim() } : {}),
+      // Materialize the lists only when the caller can supply capability-derived
+      // defaults; otherwise leave them absent so the read path keeps supplying
+      // them and a later capability change is not masked by a frozen copy.
+      ...(defaults === undefined ? {} : {
+        enabledTools: normalizeList(input.enabledTools ?? current.enabledTools ?? []),
+        enabledSkills: normalizeList(input.enabledSkills ?? current.enabledSkills ?? []),
+        enabledMcpServers: normalizeList(input.enabledMcpServers ?? current.enabledMcpServers ?? []),
+      }),
       projectPrompt: typeof input.projectPrompt === "string" ? input.projectPrompt.slice(0, 16_000) : current.projectPrompt,
     };
     if (next.folderId && !this.folders.some((folder) => folder.id === next.folderId)) throw new Error(`对话文件夹不存在：${next.folderId}`);
-    this.conversations[runId] = next;
+    this.conversations[runId] = next as StoredConversationPreferences;
     await this.persist();
     return next;
   }
 
   public async renameConversation(runId: string, title: string, defaults: ConversationPreferences): Promise<ConversationPreferences> {
-    return await this.saveConversation(runId, { title: required(title, "对话名称") }, defaults);
+    const stored = await this.saveConversation(runId, { title: required(title, "对话名称") }, defaults);
+    return this.resolve(stored as StoredConversationPreferences, defaults);
   }
 
   public async removeConversation(runId: string): Promise<void> {

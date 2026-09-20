@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T13:50:00+08:00",
+  "updatedAt": "2026-09-19T14:15:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,29 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-005",
+      "occurredAt": "2026-09-19T14:15:00+08:00",
+      "summary": "创建对话不再加载 workspace 能力目录：偏好保存允许省略能力默认值，能力列表改由读取时解析。",
+      "branch": "perf/conversation-create-minimal",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "POST /api/conversations 移除 capabilityCatalog() 与 defaultPreferences() 调用；创建只做校验工作目录、创建最小 Run、保存调用方提交的偏好字段",
+        "WorkspaceSettingsStore.saveConversation() 的 defaults 参数改为可选；省略时不落地 enabledTools/enabledSkills/enabledMcpServers，读取时由当前默认值解析",
+        "修正一处会遮蔽能力变化的旧行为：创建时把能力快照写入本地配置，会使此后新增的 Skill/MCP/Tool 对该对话永久不可见",
+        "renameConversation 显式 resolve 后再返回，保持返回类型不变",
+        "apps/gui/COMPONENT.md 新增创建路径规则；workspace-settings.test.ts 新增省略 defaults 的持久化与解析断言"
+      ],
+      "validation": [
+        "npm run typecheck --workspace=@proofblade/gui passed",
+        "node --import tsx --test apps/gui/tests/*.test.ts: 94/94 passed",
+        "新增断言确认：省略 defaults 时不写入能力列表，换用更大默认值后对话可见新能力，显式选择仍优先，文件夹校验不依赖能力默认值",
+        "npm run check:changed-tests passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-004",
       "occurredAt": "2026-09-19T13:50:00+08:00",

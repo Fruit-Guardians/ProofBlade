@@ -178,21 +178,27 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   }
   if (method === "POST" && url.pathname === "/api/conversations") {
     const body = await readBody(request);
-    const capabilities = await capabilityCatalog();
-    const defaults = defaultPreferences(capabilities);
+    // Creating a conversation deliberately does NOT load the workspace
+    // capability catalog: that scans Skills, MCP servers and the tool catalog,
+    // which an empty conversation has not asked for yet. The conversation is
+    // persisted with only what the caller supplied, and its enabled tool/skill/
+    // MCP lists are resolved from the current defaults when it is read — so a
+    // capability change after creation is reflected rather than masked by a
+    // stale create-time copy.
     const workspacePath = await requireDirectory(optionalString(body.workspacePath) || projectRoot);
+    const title = typeof body.title === "string" ? body.title : "新对话";
     const verificationCommand = optionalString(body.verificationCommand);
     const snapshot = await data.createConversation({
       runId: string(body.runId, "runId"),
-      title: typeof body.title === "string" ? body.title : "新对话",
+      title,
       workspacePath,
       ...(verificationCommand ? { verificationCommand } : {}),
     });
     await workspaceSettings.saveConversation(snapshot.runId, {
-      title: typeof body.title === "string" ? body.title : "新对话",
+      title,
       workspacePath,
       ...(typeof body.folderId === "string" && body.folderId ? { folderId: body.folderId } : {}),
-    }, defaults);
+    });
     return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
   }
   if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts[3] === "preferences") {

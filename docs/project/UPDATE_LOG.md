@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T13:50:00+08:00
+> 状态更新时间：2026-09-19T14:15:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-005 | 2026-09-19T14:15:00+08:00 | PLAN-240 | perf/conversation-create-minimal | 本条记录所在提交 |
 | UPDATE-20260919-004 | 2026-09-19T13:50:00+08:00 | PLAN-240 | test/conversation-staging-boundary | 本条记录所在提交 |
 | UPDATE-20260919-003 | 2026-09-19T13:30:00+08:00 | PLAN-240 | docs/perf-plan-revision-2 | 本条记录所在提交 |
 | UPDATE-20260919-002 | 2026-09-19T13:10:00+08:00 | PLAN-240 | feat/tool-hot-path-timing | 本条记录所在提交 |
@@ -60,6 +61,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-005
+
+时间：2026-09-19T14:15:00+08:00
+
+摘要：创建对话不再加载 workspace 能力目录：偏好保存允许省略能力默认值，能力列表改由读取时解析。
+
+### 变更
+
+- POST /api/conversations 移除 capabilityCatalog() 与 defaultPreferences() 调用；创建只做校验工作目录、创建最小 Run、保存调用方提交的偏好字段
+- WorkspaceSettingsStore.saveConversation() 的 defaults 参数改为可选；省略时不落地 enabledTools/enabledSkills/enabledMcpServers，读取时由当前默认值解析
+- 修正一处会遮蔽能力变化的旧行为：创建时把能力快照写入本地配置，会使此后新增的 Skill/MCP/Tool 对该对话永久不可见
+- renameConversation 显式 resolve 后再返回，保持返回类型不变
+- apps/gui/COMPONENT.md 新增创建路径规则；workspace-settings.test.ts 新增省略 defaults 的持久化与解析断言
+
+### 验证
+
+- [x] npm run typecheck --workspace=@proofblade/gui passed
+- [x] node --import tsx --test apps/gui/tests/*.test.ts: 94/94 passed
+- [x] 新增断言确认：省略 defaults 时不写入能力列表，换用更大默认值后对话可见新能力，显式选择仍优先，文件夹校验不依赖能力默认值
+- [x] npm run check:changed-tests passed
 
 ## UPDATE-20260919-004
 
