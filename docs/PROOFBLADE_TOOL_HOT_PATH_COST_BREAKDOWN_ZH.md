@@ -162,9 +162,43 @@ enqueue（工具返回前，仅内存）
 - 新增 §3.5 的验收条件，替换原「同步 ControlStore commit 为 0」这一不可达条目；
 - 表项 T1 的实施顺序建议排到 **D1（Session live buffer）之后**：D1 已经要建立「有界缓冲 + 明确 flush 屏障」的机制，T1 的队列应复用同一套屏障定义，而不是先造一个再改。
 
-## 6. 参考
+## 6. 相邻表项的核实结果
 
-- `docs/PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md` §5.6.3、§5.6.6、§5.7.1、§5.7.2、§6、表项 T1
+### 6.1 表项 G（Context 热路径去重）：已无剩余空间
+
+父计划 §5.4.3 假设「queue items 会先 canonicalize 再 hash，随后 ContextCompiler 又会把相同数据纳入 manifest hash」。**实测不支持这个假设**：
+
+| 环节 | 实测 | 说明 |
+|---|---|---|
+| 空 Run 的 observation queue | **0 项** | `projectObservationQueue` 在无事件时不产出条目 |
+| lane 的 `sha256(canonicalJson(items))` | **0.0016 ms** | 0 项时；64 项约 0.40ms，256 项约 1.61ms，1024 项约 6.70ms（合成压测） |
+| 500 次请求的重投影次数 | **1** | `ObservationQueueCache` 已按 `lastSeq/generation/projectionHash` 命中 |
+| 缓存命中的 `snapshot()` | **0.06 ms** | 快照本身也已缓存 |
+
+结论：**该路径已经被既有缓存覆盖**，剩余可省的是每请求一次亚毫秒级哈希。父计划 §5.4.3 提出的 revision 化（用 `lastSeq/generation` 取代内容哈希）方向正确，但收益量级为**亚毫秒**，不值得单独立项。**表项 G 建议关闭。**
+
+### 6.2 表项 H（GUI 详情按视图拆分）：假设成立，且可量化
+
+`RunDetail` 每次轮询都会完整构建并下发。实测（一个 121 事件的 Run）：
+
+| 载荷部分 | 字节 | 占比 |
+|---|---:|---:|
+| `events` | **100,160** | **69%** |
+| `snapshot` | 41,525 | 29% |
+| `telemetry` | 2,591 | 2% |
+| `controlView` / `observationQueue` / `sessions` | 各 <400 | <1% |
+| 合计 | 144,901 | 100% |
+
+即**每次轮询都在传 100KB 的完整事件流**，而 `Overview` 只用 `detail.events.slice(-10)`。父计划 §2.5 的判断因此得到确认。
+
+**但实施需要客户端协同**，不能只改服务端：`App.tsx` 的事件时间线与调试器**确实**要过滤完整事件数组（`detail.events.filter(...)`、`for (const event of detail.events)`），因此拆分为 `summary` + 增量 `events?afterSeq=` 时，时间线与调试器必须改为按需拉取。这是 GUI 行为变更，**无法仅凭单元测试证明 UI 仍然正确**，需要真机/浏览器验证。
+
+**建议**：H 作为独立条目推进，并在 PR 中明确标注"服务端载荷已验证、UI 行为需浏览器验证"，不要把两者混为一次"已验证"的改动。
+
+## 7. 参考
+
+- `docs/PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md` §5.4.3、§5.6.3、§5.6.6、§5.7.1、§5.7.2、§6、表项 G/H/T1
 - `scripts/tool-hot-path-real-run-baseline.ts`：§2 全部数据的产生脚本
 - `packages/materials/src/effects/artifact-store.ts`、`packages/materials/src/knowledge/observer.ts`：§2.1 的两个提交点
 - `packages/materials/src/observability/pi-events.ts`：§3.2 引用其 "Control-plane commands never use this class" 边界
+- `apps/gui/src/App.tsx`、`apps/gui/src/shared.ts`：§6.2 的载荷构成与客户端消费点

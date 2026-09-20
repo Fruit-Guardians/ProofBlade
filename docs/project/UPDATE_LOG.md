@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T18:40:00+08:00
+> 状态更新时间：2026-09-19T19:10:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-014 | 2026-09-19T19:10:00+08:00 | PLAN-240 | docs/items-g-and-h-verified | 本条记录所在提交 |
 | UPDATE-20260919-013 | 2026-09-19T18:40:00+08:00 | PLAN-240 | perf/skill-registry-cache | 本条记录所在提交 |
 | UPDATE-20260919-012 | 2026-09-19T18:00:00+08:00 | PLAN-240 | docs/t2-infeasible | 本条记录所在提交 |
 | UPDATE-20260919-011 | 2026-09-19T17:20:00+08:00 | PLAN-240 | perf/tool-result-telemetry-lazy | 本条记录所在提交 |
@@ -69,6 +70,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-014
+
+时间：2026-09-19T19:10:00+08:00
+
+摘要：实测核实相邻表项：G 已无剩余空间故关闭；H 的假设成立并量化为每次轮询 100KB/145KB 事件载荷。
+
+### 变更
+
+- 成本分解文档新增 §6.1：表项 G 的实测结果——空 Run 的 observation queue 为 0 项、lane 的 queueHash 为 0.0016ms、ObservationQueueCache 在 500 次请求中仅重投影 1 次、缓存命中的 snapshot() 为 0.06ms
+- 新增 §6.2：表项 H 的载荷构成——一个 121 事件 Run 的 RunDetail 为 144,901 字节，其中 events 占 100,160 字节（69%），snapshot 占 41,525（29%）
+- 父计划表项 G 标记为已关闭；表项 H 补充实测数据与「实施需客户端协同、UI 行为须浏览器验证」的验收说明
+- 记录 H 的客户端耦合点：Overview 只用 slice(-10)，但事件时间线与调试器确实过滤完整 events 数组，故不能只改服务端
+
+### 验证
+
+- [x] 表项 G：真实 ControlStore 上测得 queue 项数、queueHash 耗时、500 次请求的重投影次数与缓存快照耗时
+- [x] 表项 H：以 DebugDataService 构造一个含 121 事件的 Run，逐部分统计 RunDetail 的 JSON 字节数
+- [x] 客户端耦合点通过 grep App.tsx 的 detail.events 用法确认（3 处，其中 2 处需要完整数组）
+- [x] npm run check:project-reports、check:components passed
 
 ## UPDATE-20260919-013
 

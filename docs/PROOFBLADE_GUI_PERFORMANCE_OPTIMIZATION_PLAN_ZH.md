@@ -350,8 +350,8 @@ DSH 的 `bash`/`pwsh` 除工具定义说明外，还要求每次调用提供短�
 | D | P1 | Run 版本快照改为启动级缓存并延迟绑定 | `runtime/version.ts`、`app/demo.ts`、`control-store.ts` | 消除每个 Run 的目录重扫与重复哈希 | 相同配置连续创建 100 个 Run 只构建一次版本快照 |
 | E' | P1 | **回归测试**：锁住「普通对话不使用 staging」（无源码改动） | 仅测试文件 | 防止后续重构无意改变既有正确行为 | 普通对话不创建 `.proofblade-workspaces/<runId>`；附件任务仍创建 |
 | F | P1 | Catalog 和 prompt 派生值缓存 | Skills/MCP/Tool Catalog registry、`coding-lane.ts` | 加快首轮与后续指令 | 文件 revision 不变时不重新读内容、不重新计算 catalog hash |
-| G | P1 | Context 热路径去重 | `coding-lane.ts`、`context/compiler.ts` | 降低每次 Provider 请求前的 CPU 和序列化 | `lastSeq/generation/queue revision/guidance` 不变时复用 ContextBuildOutput |
-| H | P2 | GUI 详情接口按视图拆分 | `server.ts`、`debug-data.ts`、`api.ts`、`App.tsx` | 聊天页不读取调试器全量数据 | 聊天轮询不调用 session branch/stats 重建；打开调试器时再加载 |
+| G | ~~P1~~ **已关闭** | ~~Context 热路径去重~~ **实测无剩余空间**：observation queue 在空 Run 为 0 项、哈希 0.0016ms，`ObservationQueueCache` 已按 `lastSeq/generation/projectionHash` 命中（500 次请求仅 1 次重投影），快照本身也已缓存。剩余可省为亚毫秒级 | — | 无（已达标） | 见 `docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md` §6.1 |
+| H | P2 | GUI 详情接口按视图拆分 | `server.ts`、`debug-data.ts`、`api.ts`、`App.tsx` | 聊天页不读取调试器全量数据；**实测 `events` 占每次轮询载荷的 69%（100,160 / 144,901 字节）** | 聊天轮询不传完整事件流；时间线与调试器改为按需/增量拉取。**实施需客户端协同，且 UI 行为无法仅凭单元测试证明，须浏览器验证** |
 | I | P2 | 轮询改为增量和可见状态驱动 | `App.tsx`、`polling.ts` | 减少无效后台读取 | 非活动页停止详情轮询；使用 `lastSeq` 请求增量 |
 | J | P3 | 加入基准和预算门禁 | GUI/Materials tests、benchmark script | 防止性能回退 | CI 输出创建耗时、首轮初始化耗时、哈希和目录扫描次数 |
 
