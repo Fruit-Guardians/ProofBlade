@@ -19,7 +19,7 @@ import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
-import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import { attachPiObservability, ControlEventBatcher, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import type { ModelContextItem } from "../context/model-context-frame.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -208,6 +208,10 @@ export class PiCodingLane implements AgentLanePort {
       });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "main", controlStore: options.controlStore });
+    // Bounded write-behind for Pi hook telemetry. Without it every hook appends
+    // synchronously on the tool-result path, which is a lock + fsync the model
+    // waits on for events it never reads. turn/close flush it as the barrier.
+    const telemetry = new ControlEventBatcher(options.controlStore, options.runId, "main");
     const { models, model, closeTransport } = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     // skills/ and .mcp.json live in the ProofBlade install root, NOT the challenge
     // workspace. runDir is <installRoot>/runs/<runId>, so dirname(dirname(runDir))
@@ -837,6 +841,7 @@ export class PiCodingLane implements AgentLanePort {
         };
       },
       scheduling,
+      telemetry,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
     return new PiCodingLane(
@@ -870,6 +875,7 @@ export class PiCodingLane implements AgentLanePort {
       async () => await stopAllShellJobs(toolContext),
       async () => {
         await scheduling.flush();
+        await telemetry.flush();
         await options.controlStore.flushProjection(options.runId).catch(() => undefined);
       },
       pwnRegistry,

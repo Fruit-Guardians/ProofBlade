@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T16:40:00+08:00
+> 状态更新时间：2026-09-19T17:20:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-011 | 2026-09-19T17:20:00+08:00 | PLAN-240 | perf/tool-result-telemetry-lazy | 本条记录所在提交 |
 | UPDATE-20260919-010 | 2026-09-19T16:40:00+08:00 | PLAN-240 | docs/tool-hot-path-cost-breakdown | 本条记录所在提交 |
 | UPDATE-20260919-009 | 2026-09-19T16:10:00+08:00 | PLAN-240 | perf/real-run-baseline | 本条记录所在提交 |
 | UPDATE-20260919-008 | 2026-09-19T15:35:00+08:00 | PLAN-240 | perf/tool-artifact-readback | 本条记录所在提交 |
@@ -66,6 +67,31 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-011
+
+时间：2026-09-19T17:20:00+08:00
+
+摘要：工具结果观测改走 write-behind：把每个工具结果同步的 snapshot 读取与事件追加移出模型路径。
+
+### 变更
+
+- ControlEventBatcher.append() 新增可选 resolve：需要 snapshot 等昂贵计算的遥测字段延迟到 drain 时解析，resolve 绝不进入事件日志
+- tool_execution_end 不再同步 await controlStore.snapshot()：artifactHashes 与 evidenceAdded 改为延迟解析，artifact/evidence id 本身仍从结果自带的 details 直接提取
+- PiCodingLane.create 创建 ControlEventBatcher 并传入 attachPiObservability；此前该调用未传 telemetry，append() 会退回同步 controlStore.append()，即在每个工具结果上做一次锁与 fsync
+- 该 batcher 由既有 flushObservability 钩子在回合边界与 close() 时 flush，无需新增屏障
+- 无 batcher 的回退路径在写入前就地解析，保证两条路径记录的事件形状一致
+- resolver 抛错只丢弃富化字段并保留事件；遥测保持 fail-soft
+- packages/materials/src/observability/COMPONENT.md 记录 batcher 必须被 lane 实际装配这一约束
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test packages/materials/tests/telemetry-lazy-payload.test.ts: 6/6 passed
+- [x] 关键断言：append 时 resolver 未运行且事件未落盘；flush 后 resolver 恰好运行一次且字段合并进 payload；resolve 不出现在事件或 payload 中；resolver 抛错时事件仍被记录；false 等假值能通过合并保留
+- [x] node --import tsx --test observability/control-store/runtime-scenario-evaluator: 25/25 passed
+- [x] node --import tsx --test single-agent-loop/evaluation/demo: 26/26 passed
+- [x] npm run check:changed-tests、check:components passed
 
 ## UPDATE-20260919-010
 

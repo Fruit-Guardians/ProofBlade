@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T16:40:00+08:00",
+  "updatedAt": "2026-09-19T17:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,33 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-011",
+      "occurredAt": "2026-09-19T17:20:00+08:00",
+      "summary": "工具结果观测改走 write-behind：把每个工具结果同步的 snapshot 读取与事件追加移出模型路径。",
+      "branch": "perf/tool-result-telemetry-lazy",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "ControlEventBatcher.append() 新增可选 resolve：需要 snapshot 等昂贵计算的遥测字段延迟到 drain 时解析，resolve 绝不进入事件日志",
+        "tool_execution_end 不再同步 await controlStore.snapshot()：artifactHashes 与 evidenceAdded 改为延迟解析，artifact/evidence id 本身仍从结果自带的 details 直接提取",
+        "PiCodingLane.create 创建 ControlEventBatcher 并传入 attachPiObservability；此前该调用未传 telemetry，append() 会退回同步 controlStore.append()，即在每个工具结果上做一次锁与 fsync",
+        "该 batcher 由既有 flushObservability 钩子在回合边界与 close() 时 flush，无需新增屏障",
+        "无 batcher 的回退路径在写入前就地解析，保证两条路径记录的事件形状一致",
+        "resolver 抛错只丢弃富化字段并保留事件；遥测保持 fail-soft",
+        "packages/materials/src/observability/COMPONENT.md 记录 batcher 必须被 lane 实际装配这一约束"
+      ],
+      "validation": [
+        "npm run build:gui-deps passed",
+        "node --import tsx --test packages/materials/tests/telemetry-lazy-payload.test.ts: 6/6 passed",
+        "关键断言：append 时 resolver 未运行且事件未落盘；flush 后 resolver 恰好运行一次且字段合并进 payload；resolve 不出现在事件或 payload 中；resolver 抛错时事件仍被记录；false 等假值能通过合并保留",
+        "node --import tsx --test observability/control-store/runtime-scenario-evaluator: 25/25 passed",
+        "node --import tsx --test single-agent-loop/evaluation/demo: 26/26 passed",
+        "npm run check:changed-tests、check:components passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-010",
       "occurredAt": "2026-09-19T16:40:00+08:00",
