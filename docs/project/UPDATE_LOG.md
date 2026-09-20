@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-12T13:45:00+08:00
+> 状态更新时间：2026-09-16T00:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260916-001 | 2026-09-16T00:00:00+08:00 | PLAN-220 | codex/pwn-generation-isolation | 本条记录所在提交 |
 | UPDATE-20260912-001 | 2026-09-12T13:45:00+08:00 | PLAN-230 | codex/fix-chat-1789026563795 | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -56,6 +57,24 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260916-001
+
+时间：2026-09-16T00:00:00+08:00
+
+摘要：隔离 Pwn leak 与 base 推导的 fixture generation，避免 reset 后重新绑定历史地址事实。
+
+### 变更
+
+- 自动 Pwn leak ID 将当前 fixture generation 纳入稳定哈希，相同源字节在新 generation 产生新记录。
+- pwn_derive_base 校验源 leak 的 runId 和 generation，并拒绝将旧 leak 与当前 Artifact/Evidence 重新绑定。
+- EvidenceGraph 拒绝显式复用旧 generation 的 leak reasoning node，同时保留同 generation 幂等复用。
+- 新增 reset 后旧 leak 失败、新 leak 成功、自动 ID 变化和旧 reasoning ID 拒绝的回归测试。
+
+### 验证
+
+- [x] Pwn analysis, Pwn layer, Pwn tools, Pwn coding tools, and coding resource targeted tests passed
+- [x] Generation isolation regression passed
 
 ## UPDATE-20260912-001
 

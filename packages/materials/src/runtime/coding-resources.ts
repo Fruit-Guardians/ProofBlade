@@ -37,7 +37,7 @@ export const CODING_PROXY_TOOL_NAMES = ["update_phase", "verify_result", "eviden
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
-export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
+export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_workflow", "pwn_cyclic", "pwn_crash_analyze", "pwn_record_leak", "pwn_derive_base", "pwn_record_primitive", "pwn_reproduce"] as const;
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 /** Maximum size of an implicit complete read returned in one model turn. */
 const MAX_COMPLETE_READ_BYTES = 256 * 1024;
@@ -499,7 +499,8 @@ type InvestigationPhase = (typeof INVESTIGATION_PHASES)[number];
 /**
  * Move the durable phase before the model changes investigation tactics.
  * This is observability and context control, not a capability gate: every
- * prepared tool remains available in every phase.
+ * prepared tool remains available in every phase. Pwn-specific sequencing is
+ * exposed by pwn_workflow and remains generation-bound.
  */
 const updatePhaseTool: AgentHarnessTool<CodingResourceContext> = {
   name: "update_phase",
