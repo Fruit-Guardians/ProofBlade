@@ -20,7 +20,7 @@ import { generateCyclicPattern } from "../pwn/analysis.js";
  * the same as claiming a shell.
  */
 export function createPwnCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
-  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnWorkflowTool, pwnCyclicTool, pwnCrashAnalyzeTool, pwnRecordLeakTool, pwnDeriveBaseTool, pwnRecordPrimitiveTool, pwnReproduceTool];
+  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnWorkflowTool, pwnCyclicTool, pwnCrashAnalyzeTool, pwnRecordLeakTool, pwnDeriveBaseTool, pwnRecordPrimitiveTool, pwnIdentifyLibcTool, pwnRopChainTool, pwnFmtstrPayloadTool, pwnHeapCalcTool, pwnReproduceTool];
 }
 
 function requireHandler(context: CodingResourceContext): PwnToolHandler {
@@ -268,5 +268,92 @@ const pwnReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   async execute(_id, params, _signal, _onUpdate, context) {
     const input = params as { stages: ExploitRecipe["stages"] };
     return pwnResult(await requireHandler(context).reproduce(input.stages));
+  },
+};
+
+const pwnIdentifyLibcTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_identify_libc",
+  label: "pwn_identify_libc",
+  description: "Identify the libc behind a recorded leak and derive its base automatically. With a current-generation libc Artifact: verifies the leak's symbol against the artifact, persists the base into the leak ledger, and resolves requested symbols (e.g. system, /bin/sh) to absolute addresses. Without an artifact it returns only the low-12 fingerprint and database lookup guidance.",
+  parameters: Type.Object({
+    sourceLeakId: Type.String({ minLength: 1, maxLength: 96, description: "The pwn_leak record to identify (leakId from pwn_record_leak)." }),
+    libcArtifactId: Type.Optional(Type.String({ minLength: 1, description: "Current-generation Artifact holding the target libc ELF." })),
+    symbol: Type.Optional(Type.String({ minLength: 1, maxLength: 128, description: "Leaked symbol name; defaults to the record's symbol." })),
+    resolve: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 16, description: "Extra symbols/strings to rebase, e.g. [\"system\", \"/bin/sh\"]." })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as Parameters<PwnToolHandler["identifyLibc"]>[0];
+    return pwnResult(await requireHandler(context).identifyLibc(input));
+  },
+};
+
+const pwnRopChainTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_rop_chain",
+  label: "pwn_rop_chain",
+  description: "Scan a current-generation Artifact's ELF for gadgets and assemble a bad-byte-checked ROP chain: a function call with register arguments, an execve syscall, or system(\"/bin/sh\"). PIE/shared images require baseRecordId (a current-generation pwn_leak base from pwn_derive_base/pwn_identify_libc); non-PIE images need none. Returns the ordered chain and the packed payload hex; persists the plan as an Artifact. This is a build plan, not exploit success.",
+  parameters: Type.Object({
+    binaryArtifactId: Type.String({ minLength: 1, description: "Current-generation Artifact holding the ELF to harvest gadgets from (binary or libc)." }),
+    baseRecordId: Type.Optional(Type.String({ minLength: 1, description: "Current-generation pwn_leak base record used to rebase PIE/shared images." })),
+    goal: Type.Object({
+      kind: Type.String({ enum: ["call", "syscall_execve", "system_binsh"] }),
+      target: Type.Optional(Type.String({ minLength: 1, maxLength: 128, description: "For call: symbol name in the artifact or a hex address." })),
+      args: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 66 }), { maxItems: 6, description: "For call: register arguments as hex (rdi, rsi, rdx / rcx or r10, r8, r9 order)." })),
+      system: Type.Optional(Type.String({ minLength: 1, maxLength: 128, description: "For system_binsh: override the system symbol/address." })),
+      binShAddress: Type.Optional(Type.String({ minLength: 1, maxLength: 66, description: "Absolute address of a /bin/sh string; default: search the artifact." })),
+      alignRet: Type.Optional(Type.Boolean({ description: "Prepend a ret gadget for ABI alignment (default on for system_binsh)." })),
+    }, { additionalProperties: false, description: "Chain goal. call: target symbol/hex + register args; syscall_execve: execve(\"/bin/sh\"); system_binsh: system(\"/bin/sh\") with optional ret-align." }),
+    badBytes: Type.Optional(Type.String({ maxLength: 512, description: "Hex bytes forbidden in gadget/target addresses and values, e.g. \"000a\"." })),
+    maxWords: Type.Optional(Type.Integer({ minimum: 1, maximum: 256 })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as Parameters<PwnToolHandler["ropChain"]>[0];
+    return pwnResult(await requireHandler(context).ropChain(input));
+  },
+};
+
+const pwnFmtstrPayloadTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_fmtstr",
+  label: "pwn_fmtstr",
+  description: "Build a bounded format-string write payload (byte-wise %hhn, pwntools fmtstr_payload equivalent) with correct argument-index and alignment math. Returns packed payload hex plus the per-byte layout; nothing is executed or persisted.",
+  parameters: Type.Object({
+    offset: Type.Integer({ minimum: 1, maximum: 4096, description: "First controlled printf argument index (pwntools fmtstr offset)." }),
+    bits: Type.Optional(Type.Integer({ enum: [32, 64] })),
+    writes: Type.Array(Type.Object({
+      address: Type.String({ minLength: 1, maxLength: 66 }),
+      value: Type.String({ minLength: 1, maxLength: 66 }),
+      size: Type.Optional(Type.Integer({ minimum: 1, maximum: 8, description: "Bytes of value to write (default: full pointer width)." })),
+    }, { additionalProperties: false }), { minItems: 1, maxItems: 32 }),
+    prefixHex: Type.Optional(Type.String({ maxLength: 512, description: "Literal bytes already emitted before the payload in the same format string." })),
+    badBytes: Type.Optional(Type.String({ maxLength: 512 })),
+    maxPayload: Type.Optional(Type.Integer({ minimum: 16, maximum: 8192 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as Parameters<PwnToolHandler["fmtstrPayload"]>[0];
+    return pwnResult(requireHandler(context).fmtstrPayload(input));
+  },
+};
+
+const pwnHeapCalcTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_heap_calc",
+  label: "pwn_heap_calc",
+  description: "Deterministic glibc heap arithmetic: safe-linking protect_ptr/reveal_ptr ((pos >> 12) ^ ptr) and malloc request-to-chunk rounding with tcache/fastbin indexes. Pure computation; no state is touched.",
+  parameters: Type.Object({
+    operation: Type.String({ enum: ["protect_ptr", "reveal_ptr", "malloc_request"] }),
+    position: Type.Optional(Type.String({ minLength: 1, maxLength: 66, description: "Address of the chunk slot holding the fd (for protect/reveal)." })),
+    pointer: Type.Optional(Type.String({ minLength: 1, maxLength: 66, description: "Raw pointer (protect) or stored fd (reveal)." })),
+    request: Type.Optional(Type.String({ minLength: 1, maxLength: 66, description: "Requested allocation size for malloc_request." })),
+    bits: Type.Optional(Type.Integer({ enum: [32, 64] })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as Parameters<PwnToolHandler["heapCalc"]>[0];
+    return pwnResult(requireHandler(context).heapCalc(input));
   },
 };

@@ -8,6 +8,10 @@ import { PwnSession } from "./pwn-session.js";
 import { appendByte } from "./bytes.js";
 import { analyzeGdbTranscript, type PwnCrashReport } from "./analysis.js";
 import { deriveBaseRecord, parseLeakHex, toHex, type AddressKind, type LeakFormat, type LeakRecord } from "./leak.js";
+import { findMappedBytes, findSymbol, loadElf } from "./elfmodel.js";
+import { buildChain, parseBadBytes, scanGadgets, isSupportedRopTarget, type RopEntry, type RopGoal } from "./rop.js";
+import { mallocRequest, pointerProtection } from "./heap.js";
+import { buildFmtstrPayload } from "./fmtstr.js";
 import { derivePwnWorkflow, type PwnWorkflowState } from "./workflow.js";
 import type { PwnReproducer, ExploitRecipe, ExploitStage, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
 import type { PwnTrustedReproducer } from "../verification/pwn-reproduction-verifier.js";
@@ -612,6 +616,262 @@ export class PwnToolHandler {
     return { leakId: leak.id, recordId: `PWN-LEAK-${leak.id}`, value: leak.value, reused: result.reused };
   }
 
+  /**
+   * Identify the leak's libc by matching its symbol against a current-generation
+   * libc Artifact, then derive and persist the base through the normal ledger
+   * path. Without an artifact this stays a fingerprint + guidance answer: no
+   * record is written, and the model must go source the libc first.
+   */
+  public async identifyLibc(input: {
+    sourceLeakId: string;
+    libcArtifactId?: string;
+    symbol?: string;
+    resolve?: string[];
+    artifactIds?: string[];
+    evidenceIds?: string[];
+  }): Promise<
+    | { matched: false; fingerprint: { symbol: string; low12Bits: string }; nextActions: string[] }
+    | { matched: true; symbol: string; symbolOffset: string; base: { recordId: string; leakId: string; value: string; pageAligned: boolean; reused: boolean }; resolved: Record<string, string> }
+  > {
+    if (!this.controlStore) throw new Error("[ProofBlade tool unavailable: pwn_identify_libc]\nReason: the durable Control Store is not attached to this run. The leak was not identified.\nNext: restart the task with a Control Store-enabled pwn profile.");
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    assertPwnTarget(snapshot.task.target_kind);
+    const sourceLeakId = input.sourceLeakId.replace(/^PWN-LEAK-/, "");
+    const sourceRecord = snapshot.domainRecords[`PWN-LEAK-${sourceLeakId}`];
+    if (!sourceRecord || sourceRecord.kind !== "pwn_leak") throw new Error(pwnRequestRefusal(`unknown source leak record: ${input.sourceLeakId}`, "record the leak first with pwn_record_leak and use its leakId"));
+    if (sourceRecord.runId !== snapshot.runId || sourceRecord.generation !== snapshot.generation) {
+      throw new Error(pwnRequestRefusal(`source leak ${input.sourceLeakId} belongs to generation ${sourceRecord.generation}, current generation is ${snapshot.generation}`, "record a fresh leak for the current target generation before identifying libc"));
+    }
+    const symbol = (input.symbol ?? sourceRecord.symbol)?.trim();
+    if (!symbol) throw new Error(pwnRequestRefusal("the source leak record has no symbol name", "pass `symbol` (the leaked function, e.g. puts) or re-record the leak with one"));
+    const leakValue = BigInt(sourceRecord.value);
+    if (!input.libcArtifactId) {
+      return {
+        matched: false,
+        fingerprint: { symbol, low12Bits: toHex(leakValue & 0xfffn) },
+        nextActions: [
+          `Look up "${symbol}" ending in ${toHex(leakValue & 0xfffn)} against a libc offset database (libc-database / libc.rip) to name candidate libc builds.`,
+          "Obtain the matching libc (or the task-provided one), stage it as a current-generation Artifact, and re-run pwn_identify_libc with libcArtifactId to derive and persist the base.",
+        ],
+      };
+    }
+    if (!this.artifactStore) throw new Error("[ProofBlade tool unavailable: pwn_identify_libc]\nReason: the durable Artifact Store is not attached to this run. The libc was not identified.\nNext: restart the task with an Artifact Store-enabled pwn profile.");
+    assertCurrentReferences(snapshot, uniqueIds([input.libcArtifactId, ...(input.artifactIds ?? [])]), uniqueIds(input.evidenceIds ?? []));
+    const libcBytes = await this.artifactStore.readBytes(this.runId, snapshot.artifacts[input.libcArtifactId]!);
+    let image;
+    try {
+      image = loadElf(libcBytes);
+    } catch {
+      throw new Error(pwnRequestRefusal(`artifact ${input.libcArtifactId} is not a supported ELF image`, "stage the target libc ELF as an Artifact and retry"));
+    }
+    const found = findSymbol(image, symbol);
+    if (!found) throw new Error(pwnRequestRefusal(`symbol ${symbol} was not found in artifact ${input.libcArtifactId}`, "the artifact is probably not the target libc; verify it before deriving addresses from it"));
+    const symbolOffset = found.value;
+    if ((leakValue & 0xfffn) !== (symbolOffset & 0xfffn)) {
+      throw new Error(pwnRequestRefusal(`leaked ${sourceRecord.value} low-12 bits do not match ${symbol} at offset ${toHex(symbolOffset)} in this artifact`, "the artifact is a different libc build; identify it from the low-12 fingerprint or stage the correct libc"));
+    }
+    const base = await this.deriveBase({
+      sourceLeakId,
+      knownOffset: toHex(symbolOffset),
+      label: "libc_base",
+      artifactIds: uniqueIds([input.libcArtifactId, ...(input.artifactIds ?? [])]),
+      evidenceIds: input.evidenceIds,
+    });
+    const resolved: Record<string, string> = {};
+    for (const name of input.resolve ?? []) {
+      const trimmed = name.trim();
+      if (!trimmed) continue;
+      if (trimmed === "/bin/sh") {
+        const hit = findMappedBytes(image, libcBytes, Buffer.from("/bin/sh\0", "ascii"))[0];
+        if (hit !== undefined) resolved[trimmed] = toHex(BigInt(base.value) + hit);
+        continue;
+      }
+      const target = findSymbol(image, trimmed);
+      if (target) resolved[trimmed] = toHex(BigInt(base.value) + target.value);
+    }
+    return {
+      matched: true,
+      symbol,
+      symbolOffset: toHex(symbolOffset),
+      base: { recordId: base.recordId, leakId: base.leakId, value: base.value, pageAligned: base.pageAligned, reused: base.reused },
+      resolved,
+    };
+  }
+
+  /**
+   * Scan a current-generation ELF Artifact for ROP gadgets and assemble a
+   * constraint-checked chain (call / syscall-execve / system("/bin/sh")).
+   * The assembled plan is persisted as an Artifact for audit; it is a build
+   * plan, never evidence of control — success still flows only through
+   * pwn_reproduce.
+   */
+  public async ropChain(input: {
+    binaryArtifactId: string;
+    baseRecordId?: string;
+    goal: {
+      kind: "call" | "syscall_execve" | "system_binsh";
+      target?: string;
+      args?: string[];
+      system?: string;
+      binShAddress?: string;
+      alignRet?: boolean;
+    };
+    badBytes?: string;
+    maxWords?: number;
+    artifactIds?: string[];
+    evidenceIds?: string[];
+  }): Promise<{ planArtifactId: string; ok: boolean; entries: RopEntry[]; payloadHex: string; payloadBytes: number; problems: string[] }> {
+    if (!this.controlStore || !this.artifactStore) throw new Error("[ProofBlade tool unavailable: pwn_rop_chain]\nReason: gadget scanning requires the durable Artifact and Control Stores, which are not attached to this run. No chain was built.\nNext: restart the task with a Control Store-enabled pwn profile.");
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    assertPwnTarget(snapshot.task.target_kind);
+    assertCurrentReferences(snapshot, uniqueIds([input.binaryArtifactId, ...(input.artifactIds ?? [])]), uniqueIds(input.evidenceIds ?? []));
+    let base = 0n;
+    if (input.baseRecordId !== undefined) {
+      assertCurrentPreconditionRecords(snapshot, [input.baseRecordId]);
+      const record = snapshot.domainRecords[input.baseRecordId]!;
+      if (record.kind !== "pwn_leak") throw new Error(pwnRequestRefusal(`base record ${input.baseRecordId} is a ${record.kind}, not a pwn_leak ledger record`, "pass the recordId returned by pwn_derive_base or pwn_identify_libc"));
+      base = BigInt(record.value);
+    }
+    const artifact = snapshot.artifacts[input.binaryArtifactId]!;
+    const bytes = await this.artifactStore.readBytes(this.runId, artifact);
+    let image;
+    try {
+      image = loadElf(bytes);
+    } catch {
+      throw new Error(pwnRequestRefusal(`artifact ${input.binaryArtifactId} is not a supported ELF image`, "stage the target binary or libc ELF as an Artifact and retry"));
+    }
+    if (!isSupportedRopTarget(image)) throw new Error(pwnRequestRefusal(`machine ${image.machine} is not supported by pwn_rop_chain`, "this builder covers x86/x86-64; use the container toolchain (ROPgadget/ropper) for other architectures"));
+    if (image.type === 3 && input.baseRecordId === undefined) {
+      throw new Error(pwnRequestRefusal("this image is PIE/shared: gadget addresses are relative and need a runtime base", "pass baseRecordId of a current-generation pwn_leak base derived from a leak"));
+    }
+    if (image.type === 2 && base !== 0n) throw new Error(pwnRequestRefusal("this image loads at absolute addresses (non-PIE)", "drop baseRecordId; absolute gadget addresses need no rebase"));
+    const scanned = scanGadgets(image, bytes);
+    // Rebase the whole catalog once, before chain assembly: symbols, strings,
+    // and payload words are all resolved against this same base, so nothing is
+    // doubled or skipped downstream.
+    const catalog = base === 0n
+      ? scanned
+      : {
+          pops: new Map([...scanned.pops.entries()].map(([reg, gadgets]) => [reg, gadgets.map((gadget) => ({ ...gadget, address: gadget.address + base }))])),
+          rets: scanned.rets.map((gadget) => ({ ...gadget, address: gadget.address + base })),
+          syscalls: scanned.syscalls.map((gadget) => ({ ...gadget, address: gadget.address + base })),
+          int80: scanned.int80.map((gadget) => ({ ...gadget, address: gadget.address + base })),
+          leaveRet: scanned.leaveRet.map((gadget) => ({ ...gadget, address: gadget.address + base })),
+          truncated: scanned.truncated,
+        };
+    const badBytes = parseBadBytes(input.badBytes);
+    const maxWords = input.maxWords !== undefined && Number.isInteger(input.maxWords) && input.maxWords >= 1 && input.maxWords <= 256 ? input.maxWords : 64;
+    const resolveAddress = (value: string, label: string): bigint => {
+      const trimmed = value.trim();
+      if (/^(?:0x)?[0-9a-f]+$/i.test(trimmed)) return parseHexInteger(trimmed, label);
+      const symbol = findSymbol(image, trimmed);
+      if (!symbol) throw new Error(pwnRequestRefusal(`${label} ${trimmed} matched no symbol in artifact ${input.binaryArtifactId}`, "pass a hex address, or inspect the artifact symbols first"));
+      return symbol.value + base;
+    };
+    const defaultBinSh = (): bigint => {
+      const hit = findMappedBytes(image, bytes, Buffer.from("/bin/sh\0", "ascii"))[0];
+      if (hit === undefined) throw new Error(pwnRequestRefusal('no "/bin/sh\\0" string was found in this image', "pass binShAddress explicitly or chain a write of the string first"));
+      return hit + base;
+    };
+    let goal: RopGoal;
+    let alignRet = false;
+    if (input.goal.kind === "call") {
+      if (!input.goal.target) throw new Error(pwnRequestRefusal("goal kind call requires a target", "pass the callee as a symbol name in the artifact or a hex address"));
+      alignRet = input.goal.alignRet ?? false;
+      goal = { kind: "call", target: resolveAddress(input.goal.target, "call target"), args: (input.goal.args ?? []).slice(0, 6).map((value, index) => parseHexInteger(value, `arg${index}`)) };
+    } else if (input.goal.kind === "syscall_execve") {
+      const binSh = input.goal.binShAddress !== undefined ? parseHexInteger(input.goal.binShAddress, "binShAddress") : defaultBinSh();
+      goal = { kind: "syscall", number: image.bits === 64 ? 59n : 11n, args: [binSh, 0n, 0n] };
+    } else if (input.goal.kind === "system_binsh") {
+      alignRet = input.goal.alignRet ?? true;
+      const system = input.goal.system !== undefined ? resolveAddress(input.goal.system, "system") : resolveAddress("system", "system");
+      const binSh = input.goal.binShAddress !== undefined ? parseHexInteger(input.goal.binShAddress, "binShAddress") : defaultBinSh();
+      goal = { kind: "call", target: system, args: [binSh] };
+    } else {
+      throw new Error(pwnRequestRefusal(`unknown chain goal kind ${String((input.goal as { kind: unknown }).kind)}`, "use call, syscall_execve, or system_binsh"));
+    }
+    const build = buildChain(catalog, goal, { bits: image.bits, ...(badBytes ? { badBytes } : {}), maxWords });
+    if (alignRet) {
+      const wordBytes = image.bits === 64 ? 8 : 4;
+      const cleanRet = catalog.rets.find((gadget) => !badBytes || !badBytes.size || Array.from({ length: wordBytes }, (_, index) => Number((gadget.address >> BigInt(index * 8)) & 0xffn)).every((byte) => !badBytes.has(byte)));
+      if (cleanRet) {
+        build.entries.unshift({ role: "gadget", address: toHex(cleanRet.address), asm: "ret", note: "stack alignment padding: glibc system/movaps paths require rsp 16-byte-aligned at call time" });
+      } else {
+        build.problems.push("no ret gadget survived the bad-byte filter for stack alignment; the chain may crash inside libc on movaps");
+      }
+    }
+    // Repack the payload from the final entries so alignment padding and any
+    // rebase are reflected consistently in the emitted wire bytes.
+    const repackedWords: bigint[] = build.entries.map((entry) => BigInt(entry.address ?? entry.value ?? "0x0"));
+    build.payloadHex = repackedWords.map((word) => Array.from({ length: image.bits === 64 ? 8 : 4 }, (_, index) => ((word >> BigInt(index * 8)) & 0xffn).toString(16).padStart(2, "0")).join("")).join("");
+    build.payloadBytes = repackedWords.length * (image.bits === 64 ? 8 : 4);
+    const plan = {
+      goal: input.goal.kind,
+      binaryArtifactId: input.binaryArtifactId,
+      ...(input.baseRecordId !== undefined ? { baseRecordId: input.baseRecordId, base: toHex(base) } : {}),
+      ok: build.ok,
+      entries: build.entries,
+      problems: build.problems,
+      payloadBytes: build.payloadBytes,
+      truncated: catalog.truncated,
+    };
+    const planArtifact = await this.artifactStore.putText(this.runId, JSON.stringify(plan, null, 2), {
+      filename: `pwn-rop-chain-${snapshot.generation}.json`,
+      mime: "application/json",
+      sensitivity: "public",
+      semantic: { name: "Pwn ROP chain plan", summary: `Gadget-selected ${input.goal.kind} chain plan (${build.ok ? "complete" : "partial"}) built from current-generation records.`, tags: ["pwn", "rop-chain"], role: "intermediate", relatedIds: [input.binaryArtifactId], annotatedBy: "harness" },
+    });
+    return { planArtifactId: planArtifact.id, ok: build.ok, entries: build.entries, payloadHex: build.payloadHex, payloadBytes: build.payloadBytes, problems: build.problems };
+  }
+
+  /** Deterministic glibc heap arithmetic (safe-linking, request rounding, bin indexes). */
+  public heapCalc(input: {
+    operation: "protect_ptr" | "reveal_ptr" | "malloc_request";
+    position?: string;
+    pointer?: string;
+    request?: string;
+    bits?: 32 | 64;
+  }): unknown {
+    const bits = input.bits ?? 64;
+    if (input.operation === "malloc_request") {
+      if (input.request === undefined) throw new Error(pwnRequestRefusal("malloc_request requires `request` (hex size)", "e.g. { operation: \"malloc_request\", request: \"0x80\" }"));
+      return mallocRequest(parseHexInteger(input.request, "request"), bits);
+    }
+    if (input.position === undefined || input.pointer === undefined) {
+      throw new Error(pwnRequestRefusal(`${input.operation} requires both position and pointer`, "position = the chunk/slot address holding the fd, pointer = the raw or stored fd value"));
+    }
+    return pointerProtection(input.operation, parseHexInteger(input.position, "position"), parseHexInteger(input.pointer, "pointer"));
+  }
+
+  /** Deterministic format-string payload (byte-wise %hhn) with alignment and index math. */
+  public fmtstrPayload(input: {
+    offset: number;
+    bits?: 32 | 64;
+    writes: Array<{ address: string; value: string; size?: number }>;
+    prefixHex?: string;
+    badBytes?: string;
+    maxPayload?: number;
+  }): unknown {
+    const bits = input.bits ?? 64;
+    const wordBytes = bits === 64 ? 8 : 4;
+    const prefix = input.prefixHex ? Buffer.from(parseHexBytes(input.prefixHex, "prefixHex"), "hex") : undefined;
+    const writes = input.writes.slice(0, 32).map((write, index) => ({
+      address: parseHexInteger(write.address, `writes[${index}].address`),
+      value: parseHexInteger(write.value, `writes[${index}].value`),
+      ...(write.size !== undefined ? { size: write.size } : {}),
+    }));
+    if (writes.some((write) => write.size !== undefined && (write.size < 1 || write.size > wordBytes))) {
+      throw new Error(pwnRequestRefusal("write sizes must fit the pointer width", `use sizes 1-${wordBytes} for a ${bits}-bit target`));
+    }
+    return buildFmtstrPayload(writes, {
+      offset: input.offset,
+      bits,
+      ...(prefix ? { prefix } : {}),
+      ...(parseBadBytes(input.badBytes) ? { badBytes: parseBadBytes(input.badBytes) } : {}),
+      ...(input.maxPayload !== undefined ? { maxPayload: input.maxPayload } : {}),
+    });
+  }
+
   private async recordTranscript(sessionId: string, operation: string, anchors: string[]): Promise<void> {
     if (!this.artifactStore || !this.controlStore) return;
     const snapshot = await this.controlStore.snapshot(this.runId);
@@ -751,6 +1011,15 @@ function parseHexInteger(value: string, label: string): bigint {
   const trimmed = value.trim();
   if (!/^(?:0x)?[0-9a-f]+$/i.test(trimmed) || trimmed.length > 66) throw new Error(pwnRequestRefusal(`${label} must be a bounded non-negative hexadecimal integer`, `pass ${label} such as 0x84420`));
   return BigInt(`0x${trimmed.replace(/^0x/i, "")}`);
+}
+
+/** Parse a hex byte string and return its canonical lowercase form. */
+function parseHexBytes(value: string, label: string): string {
+  const compact = value.trim().replace(/^0x/i, "").replace(/[\s,]+/g, "").toLowerCase();
+  if (compact.length === 0 || compact.length % 2 !== 0 || !/^[0-9a-f]+$/.test(compact) || compact.length > 512) {
+    throw new Error(pwnRequestRefusal(`${label} must be whole hexadecimal bytes`, `pass ${label} such as "deadbeef"`));
+  }
+  return compact;
 }
 
 function normalizeLeakId(value: string | undefined, seed: Record<string, unknown>): string {
