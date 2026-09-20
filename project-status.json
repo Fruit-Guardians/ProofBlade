@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-20T00:20:00+08:00",
+  "updatedAt": "2026-09-20T23:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2001,6 +2001,52 @@
         "npm run typecheck passed",
         "162/162 Materials tests passed",
         "component documentation check passed (25 components, 6 affected)"
+      ]
+    },
+    {
+      "id": "UPDATE-20260920-002",
+      "occurredAt": "2026-09-20T21:00:00+08:00",
+      "summary": "把 ControlStore 权威读取路径降为 O(增量)：投影当前时不再解析事件流，10,001 事件冷读从 1876ms 降到 12.5ms。",
+      "branch": "fix/barrier-cadence-evidence",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "根因有两处，第一处修完只从 1877ms 降到 1845ms：migrateLegacyRun() 在每次缓存未命中的读取开头无条件解析整条事件流，只为判断 Run 是否已锚定",
+        "改为两次有界读：firstEvent() 读文件头 64 KiB 确认首个 run_started 带 authorityHash，lastEvent() 读文件尾 64 KiB 确认末尾不是 run_authority_migrated；判断不了就退回完整解析，只多花时间不会给错答案",
+        "第二处在 #readSnapshot：先问 loadProjectionHint()，它用 authority secret 验签并以内容确立时效（投影 lastSeq 等于日志末 seq），投影当前时它就是要的状态，重新解析纯属浪费",
+        "events() 改为惰性求值：快路径根本不解析事件流，提前 await 会把 O(历史) 成本花在一个已经知道答案的问题上",
+        "删除了那条失准注释（声称 replay 会 revalidate 被篡改的前缀，而 replay() 里没有该步骤）",
+        "新增 packages/materials/tests/projection-read-bound.test.ts 五条守恒断言：投影当前解析 0 事件、投影落后仍折叠到与 replay() 完全一致、伪造投影仍不能覆盖事件日志、投影缺失仍可从日志重建、无 seal 的旧投影不被信任"
+      ],
+      "validation": [
+        "10,001 事件冷读：1876ms -> 12.5ms，快路径解析 0 个事件（生产形态，读写双方同一 authority）",
+        "规模曲线：投影当前时 0 与 10,001 事件同为 11-12ms，不随历史增长",
+        "读取方注入错误 secret 时回退完整解析（2064ms），fail-safe 不返回错状态",
+        "npm run test:staged: 1008 tests, 1002 pass, 2 fail（既有 EBUSY 环境性失败）, 4 skipped",
+        "check:components / check:change-contracts / check:project-reports / api:index:check / check:changed-tests all passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260920-003",
+      "occurredAt": "2026-09-20T23:00:00+08:00",
+      "summary": "把 docs/project 下的生成报告移出版本控制：每个 PR 都签入自己那一份，合并任一个都会让其余全部相对新 base 变陈旧并触发文档门禁矛盾。",
+      "branch": "fix/barrier-cadence-evidence",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "docs/project/ 四份报告改为生成物并加入 .gitignore，连同 git rm --cached 一并移出版本控制；本地与 CI 仍可用 npm run reports:project 生成",
+        "CI 顺序调整：先跑 --base 契约检查，再生成报告并作为 artifact 上传（proofblade-project-reports-<run_id>）；原先在检查前无条件重新生成，使那四份报告的字节比对几乎恒真，签入的唯一实际效果就是合并时制造矛盾",
+        "project-report-change-lib.mjs 的 docs/project/ 分支保留并加注释说明它已不可达（这些文件不再被跟踪），避免读者误判",
+        "check:project-reports 的契约保持不变：生成物仍须与 project-status.json 及组件元数据一致，改动账本却不重新生成仍会失败"
+      ],
+      "validation": [
+        "文件在盘时检查通过；模拟全新克隆（文件缺失）检查按预期报 missing，先 npm run reports:project 后通过",
+        "变异验证：篡改一份报告 -> stale generated report 失败；只改 project-status.json 不重新生成 -> 四份全部 stale 失败；还原后通过",
+        "CI 序列本地全绿：check:components / check:change-contracts / check:project-reports（均带 --base origin/main）/ api:index:check / check:changed-tests / test:ci-gates 40 通过"
       ]
     }
   ],

@@ -34,10 +34,23 @@ jobs:
         env:
           COMPONENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          npm run reports:project
           npm run check:components -- --base "$COMPONENT_BASE_SHA"
           npm run check:change-contracts -- --base "$COMPONENT_BASE_SHA"
           npm run check:project-reports -- --base "$COMPONENT_BASE_SHA"
+      - name: Generate project reports
+        # Reports are generated artifacts, not tracked files: each PR used to
+        # check in its own copy, so merging one PR left every other PR stale
+        # against the new base. The contract check above still verifies they
+        # match what project-status.json and the component metadata produce.
+        run: npm run reports:project
+      - name: Upload project reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proofblade-project-reports-${{ github.run_id }}
+          path: docs/project/*.md
+          if-no-files-found: warn
+          retention-days: 14
       - name: Run staged repository verification
         run: npm run verify
       - name: Upload staged test logs

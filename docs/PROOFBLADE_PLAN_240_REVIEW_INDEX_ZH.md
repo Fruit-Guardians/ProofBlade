@@ -6,7 +6,8 @@
 - 成本分解与全部实测：`docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md`
 - Bash `description` 契约（已拆出，不在本计划范围）：`docs/PROOFBLADE_BASH_DESCRIPTION_CONTRACT_ZH.md`
 - DSH 插件可行性（本次会话的另一个问题）：`docs/deepseek-harness-plugin-feasibility.md`
-- 项目报告为生成物（`docs/project/` 下 `PLAN.md`、`UPDATE_LOG.md`、`COMPLETION_REPORT.md`、`MAINTENANCE_REPORT.md`），**不要直接编辑**；唯一事实来源是根目录 `project-status.json`，改后跑 `npm run reports:project`。
+- 项目报告**已移出版本控制**（`docs/project/` 下 `PLAN.md`、`UPDATE_LOG.md`、`COMPLETION_REPORT.md`、`MAINTENANCE_REPORT.md`）。唯一事实来源是根目录 `project-status.json`；本地用 `npm run reports:project` 生成，CI 作为 artifact `proofblade-project-reports-<run_id>` 上传。**不要直接编辑那四份文件，也不要用它们做评审依据**——它们随每次生成而变。
+- 之所以移出：每个 PR 都签入自己那一份（内含各自的 `updatedAt` 与组件版本），合并任意一个都会让其余全部相对新 base 变陈旧，`check:project-reports --base` 随即报矛盾。详见本文件 §7。
 
 ## 1. 建议的评审顺序
 
@@ -132,3 +133,30 @@
 2. **曾误称「全部还原」**，实际只还原了 `control-store.ts`，`jsonl-store.ts` 的计数器与测试仍在且已交付。已在下一轮逐文件核对工作树与 HEAD 后更正。
 
 共同成因是同一个毛病：**用自己上一步的输出代替对实际状态的核对**。此后改为逐文件比对内容、并用 `gh` 取权威映射。
+
+## 7. 生成报告移出版本控制（为什么，以及影响）
+
+**症状**：每合并一个 PR，其余 PR 就开始报文档矛盾。
+
+**机制**（已实测，不是推断）：每个 PR 都会改同一批「账本文件」，而其中带**每个 PR 自己唯一的时间戳**：
+
+| 文件 | 每个 PR 都改 |
+|---|---|
+| `project-status.json` | `updatedAt` + 新增 UPDATE 记录 |
+| `docs/project/*.md`（4 份） | 由上面那份**生成**，内容含 `updatedAt` 与组件版本/次数/指纹 |
+| `COMPONENT.md` | `version`（patch+1）、`updatedAt`、审计次数、`sourceHash` |
+
+实测两个分支各自对 `main` 的改动量：`project-status.json` 我=[+581,−1] / PR227=[+173,−1]；`MAINTENANCE_REPORT.md` 我=[+10,−10] / PR227=[+6,−6]。
+
+**合并第一个 PR 后，其余每个 PR 的这 6 个文件都相对新 base 陈旧** → `check:project-reports --base` 报 `stale generated report`，`check:components --base` 报版本/指纹矛盾。
+
+**讽刺点**：`ci.yml` 原本在检查**之前**就跑了 `npm run reports:project`，把那 4 份报告重新生成了一遍——所以它们在 CI 里的字节比对几乎是恒真的。**签入仓库的唯一实际效果就是每次合并制造矛盾。**
+
+**改动**：
+- `docs/project/` 加入 `.gitignore`，四份文件 `git rm --cached` 移出版本控制（仍可随时生成）
+- CI 顺序调整：先跑 `--base` 契约检查，再生成报告并作为 artifact 上传
+- `check:project-reports` 的**契约本身不变**——生成物仍须与 `project-status.json` 及组件元数据一致
+
+**契约仍会咬人**（变异验证过）：篡改一份报告 → `stale generated report` 失败；只改 `project-status.json` 而不重新生成 → 四份全部 stale 失败；还原后通过。模拟全新克隆（文件缺失）→ 报 `missing`，先 `npm run reports:project` 后通过。
+
+**评审这部分的注意事项**：这是**仓库治理改动**，会改变所有 PR 的行为，值得单独审。剩余冲突面只有 `project-status.json` 与 `COMPONENT.md`；前者是纯 JSON 追加，冲突通常是单行 `updatedAt`。
