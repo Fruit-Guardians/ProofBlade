@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { taskWorkspaceDir, taskWorkspaceRoot } from "../src/task-workspace.js";
 import { JsonlControlStore, projectionHash, RunEventIngress } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
@@ -334,6 +335,61 @@ test("RunDetail exposes the durable observation queue projection for the GUI", a
     assert.doesNotMatch(JSON.stringify(detail.observationQueue), /secret output/);
     await data.close();
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("an ordinary conversation never stages a workspace while an attachment task still does", async () => {
+  // Regression guard for the behaviour PLAN-240 §2.2 verified as already correct:
+  // createConversation() builds its TaskContract from the user's real directory
+  // (target/allowed_workspace = root, inputs = []), and execution resolves cwd
+  // through taskExecutionWorkspace(), so no staging directory is ever created.
+  // Staging exists only for attachment-backed verifier tasks, where immutable
+  // inputs, per-file sha256 and a replay-safe cwd are required.
+  //
+  // Both directions are asserted. Without the second one, deleting staging
+  // altogether would leave this test green.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-staging-boundary-"));
+  let data: DebugDataService | undefined;
+  try {
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runsRoot = join(root, config.storage.runsDir);
+
+    const chatRunId = "CHAT-STAGING-001";
+    await data.createConversation({ runId: chatRunId, title: "no staging", workspacePath: root });
+    assert.equal(await exists(taskWorkspaceDir(runsRoot, chatRunId)), false, "an ordinary conversation must not create a staged workspace");
+
+    // A conversation that merely declares a verification command is still an
+    // ordinary conversation: createConversation() writes it into the contract
+    // without staging anything.
+    const verifiedChatRunId = "CHAT-STAGING-002";
+    await data.createConversation({ runId: verifiedChatRunId, title: "no staging with verifier", workspacePath: root, verificationCommand: "echo ok" });
+    assert.equal(await exists(taskWorkspaceDir(runsRoot, verifiedChatRunId)), false, "a verification command alone must not trigger staging");
+
+    // The task path does stage, and the staged task also owns the immutable copy.
+    const attachment = join(root, "input.txt");
+    await writeFile(attachment, "challenge input\n", "utf8");
+    const taskRunId = "CHAT-STAGING-003";
+    await data.startTask({
+      runId: taskRunId,
+      objective: "verify the attachment",
+      workspacePath: root,
+      attachmentPaths: ["input.txt"],
+      verificationCommand: "echo ok",
+      mode: "auto",
+      maxTurns: 1,
+    });
+    const staged = taskWorkspaceDir(runsRoot, taskRunId);
+    assert.equal(await exists(staged), true, "an attachment task must still stage its workspace");
+    assert.equal(await exists(join(staged, "attachments", "input.txt")), true, "the attachment must be copied into the staged workspace");
+    assert.equal(await exists(join(staged, "challenge.md")), true, "the staged task must record its objective");
+
+    // The staging root sits beside the runs directory, never inside it: a
+    // pre-existing run directory would make JsonlControlStore treat the staged
+    // task as an already-created Run.
+    assert.equal(taskWorkspaceRoot(runsRoot), join(root, ".proofblade-workspaces"));
+  } finally {
+    await data?.close?.().catch(() => undefined);
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -1070,6 +1126,16 @@ const config: ProofBladeConfig = {
 
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+/** Path existence as a boolean, so staging assertions read directly. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function hash(value: string): string {

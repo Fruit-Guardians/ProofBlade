@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.20",
+  "version": "0.7.21",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-09-19T04:45:00.000Z",
+  "updatedAt": "2026-09-19T05:50:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 20,
-    "securityAuditCount": 20,
-    "lastBugAuditAt": "2026-09-19T04:45:00.000Z",
-    "lastSecurityAuditAt": "2026-09-19T04:45:00.000Z",
-    "sourceHash": "e6491847f8377592cf32c40b44551a215e6db6adb3859241b63e1c0f7508d269",
+    "bugAuditCount": 21,
+    "securityAuditCount": 21,
+    "lastBugAuditAt": "2026-09-19T05:50:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T05:50:00.000Z",
+    "sourceHash": "7ad1ef1cf9e3faf73179f1328ad8ffd24d9fa085d76637278c53cca61163deb2",
     "result": "passed"
   }
 }
@@ -58,6 +58,7 @@
 - 首屏只等待轻量 bootstrap 与 Provider 设置即可解除全局 loading；Workspace Skill/MCP 能力扫描和 Run 列表必须后台加载，不能阻止用户打开“新建对话”。静态 Skill/MCP 目录在进程内 single-flight 缓存，Provider Native 状态继续按当前配置动态生成。
 - Run 列表优先读取并校验 `projection.json`，不为侧栏统计 Tool 次数而回放完整事件流；projection 缺失或损坏（含无封印的历史 Run）时才在持锁回放后回填带封印的 projection，仅落后但已校验的 projection 走尾部折叠，不得因列表刷新而重放或重写 projection。历史 Run 只在首次冷读时回放一次，后续 GUI 启动复用已校验的封印投影；列表 Tool 数是可选投影，缺失时不显示。
 - Server 启动必须在首个请求前调用 `DebugDataService.assertRuntimeShape()`，断言 `@proofblade/materials` 运行时暴露 `REQUIRED_CONTROL_METHODS` 的全部成员并打印解析到的包路径。缺失成员属于源码与 `dist` 的构建错配，必须 fail-fast；不得为该断言增加运行时兼容降级，降级会把构建问题重新变成难以定位的投影异常。`npm run gui` 先执行 `build:gui-deps` 保证产物一致，`gui:fast` 只用于已由 watcher 保证一致的场景。
+- 普通对话**不得**创建 `.proofblade-workspaces/<runId>`。`createConversation()` 构造的 TaskContract 使用用户选择的真实目录（`target`/`allowed_workspace` = 该目录、`inputs: []`），执行 cwd 由 `taskExecutionWorkspace()` 解析，因此无需 staging；即使填写了 `verificationCommand` 也仍是普通对话。staging 只服务附件验证任务，由 `startTask()` 经 `stageTaskWorkspace()` 创建，用于不可变附件、逐文件 sha256、符号链接拒绝与可重放 cwd。staging 根必须是 `dirname(runsRoot)` 而非 Run 目录内部——`JsonlControlStore` 会把任何已存在的 Run 目录当作既有 Run。该边界由回归测试**双向**锁定（普通对话不创建 + 附件任务仍创建），路径断言必须复用 `taskWorkspaceDir()`/`taskWorkspaceRoot()`，不得另写字面量以免与实现漂移。
 
 ## 验证
 

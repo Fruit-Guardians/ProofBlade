@@ -205,6 +205,12 @@
       "command": "node --import tsx --test packages/materials/tests/app-server.test.ts packages/materials/tests/approval-policy.test.ts"
     },
     {
+      "id": "gui-task-workspace",
+      "sourceGlobs": ["apps/gui/src/task-workspace.ts"],
+      "testGlobs": ["apps/gui/tests/debug-data.test.ts"],
+      "command": "node --import tsx --test apps/gui/tests/debug-data.test.ts"
+    },
+    {
       "id": "gui-runtime-shape",
       "sourceGlobs": ["apps/gui/src/runtime-shape.ts"],
       "testGlobs": ["apps/gui/tests/runtime-shape.test.ts"],

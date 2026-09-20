@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T13:30:00+08:00",
+  "updatedAt": "2026-09-19T13:50:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,30 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-004",
+      "occurredAt": "2026-09-19T13:50:00+08:00",
+      "summary": "为「普通对话不使用 staging workspace」这一既有正确行为补双向回归断言，并把 staging 路径抽为共享辅助函数。",
+      "branch": "test/conversation-staging-boundary",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "apps/gui/src/task-workspace.ts 导出 taskWorkspaceRoot()/taskWorkspaceDir()，stageTaskWorkspace() 改为复用；路径断言不再另写字面量，避免与实现漂移",
+        "apps/gui/tests/debug-data.test.ts 新增双向回归断言：普通对话（含仅声明 verificationCommand 的对话）不创建 .proofblade-workspaces/<runId>，附件任务仍创建并写入 attachments/ 与 challenge.md",
+        "断言 staging 根位于 dirname(runsRoot) 而非 Run 目录内部，锁住 JsonlControlStore 会把已存在 Run 目录当作既有 Run 的约束",
+        ".github/test-matrix.json 新增 gui-task-workspace 规则映射到 apps/gui/tests/debug-data.test.ts",
+        "apps/gui/COMPONENT.md 新增 staging 边界规则"
+      ],
+      "validation": [
+        "npm run build:gui-deps passed",
+        "node --import tsx --test apps/gui/tests/debug-data.test.ts: 42/42 passed",
+        "独立探针确认：createConversation 后 staging 不存在，startTask 后 staging 存在且附件与 challenge.md 均落盘",
+        "npm run check:changed-tests passed",
+        "npm run check:components passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-003",
       "occurredAt": "2026-09-19T13:30:00+08:00",

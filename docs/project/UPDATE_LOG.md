@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T13:30:00+08:00
+> 状态更新时间：2026-09-19T13:50:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-004 | 2026-09-19T13:50:00+08:00 | PLAN-240 | test/conversation-staging-boundary | 本条记录所在提交 |
 | UPDATE-20260919-003 | 2026-09-19T13:30:00+08:00 | PLAN-240 | docs/perf-plan-revision-2 | 本条记录所在提交 |
 | UPDATE-20260919-002 | 2026-09-19T13:10:00+08:00 | PLAN-240 | feat/tool-hot-path-timing | 本条记录所在提交 |
 | UPDATE-20260919-001 | 2026-09-19T12:40:00+08:00 | PLAN-240 | fix/gui-runtime-shape-assertion | 本条记录所在提交 |
@@ -59,6 +60,28 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-004
+
+时间：2026-09-19T13:50:00+08:00
+
+摘要：为「普通对话不使用 staging workspace」这一既有正确行为补双向回归断言，并把 staging 路径抽为共享辅助函数。
+
+### 变更
+
+- apps/gui/src/task-workspace.ts 导出 taskWorkspaceRoot()/taskWorkspaceDir()，stageTaskWorkspace() 改为复用；路径断言不再另写字面量，避免与实现漂移
+- apps/gui/tests/debug-data.test.ts 新增双向回归断言：普通对话（含仅声明 verificationCommand 的对话）不创建 .proofblade-workspaces/<runId>，附件任务仍创建并写入 attachments/ 与 challenge.md
+- 断言 staging 根位于 dirname(runsRoot) 而非 Run 目录内部，锁住 JsonlControlStore 会把已存在 Run 目录当作既有 Run 的约束
+- .github/test-matrix.json 新增 gui-task-workspace 规则映射到 apps/gui/tests/debug-data.test.ts
+- apps/gui/COMPONENT.md 新增 staging 边界规则
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test apps/gui/tests/debug-data.test.ts: 42/42 passed
+- [x] 独立探针确认：createConversation 后 staging 不存在，startTask 后 staging 存在且附件与 challenge.md 均落盘
+- [x] npm run check:changed-tests passed
+- [x] npm run check:components passed
 
 ## UPDATE-20260919-003
 
