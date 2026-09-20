@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T19:40:00+08:00
+> 状态更新时间：2026-09-19T20:10:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-016 | 2026-09-19T20:10:00+08:00 | PLAN-240 | perf/observer-diagnostics | 本条记录所在提交 |
 | UPDATE-20260919-015 | 2026-09-19T19:40:00+08:00 | PLAN-240 | perf/hot-path-budget-gate | 本条记录所在提交 |
 | UPDATE-20260919-014 | 2026-09-19T19:10:00+08:00 | PLAN-240 | docs/items-g-and-h-verified | 本条记录所在提交 |
 | UPDATE-20260919-013 | 2026-09-19T18:40:00+08:00 | PLAN-240 | perf/skill-registry-cache | 本条记录所在提交 |
@@ -71,6 +72,30 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-016
+
+时间：2026-09-19T20:10:00+08:00
+
+摘要：表项 D3：观察路径的失败不再静默吞掉，新增有界内存诊断，同时确认结果与模型内容不受观察失败影响。
+
+### 变更
+
+- 新增 packages/materials/src/observability/observer-diagnostics.ts：ObserverDiagnostics 记录观察失败，有界样本（默认 32）加生命周期计数，消息上限 400 字符
+- coding-resources.ts 的两处观察 catch 由静默改为记录诊断；工具结果与模型内容仍然不受影响
+- record() 在 total 自增之后才派生消息，且消息派生本身受 try 保护——toString 会抛错的错误对象不能抹掉对自身失败的记录（该缺陷由测试发现并修正）
+- CodingResourceContext 新增可选 observerDiagnostics；轻量 test/offline context 可省略
+- observer-diagnostics 的失败契约登记进 hot-path-cost-budget 契约（scenarios 增至 5 条）
+- packages/materials/src/observability/COMPONENT.md 记录「吞掉不等于静默」与该实现顺序要求
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test packages/materials/tests/observer-diagnostics.test.ts: 6/6 passed
+- [x] 关键断言：观察抛错时 isError 不变、文件内容仍到达模型、错误信息不泄漏进模型内容；失败被记录且 stage/runId/消息正确；健康路径 total 为 0 且 observationId 仍存在（证明静默不是「什么都没跑」）
+- [x] 实测确认计划 D3 的前半部分（observer 不改变 isError 与模型内容）在改动前即已成立，本项补的是缺失的诊断半边
+- [x] node --import tsx --test coding-resources/demo/observability/hot-path-budget: 45 passed / 2 failed，两项为既有失败（已在 clean worktree 多次复现）
+- [x] npm run check:change-contracts、check:changed-tests、api:index:check passed
 
 ## UPDATE-20260919-015
 

@@ -26,7 +26,8 @@
         "contract:hot-path-event-budget",
         "contract:hot-path-projection-budget",
         "contract:hot-path-readback-budget",
-        "contract:skill-catalog-parse-budget"
+        "contract:skill-catalog-parse-budget",
+        "contract:observer-failure-is-diagnostic-only"
       ]
     },
     {

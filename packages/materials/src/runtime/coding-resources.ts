@@ -26,6 +26,7 @@ import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
 import { withToolTimingOnTools, type ToolTimingRecorder } from "../observability/tool-timing.js";
+import type { ObserverDiagnostics } from "../observability/observer-diagnostics.js";
 import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
@@ -120,6 +121,14 @@ export interface CodingResourceContext extends ExecutionToolContext {
   runtime: ProofBladeToolRuntime;
   /** Durable per-run gate for repeated process/network experiments. */
   experimentGate?: ExperimentGate;
+  /**
+   * Optional sink for observation-path failures.
+   *
+   * Present so a best-effort observation that fails leaves a trace instead of
+   * vanishing. Absent in lightweight test/offline contexts, where there is no
+   * operator to inform and the failure is already covered by the assertions.
+   */
+  observerDiagnostics?: ObserverDiagnostics;
   webReproduce?: (recipe: WebExploitRecipe, signal?: AbortSignal) => Promise<unknown>;
   /**
    * Present only when the task has a resolvable web target. Drives interactive
@@ -2248,9 +2257,12 @@ async function observeCodingArtifact(
       details.evidenceId = observed.evidenceId;
       details.candidateKinds = observed.candidateKinds;
       details.progressKey ??= observed.progressKey;
-    } catch {
+    } catch (error) {
       // Automatic observation is best-effort; the raw Artifact remains the
-      // durable source if the control store is temporarily unavailable.
+      // durable source if the control store is temporarily unavailable. Record
+      // it rather than swallowing silently: otherwise "no observations" and
+      // "observations all failed" are indistinguishable to an operator.
+      context.observerDiagnostics?.record("artifact-observation", context.runtime.runId, error);
     }
   } else {
     try {
@@ -2259,9 +2271,10 @@ async function observeCodingArtifact(
       const review = await context.evidenceGraph.annotateArtifact({ artifactId, name, summary, role, tags: [...tags, "auto-reviewed"] });
       details.durableProgress = false;
       details.progressKey = review.progressKey;
-    } catch {
+    } catch (error) {
       // Artifact annotation is an observer side effect. A transient control-store
       // failure must not turn a completed bash/read call into a failed solve.
+      context.observerDiagnostics?.record("artifact-annotation", context.runtime?.runId ?? context.outputRewrite?.runId ?? "unknown", error);
     }
   }
   return details;

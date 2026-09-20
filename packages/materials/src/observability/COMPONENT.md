@@ -4,15 +4,15 @@
 {
   "id": "materials-observability",
   "name": "Runtime Observability",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-09-19T09:20:00.000Z",
+  "updatedAt": "2026-09-19T12:10:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 8,
-    "securityAuditCount": 8,
-    "lastBugAuditAt": "2026-09-19T09:20:00.000Z",
-    "lastSecurityAuditAt": "2026-09-19T09:20:00.000Z",
-    "sourceHash": "a23a4c18f453b228ec859145c1753c2d7b501173e374c10ad89a169c59d51af4",
+    "bugAuditCount": 9,
+    "securityAuditCount": 9,
+    "lastBugAuditAt": "2026-09-19T12:10:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T12:10:00.000Z",
+    "sourceHash": "c1d41688cc58bd08d804898725e53a49d3ef33f74deba7f877e811eeda178909",
     "result": "passed"
   }
 }
@@ -41,7 +41,9 @@ Frame 事件只保存 role/source/content hash/visible length/estimated tokens �
 
 需要 snapshot 等昂贵计算才能补齐的遥测字段，一律通过 `append(..., resolve)` **延迟到 drain 时计算**：遥测是 fail-soft 旁路，其富化不得落在工具结果路径上——模型不该为装饰一个它从不读取的可观测载荷而等待一次 snapshot 读取。resolver 抛错时只丢弃富化字段并保留事件；无 batcher 的回退路径会在写入前就地解析，保证两种路径记录的事件形状一致。`resolve` 本身绝不进入事件日志。
 
+`observer-diagnostics.ts` 记录观察路径的失败。观察是 best-effort：失败不得把已完成的工具调用变成失败调用，因此调用点仍然吞掉异常——但**吞掉不等于静默**，否则「没有观察」与「观察全部失败」对运维者不可区分。`ObserverDiagnostics.record()` 在 `total` 自增之后才派生消息，且消息派生本身受保护：**一个 `toString` 会抛错的错误对象不能抹掉对自身失败的记录**。诊断只驻留内存（有界样本 + 生命周期计数），不新增热路径上的 durable 写。
+
 ```powershell
-node --import tsx --test packages/materials/tests/observability.test.ts packages/materials/tests/tool-timing.test.ts packages/materials/tests/telemetry-lazy-payload.test.ts
+node --import tsx --test packages/materials/tests/observability.test.ts packages/materials/tests/tool-timing.test.ts packages/materials/tests/telemetry-lazy-payload.test.ts packages/materials/tests/observer-diagnostics.test.ts
 npm run baseline:tools
 ```
