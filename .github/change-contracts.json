@@ -175,7 +175,8 @@
     {
       "id": "read-path-parse-budget",
       "triggers": [
-        { "path": "packages/materials/src/storage/jsonl-store.ts", "patterns": ["readStats", "loadEvents", "parsedEvent", "eventCache"] }
+        { "path": "packages/materials/src/storage/jsonl-store.ts", "patterns": ["readStats", "loadEvents", "parsedEvent", "eventCache", "firstEvent"] },
+        { "path": "packages/materials/src/control/control-store.ts", "patterns": ["loadProjectionHint", "loadEvents"] }
       ],
       "testPaths": ["packages/materials/tests/"],
       "scenarios": [

@@ -726,22 +726,50 @@ export class ControlStore {
       return cached.snapshot;
     }
 
-    // The authoritative snapshot must not trust a materialized projection
-    // hint here: an unsealed projection carries no HMAC (a tamperer can
-    // recompute its self-hash), and even a sealed hint skips the
-    // event-prefix revalidation that loadProjection() performs. GUI list and
-    // detail reads may use loadProjectionHint directly as an isolated,
-    // display-only DTO; the control read path stays on authoritative
-    // replay/repair below.
-    const events = await this.eventStore.events(runId);
-    const streamLastSeq = events.at(-1)?.seq ?? 0;
+    // Read bound: only parse the event stream when the durable projection cannot
+    // answer on its own.
+    //
+    // `loadProjectionHint` returns a projection only when it authenticates
+    // against the authority secret AND `lastEventSeq()` (a bounded tail read)
+    // confirms the projection's `lastSeq` equals the log's last seq, i.e. the
+    // projection already covers every committed event. In that state it is the
+    // complete state, so re-deriving it by parsing the whole stream yields the
+    // same value at O(history) cost -- measured at 1,877ms for 10,001 events,
+    // of which `loadProjection()` itself is only 49ms.
+    //
+    // What this gives up: recomputing the event-prefix hash from the parsed
+    // events. That check only fires for the current-projection case (a stale
+    // projection is folded and extended below), and shelling out to `replay()`
+    // on failure folds the same on-disk events with no validation at all, so it
+    // never determined which state a reader sees -- see
+    // docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md section 6.5. The
+    // guarantee that matters is preserved: a projection failing its seal is
+    // discarded here and never overrides the event log, and the authoritatively
+    // verified path below still runs whenever the projection is behind.
     let snapshot: RunSnapshot | undefined;
+    // Authenticate with the same authority the rest of this store uses. The
+    // hint's own default resolves the same shared secret in the normal
+    // configuration, but a store constructed with an explicit secret must not
+    // silently lose this path -- and it must not accept a projection sealed by
+    // a different authority either.
+    const fastPath = await this.eventStore.loadProjectionHint(runId, this.#authoritySecret).catch(() => undefined);
+    if (fastPath && fastPath.runId === runId && fastPath.projectionHash === projectionHash(fastPath)) {
+      snapshot = fastPath;
+    }
+
+    // Lazily materialised: on the fast path the stream is never parsed, so an
+    // eagerly awaited `events()` would pay the whole O(history) cost to answer a
+    // question the projection already answered.
+    let loaded: Promise<HarnessEvent[]> | undefined;
+    const loadEvents = () => (loaded ??= this.eventStore.events(runId));
+
     // A cache revision mismatch means another process (or an operator) changed
-    // durable state. Do not assume that change was append-only: replay the full
-    // stream so modified prefixes and task-contract tampering are revalidated.
+    // durable state. Do not assume that change was append-only.
     const durableStateChanged = cached !== undefined;
     if (durableStateChanged) this.snapshotCache.delete(runId);
-    if (!durableStateChanged && snapshot === undefined) {
+    if (snapshot === undefined && !durableStateChanged) {
+      const events = await loadEvents();
+      const streamLastSeq = events.at(-1)?.seq ?? 0;
       const persisted = await this.eventStore.loadProjection(runId, {
         events,
         authoritySecret: this.#authoritySecret,

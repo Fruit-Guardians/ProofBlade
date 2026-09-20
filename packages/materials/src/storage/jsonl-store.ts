@@ -310,6 +310,22 @@ export class JsonlControlStore {
    */
   public async migrateLegacyRun(runId: string, authorityHash: string): Promise<"anchored" | "migrated" | "read_only"> {
     if (!/^[a-f0-9]{64}$/i.test(authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
+    // A Run is anchored exactly when `authorityAnchor()` finds an authority
+    // hash, and a current-format Run records that hash in its very first
+    // `run_started` event. Two bounded reads (`firstEvent` + `lastEventSeq`)
+    // settle that case without parsing the stream, which otherwise made every
+    // cache-missing read O(history) before it could consult the projection.
+    //
+    // `run_authority_migrated` is itself an anchor, so a stream carrying one
+    // must still take the full path below. A mis-signalled Run therefore only
+    // costs the parse, never a wrong answer.
+    const first = await this.firstEvent(runId);
+    if (first !== undefined && first.type === "run_started" && first.seq === 1 && typeof first.payload?.authorityHash === "string") {
+      const tailSeq = await this.lastEventSeq(runId);
+      if (tailSeq === 1) return "anchored";
+      const last = tailSeq === undefined ? undefined : await this.lastEvent(runId);
+      if (last !== undefined && last.type !== "run_authority_migrated") return "anchored";
+    }
     return await this.withRunLock(runId, async () => {
       const events = await this.events(runId);
       const first = events[0];
@@ -506,6 +522,75 @@ export class JsonlControlStore {
    * means "unknown", and callers must treat that as "cannot confirm currency"
    * rather than as "current".
    */
+  /**
+   * The first committed event, from a bounded read of the file head.
+   *
+   * Mirrors `#loadEvents()`'s record framing: a record counts only once its
+   * terminating newline is durable, and blank lines are skipped. Returns
+   * undefined when the head holds nothing usable, in which case callers must
+   * fall back to the full parse rather than conclude anything.
+   */
+  private async firstEvent(runId: string): Promise<HarnessEvent | undefined> {
+    const HEAD_BYTES = 64 * 1024;
+    try {
+      const path = this.runPath(runId);
+      const stats = await stat(path);
+      if (stats.size === 0) return undefined;
+      const length = Math.min(HEAD_BYTES, stats.size);
+      const handle = await open(path, "r");
+      try {
+        const buffer = Buffer.alloc(length);
+        await handle.read(buffer, 0, length, 0);
+        const content = buffer.toString("utf8");
+        const lines = content.split("\n");
+        const first = lines[0];
+        if (first === undefined || !first.trim()) return undefined;
+        // A record is committed only once its terminating newline is durable;
+        // when the head cut the first line short there is nothing to conclude.
+        if (lines.length === 1 && stats.size > length) return undefined;
+        return JSON.parse(first) as HarnessEvent;
+      } finally {
+        await handle.close();
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      return undefined;
+    }
+  }
+
+  /** The last committed event, from the same bounded tail read as `lastEventSeq`. */
+  private async lastEvent(runId: string): Promise<HarnessEvent | undefined> {
+    const TAIL_BYTES = 64 * 1024;
+    try {
+      const path = this.runPath(runId);
+      const stats = await stat(path);
+      if (stats.size === 0) return undefined;
+      const start = Math.max(0, stats.size - TAIL_BYTES);
+      const length = stats.size - start;
+      const handle = await open(path, "r");
+      try {
+        const buffer = Buffer.alloc(length);
+        await handle.read(buffer, 0, length, start);
+        const lines = buffer.toString("utf8").split("\n").filter((line) => line.trim().length > 0);
+        // The first line of a non-zero offset chunk is almost certainly partial.
+        const candidates = start > 0 ? lines.slice(1) : lines;
+        for (let index = candidates.length - 1; index >= 0; index -= 1) {
+          try {
+            return JSON.parse(candidates[index]!) as HarnessEvent;
+          } catch {
+            // A torn or partial trailing line: keep walking back.
+          }
+        }
+        return undefined;
+      } finally {
+        await handle.close();
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+  }
+
   private async lastEventSeq(runId: string): Promise<number | undefined> {
     const TAIL_BYTES = 64 * 1024;
     let handle;

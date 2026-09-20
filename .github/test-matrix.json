@@ -130,9 +130,10 @@
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
-        "packages/materials/tests/read-path-parse-budget.test.ts"
+        "packages/materials/tests/read-path-parse-budget.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/control-store.test.ts packages/materials/tests/control-store-concurrency.test.ts packages/materials/tests/competition-convergence.test.ts packages/materials/tests/handoff.test.ts packages/materials/tests/evidence-curation-gate.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/domain-records.test.ts packages/materials/tests/pwn-layer.test.ts packages/materials/tests/read-path-parse-budget.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/control-store.test.ts packages/materials/tests/control-store-concurrency.test.ts packages/materials/tests/competition-convergence.test.ts packages/materials/tests/handoff.test.ts packages/materials/tests/evidence-curation-gate.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/domain-records.test.ts packages/materials/tests/pwn-layer.test.ts packages/materials/tests/read-path-parse-budget.test.ts packages/materials/tests/projection-read-bound.test.ts"
     },
     {
       "id": "evaluation",

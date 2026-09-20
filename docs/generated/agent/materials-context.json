@@ -39,7 +39,7 @@
     "src/context/model-receipt.ts": "65a8fee2381ac0f50490145d162c2232343106cec18f8d1b05d23d9ce8c2c996",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
-    "src/control/control-store.ts": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+    "src/control/control-store.ts": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
     "src/control/lease-manager.ts": "71e1e334b21ce9a2083ccd5ef3dc4ba31de239f8352bac24aef8bc731561734c",
     "src/control/phase-machine.ts": "870185bade60194a641f4552fe772bcfcfe870144af914950ca82b67ec6fc9e2",
     "src/control/reducer.ts": "ffe52d053482f449f37cf16ecbf1802c4d445adc30c12708a4ab03c06101d814",
@@ -148,7 +148,7 @@
     "src/security/approval-policy.ts": "1f9d442218afddf3547d7bd481fc4121394b2fb0ad7bba66d7ab1934d6876e5c",
     "src/skills/registry.ts": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
     "src/storage/control-authority.ts": "8add37c36f821514cf985b4c9c96722351314ae4ffc516efd91d617a8c787647",
-    "src/storage/jsonl-store.ts": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+    "src/storage/jsonl-store.ts": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
     "src/storage/spill-store.ts": "be10856f0ca4e4ef962033559921dbce390efca16d0b55b683013954031c0a51",
     "src/tools/catalog.ts": "5501a98ee2a6215f1135ce8402ec554eea8dc0b545df2833e6133dfe13e49283",
     "src/tools/contracts.ts": "809bb08337ad6b77cc4950cf336b680db418c97a3ba85d6deb2e88a52bf0ead1",
@@ -741,7 +741,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 246,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/barrier-projection.test.ts",
@@ -758,6 +758,7 @@
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -1863,7 +1864,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 63,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -1877,6 +1878,7 @@
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -3303,6 +3305,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -3947,8 +3950,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 2365,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 2393,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/durability.test.ts",
@@ -4024,6 +4027,7 @@
         "packages/materials/tests/demo.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
@@ -4053,6 +4057,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
@@ -6995,8 +7000,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 685,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 770,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/control-authority-migration.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
@@ -8582,6 +8587,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -9275,7 +9281,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 222,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9289,7 +9295,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 227,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9303,7 +9309,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 99,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9317,7 +9323,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 81,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9331,7 +9337,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 234,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9345,7 +9351,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 95,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9359,7 +9365,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 89,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -9373,7 +9379,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 64,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/competition-sandbox.test.ts"
       ]
@@ -9389,7 +9395,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 73,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -14738,7 +14744,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 24,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -14752,7 +14758,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 14,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -16402,6 +16408,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -16591,6 +16598,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -16877,6 +16885,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -17066,6 +17075,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -17255,6 +17265,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -17444,6 +17455,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -17645,6 +17657,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -18357,6 +18370,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -18432,6 +18446,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -19428,6 +19443,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -19535,6 +19551,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -19660,6 +19677,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -19795,6 +19813,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -19855,6 +19874,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
@@ -20510,6 +20530,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -20653,6 +20674,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-native.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -20969,6 +20991,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -21040,6 +21063,7 @@
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -21120,6 +21144,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-native.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -21363,6 +21388,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -21479,6 +21505,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -21649,6 +21676,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry.test.ts",
@@ -21748,6 +21776,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -21824,6 +21853,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
@@ -21884,6 +21914,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -21997,6 +22028,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -22060,8 +22092,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 770,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 798,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22074,8 +22106,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 785,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 813,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22088,8 +22120,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 881,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 909,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22102,8 +22134,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 915,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 943,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22116,8 +22148,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 896,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 924,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22130,8 +22162,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 858,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 886,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22144,8 +22176,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 826,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "line": 854,
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22159,7 +22191,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 333,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22173,7 +22205,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 671,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts"
       ]
@@ -22189,8 +22221,10 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 713,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
-      "testRefs": []
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
+      "testRefs": [
+        "packages/materials/tests/projection-read-bound.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::method::ControlStore.#recordProjectionMode",
@@ -22203,7 +22237,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 678,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22217,7 +22251,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 683,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22231,7 +22265,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 474,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22245,7 +22279,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 567,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -22262,6 +22296,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -22284,7 +22319,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 437,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22298,7 +22333,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 350,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22312,7 +22347,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 328,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22326,7 +22361,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 393,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22340,7 +22375,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 262,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -22397,6 +22432,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -22446,7 +22482,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 290,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
@@ -22483,6 +22519,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -22515,7 +22552,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 515,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -22563,7 +22600,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 519,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -22584,7 +22621,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 555,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -22601,7 +22638,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 531,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts"
@@ -22618,7 +22655,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 345,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -22646,6 +22683,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -22674,12 +22712,13 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 637,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
     },
@@ -22694,11 +22733,12 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 310,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
     },
@@ -22713,9 +22753,10 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 323,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
     },
@@ -22730,7 +22771,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 610,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts"
       ]
@@ -22746,7 +22787,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 305,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -22782,6 +22823,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -22812,7 +22854,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 599,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -22828,7 +22870,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 301,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -22872,6 +22914,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -22905,7 +22948,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 465,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -22919,7 +22962,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 511,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
@@ -23269,6 +23312,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -23618,6 +23662,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -23704,6 +23749,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -23791,6 +23837,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -23924,6 +23971,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -24033,7 +24081,8 @@
       "line": 50,
       "moduleHash": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
       "testRefs": [
-        "packages/materials/tests/ablation-policy.test.ts"
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts"
       ]
     },
     {
@@ -24172,6 +24221,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -24300,6 +24350,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -24431,6 +24482,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -24562,6 +24614,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -24693,6 +24746,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -24843,6 +24897,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -25045,6 +25100,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -25580,6 +25636,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -26297,6 +26354,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -26540,6 +26598,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -26648,6 +26707,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -26677,6 +26737,7 @@
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts"
       ]
@@ -26699,6 +26760,7 @@
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts"
       ]
@@ -26859,6 +26921,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry.test.ts",
@@ -26987,6 +27050,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry.test.ts",
@@ -27073,6 +27137,7 @@
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -27315,6 +27380,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -27429,6 +27495,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -27976,6 +28043,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -28115,6 +28183,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -28199,6 +28268,7 @@
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
@@ -28559,6 +28629,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -28825,6 +28896,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -28908,6 +28980,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -29040,6 +29113,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -29562,6 +29636,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -29862,6 +29937,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -30119,6 +30195,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -30565,6 +30642,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -30902,6 +30980,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -31470,6 +31549,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -31781,6 +31861,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -32183,6 +32264,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -32588,6 +32670,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -32987,6 +33070,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -33276,6 +33360,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -33657,6 +33742,7 @@
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-native.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -33793,6 +33879,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
@@ -34113,6 +34200,7 @@
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -34292,6 +34380,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -34491,6 +34580,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -34578,8 +34668,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 544,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 629,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34592,8 +34682,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 557,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 642,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34606,8 +34696,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 586,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 671,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34621,7 +34711,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 190,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
@@ -34636,8 +34726,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 361,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 377,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34650,8 +34740,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 380,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 396,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34665,7 +34755,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 275,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34682,6 +34772,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -34704,7 +34795,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 126,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -34761,6 +34852,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -34810,7 +34902,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 171,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -34838,6 +34930,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -34865,12 +34958,13 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 402,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 418,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
     },
@@ -34884,10 +34978,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 444,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 460,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
     },
@@ -34901,8 +34996,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 367,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 383,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34916,7 +35011,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 311,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34929,8 +35024,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 540,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 625,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -34944,8 +35039,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 96,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ]
     },
@@ -34960,7 +35056,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 297,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -34996,6 +35092,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -35026,7 +35123,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 105,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/version-cache.test.ts"
@@ -35043,7 +35140,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 100,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -35056,8 +35153,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
-      "line": 376,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "line": 392,
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts"
@@ -35074,7 +35171,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 284,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -35118,6 +35215,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -35151,7 +35249,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 233,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -35165,7 +35263,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 154,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts"
       ]
@@ -35181,7 +35279,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/storage/jsonl-store.ts",
       "line": 166,
-      "moduleHash": "25eb905a106a9af5304a2f5515efc36a7616127e2f63fd9ff357d820e030e257",
+      "moduleHash": "1253d371da0993e9266ee85148610628f5c50fb4e85d040863fbb2b1e1278dbe",
       "testRefs": []
     },
     {
@@ -35218,6 +35316,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -35307,6 +35406,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -35452,6 +35552,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -35589,6 +35690,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -36316,6 +36418,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -36645,6 +36748,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
@@ -36707,6 +36811,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -37585,6 +37690,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -37805,6 +37911,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -38255,6 +38362,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -38716,6 +38824,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -38857,6 +38966,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -39086,6 +39196,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -39183,6 +39294,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -39447,6 +39559,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -39521,6 +39634,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -39610,6 +39724,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -40151,7 +40266,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 144,
-      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "moduleHash": "3aea63e35bc91e0cf64f18b9c50d24d8da155949738b6af6e434dfbc665b2494",
       "testRefs": []
     },
     {
