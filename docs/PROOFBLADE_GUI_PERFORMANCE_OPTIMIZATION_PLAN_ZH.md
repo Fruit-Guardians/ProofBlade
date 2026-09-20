@@ -339,7 +339,7 @@ DSH 的 `bash`/`pwsh` 除工具定义说明外，还要求每次调用提供短�
 | A | P0 | 修复 GUI 与 workspace package 的构建一致性 | `package.json`、`apps/gui/package.json`、启动测试 | 消除 `loadProjectionHint` 运行时报错 | 启动前验证该方法存在；GUI HTTP 200；源码变化后不会加载旧 `dist` |
 | T0 | P0 | 增加工具分阶段计时，不经 ControlStore 持久化计时本身 | `coding-resources.ts`、Pi observability、benchmark | 精确区分命令耗时和框架开销 | 输出 execute/rewrite/artifact/control/observe/experiment/subscriber/total 时间 |
 | T1 | P0 | 普通结果的派生观察延后到回合边界（最多一次同步提交） | `coding-resources.ts`、`tools/runtime.ts`、`knowledge/observer.ts` | 毫秒命令不再等待第二多轮锁和 fsync；收益约 12ms/次 | 小型成功 read/glob/grep/bash 的同步 ControlStore commit <= 1（实测现状为 2）；见 §5.6.3 与拆分文档 |
-| T2 | P0 | 将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit | ArtifactStore、Observer、ExperimentGate、ControlStore | 重要结果从多次事务降到一次 | 单个重要工具结果最多一次锁、一次 event append、零次 projection rewrite |
+| T2 | ~~P0~~ **已关闭** | ~~将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit~~ **经代码核实不可行**：`dispatchTransaction` 的 `prepare(before)` 用批次前快照校验整批，故不能在同一批次内注解或引用本批次刚注册的 artifact。改由 T1 的延后路径达成同等目标 | — | 与 T1 相同（工具返回前 1 个提交），且不需要改事务模型 | 见 `docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md` §2.5 / §2.6 |
 | T3 | P0 | ExperimentGate 只对声明需要的安全实验启用，普通 coding chat 使用内存去重 | `experiment-gate.ts`、`coding-lane.ts` | 删除每次普通 bash 的投影重写 | 普通对话 bash 不产生同步 experiment projection |
 | T4 | P1 | 去除工具结果重复 hash、Artifact 回读和 telemetry snapshot | `coding-resources.ts`、`runtime.ts`、`pi-events.ts` | 降低 CPU、磁盘和 subscriber barrier | 同一输出只计算一次内容 hash；observer 直接接收已知内容；telemetry 不读 snapshot |
 | D0 | P0 | 引入 DSH 风格 ToolResultEnvelope | tool contract、`coding-resources.ts`、GUI presenter | 规范值、模型文本、GUI 元数据和长期引用解耦 | `finalizeContent`/render 为同步纯函数，禁止 I/O |
@@ -572,7 +572,18 @@ tool_result_emitted -> subscribers_complete
 
 计时结果只能写入进程内环形缓冲区或现有 telemetry batcher，禁止为了测量工具延迟再增加一次同步 ControlStore 写入。开发接口按需读取最近样本，benchmark 直接消费内存计数器。
 
-#### 5.6.2 引入 `ToolResultCommit`
+#### 5.6.2 引入 `ToolResultCommit`（**已关闭：经核实不可行**）
+
+> **评审修订 3（代码核实）**：本节假设可以把 artifact 注册与派生观察放进同一批次。核实结果是不能：`ControlStore.dispatchTransaction` 先执行 `prepare(before)` 并用**批次之前的快照**校验整批命令，因此
+>
+> - 对本批次刚注册的 artifact 发 `artifact_annotation` 会被拒绝；
+> - 引用本批次刚创建的 observation 的 `evidence` 会被 `validateEvidence` 拒绝（它对 artifact 查 `snapshot.artifacts`，而非同批次引用表）。
+>
+> 即 **artifact 注册必须先于派生观察提交**，这是被强制的顺序不变量。突破它需要改事务模型（按批内顺序增量校验），属于语义变更而非性能优化。
+>
+> **等价目标改由表项 T1 的延后路径达成**：artifact 同步提交，派生观察在回合边界批量落盘。两者都能把工具返回前压到 1 个提交，但 T1 不需要改事务模型。详见 `docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md` §2.5 / §2.6。
+>
+> 下文保留原始设计，仅作历史记录，不构成本计划的实施内容。
 
 新增一个工具结果批量提交结构：
 

@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T17:20:00+08:00
+> 状态更新时间：2026-09-19T18:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-012 | 2026-09-19T18:00:00+08:00 | PLAN-240 | docs/t2-infeasible | 本条记录所在提交 |
 | UPDATE-20260919-011 | 2026-09-19T17:20:00+08:00 | PLAN-240 | perf/tool-result-telemetry-lazy | 本条记录所在提交 |
 | UPDATE-20260919-010 | 2026-09-19T16:40:00+08:00 | PLAN-240 | docs/tool-hot-path-cost-breakdown | 本条记录所在提交 |
 | UPDATE-20260919-009 | 2026-09-19T16:10:00+08:00 | PLAN-240 | perf/real-run-baseline | 本条记录所在提交 |
@@ -67,6 +68,25 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-012
+
+时间：2026-09-19T18:00:00+08:00
+
+摘要：经代码核实关闭表项 T2：批次前校验使「注册 artifact 并在同一批次派生观察」不可行，等价目标改由 T1 延后路径达成。
+
+### 变更
+
+- 成本分解文档新增 §2.5：记录 dispatchTransaction 的 prepare(before) 用批次前快照校验整批，故同批次内不能注解或引用本批次刚注册的 artifact
+- 新增 §2.6：区分「合并」（表项 T2，不可行，需改事务模型）与「延后」（表项 T1，可行，复用既有队列与屏障模式），二者都能把工具返回前压到 1 个提交
+- 父计划表项 T2 标记为已关闭并说明替代路径；§5.6.2 加评审修订说明，保留原设计仅作历史记录
+- 实测复核：一次 read 的公共写入口调用数为 3，但 dispatch 内部委托 dispatchBatch，逻辑提交数为 2，与 4 条事件（artifact_registered + observer 单批次的 annotated/observation/evidence）吻合
+
+### 验证
+
+- [x] 代码核实：control-store.ts dispatchTransaction / #commitCommands / validateEvidence(1573 行查 snapshot.artifacts) / validateCommand(BatchReferences)
+- [x] 实测复核：一次 read 的公共写入口调用 3 次、逻辑提交 2 次
+- [x] npm run check:project-reports、check:components passed
 
 ## UPDATE-20260919-011
 

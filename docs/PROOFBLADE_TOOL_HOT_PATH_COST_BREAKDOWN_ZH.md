@@ -57,11 +57,43 @@ CTRL.dispatchTransaction DeterministicObserver.observe    (observer.ts:78)
 | 组成 | 每次 | 可否移除 |
 |---|---:|---|
 | run 锁 + event append + `fsync`（提交 1：artifact） | 约 12ms | 否——artifact 是 Evidence 提升的引用对象 |
-| run 锁 + event append + `fsync`（提交 2：observation） | 约 12ms | **可延后**，见 §3 |
+| run 锁 + event append + `fsync`（提交 2：observation） | 约 12ms | **否——见 §2.5** |
 | 投影重写 | 0（已由 T3 移除） | 已解决 |
 | Artifact 回读 | 0（已由 PR #229 移除） | 已解决 |
 
 **「零同步提交」在当前架构下不可达**：只要结果需要被后续 Evidence 引用，artifact 注册就必须在模型继续之前 durable。父计划 §5.6.3 的措辞应据此修正为「**普通结果最多一次同步提交**」。
+
+### 2.5 表项 T2 不可行（经代码核实）
+
+父计划表项 T2 要求「将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit」。**核实结论：在当前事务模型下不可行**，理由不是成本而是顺序：
+
+```text
+ControlStore.dispatchTransaction(runId, prepare, options)
+  -> const transaction = prepare(before);          // before = 批次之前的快照
+  -> #commitCommands(runId, before, transaction.commands, ...)
+```
+
+`prepare` 拿到的是**批次之前**的快照，整批命令都对它校验。因此同一批次内：
+
+- 对「本批次刚注册的 artifact」发 `artifact_annotation` 会被校验拒绝；
+- 引用「本批次刚创建的 observation」的 `evidence` 会被 `validateEvidence` 拒绝——它对 artifact 用的是 `snapshot.artifacts[artifactId]`（第 1573 行）而非同批次引用表，而 `artifact_annotation` / `supports` 走的是允许同批次的 `references`。
+
+即 **artifact 注册必须先于派生观察提交**，这是被强制的不变量，不是实现疏漏。要突破它需要改事务模型（例如让校验按批内顺序增量应用），那属于语义变更，不是性能优化。
+
+**实测复核**：一次 `read` 的公共写入口调用数为 3，但其中 `dispatch` 会内部委托 `dispatchBatch`，因此**逻辑提交为 2**（artifact 注册、派生观察各一）。这与 §2.1 的 4 条事件吻合：`observer.observe` 已把 annotation、observation、evidence 放在同一批次里。
+
+**因此 T1/T2 的合并空间已被穷尽**：不能在 2 个提交以下完成一次「归档 + 派生观察」。剩余的 25ms 中约 24ms 是两次提交各自的固有成本，只能靠减少提交**次数以外的**手段解决（例如降低 `fsync` 频率——父计划 §5.6.6 已明确反对直接删除屏障）。
+
+### 2.6 「合并」与「延后」是两条不同的路，只有后者可行
+
+§2.5 否掉的是**合并**（把两个提交压成一个，两者仍都在工具返回前）。§3 提议的是**延后**（把派生观察移到回合边界，工具返回前只剩一个提交）。两者不可混淆：
+
+| 方案 | 机制 | 工具返回前的提交数 | 可行性 |
+|---|---|---:|---|
+| 合并（表项 T2） | 一个批次里同时注册 artifact 并派生观察 | 1 | **不可行**，被 §2.5 的批前校验强制阻断 |
+| 延后（§3，表项 T1） | artifact 同步提交；派生观察排队到回合边界 | 1 | 可行，但需处理 §3.3 的三处语义变化 |
+
+两者最终都能把工具返回前压到 **1 个提交**，但路径不同：合并要求改事务模型（语义变更），延后只需引入队列与屏障（既有模式，`ControlEventBatcher` 已是同构先例）。**因此应走延后，并据此把表项 T2 关闭或改述**。
 
 ## 3. 设计提案：延后派生观察
 
