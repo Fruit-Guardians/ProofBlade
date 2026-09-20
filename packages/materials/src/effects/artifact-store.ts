@@ -69,6 +69,43 @@ export class ArtifactStore {
     return Buffer.from(await repository.read(artifact)).toString("utf8");
   }
 
+  /**
+   * Exact raw bytes for binary Artifacts (ELF images, packed payloads). Unlike
+   * putText, binary content is stored verbatim: text-oriented secret redaction
+   * is skipped because it would corrupt non-UTF-8 payloads.
+   */
+  public async putBytes(runId: string, content: Uint8Array, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
+    const snapshot = await this.controlStore.snapshot(runId);
+    const artifactId = id("A");
+    const filename = sanitizeFilename(meta.filename ?? `${artifactId}.bin`);
+    const relativePath = join("artifacts", `${artifactId}-${filename}`);
+    const repository = new FileArtifactRepository(join(this.runsRoot, runId));
+    const stored = await repository.put(relativePath, content, meta.mime ?? "application/octet-stream");
+    const artifact: ArtifactRef = {
+      id: artifactId,
+      runId,
+      generation: snapshot.generation,
+      origin: {
+        schemaVersion: 1,
+        registeredBy: "agent",
+        operation: meta.sourceEffectId ? snapshot.effects[meta.sourceEffectId]?.operation : undefined,
+        tags: [...(meta.semantic?.tags ?? [])],
+      },
+      ...stored,
+      sensitivity: meta.sensitivity ?? "public",
+      sourceEffectId: meta.sourceEffectId,
+      truncated: meta.truncated,
+      semantic: meta.semantic ? { ...meta.semantic, updatedSeq: 0 } : undefined,
+    };
+    await this.controlStore.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
+    return (await this.controlStore.snapshot(runId)).artifacts[artifact.id] ?? artifact;
+  }
+
+  public async readBytes(runId: string, artifact: ArtifactRef): Promise<Buffer> {
+    const repository = new FileArtifactRepository(join(this.runsRoot, runId));
+    return Buffer.from(await repository.read(artifact));
+  }
+
   /** Read a bounded UTF-8 prefix without allocating the complete Artifact. */
   public async readTextRange(runId: string, artifact: ArtifactRef, maxBytes: number, offset = 0): Promise<ArtifactTextRange> {
     const repository = new FileArtifactRepository(join(this.runsRoot, runId));

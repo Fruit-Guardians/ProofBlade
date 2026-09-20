@@ -150,7 +150,17 @@ export function derivePwnWorkflow(snapshot: RunSnapshot): PwnWorkflowState {
   const lastAttempt = latestAttempt(stages);
   const retryBlocked = Boolean(lastAttempt?.status === "failed" && !hasMaterialAfter(lastAttempt.lastSeq, pwnRecords));
   const primitiveText = latestPrimitive?.primitive.toLowerCase() ?? "";
-  const route = chooseRoute(primitiveText, profiles, leaks, latestCrash);
+  // A primitive's current-generation preconditions are stronger route evidence
+  // than its free text: a "control hijack" hypothesis whose preconditions are
+  // current leaks is on the leak/base route no matter how it is worded.
+  const primitiveLinkedKinds = new Set<DomainRecord["kind"]>();
+  if (latestPrimitive) {
+    for (const preconditionId of latestPrimitive.preconditionRecordIds) {
+      const linked = snapshot.domainRecords[preconditionId];
+      if (linked && linked.runId === snapshot.runId && linked.generation === currentGeneration) primitiveLinkedKinds.add(linked.kind);
+    }
+  }
+  const route = chooseRoute(primitiveText, profiles, leaks, latestCrash, primitiveLinkedKinds);
   const routeConfidence = confidenceForRoute(route, latestPrimitive, latestCrash, latestBase);
   const controlOffset = controlOffsetFor(crashes);
   const reproductionAvailable = Boolean(
@@ -388,8 +398,12 @@ function action(id: string, phase: PwnWorkflowPhase, toolNames: string[], object
 
 function recoveryAction(route: PwnWorkflowRoute, basis: PwnWorkflowBasis, recordIds: string[]): PwnWorkflowAction {
   const tools = route === "leak-base-rop"
-    ? ["pwn_send", "pwn_recv", "pwn_record_leak", "pwn_derive_base"]
-    : ["pwn_send", "pwn_recv", "pwn_crash_analyze", "pwn_record_primitive"];
+    ? ["pwn_send", "pwn_recv", "pwn_record_leak", "pwn_derive_base", "pwn_identify_libc", "pwn_rop_chain"]
+    : route === "format-string"
+      ? ["pwn_send", "pwn_recv", "pwn_fmtstr", "pwn_crash_analyze"]
+      : route === "heap"
+        ? ["pwn_send", "pwn_recv", "pwn_heap_calc", "pwn_crash_analyze"]
+        : ["pwn_send", "pwn_recv", "pwn_crash_analyze", "pwn_record_primitive"];
   return action("experiment.recover-failed-reproduction", "EXPERIMENT", tools, "Change one material exploit assumption, run one bounded probe, and preserve the new result.", "A new current-generation crash, leak/base derivation, primitive, or binary profile that changes the exploit basis.", "Do not call pwn_reproduce again until new material evidence exists.", [
     ...recordIds,
     ...(basis.primitiveId ? [basis.primitiveId] : []),
@@ -398,20 +412,24 @@ function recoveryAction(route: PwnWorkflowRoute, basis: PwnWorkflowBasis, record
 
 function experimentAction(route: PwnWorkflowRoute, basis: PwnWorkflowBasis, recordIds: PwnWorkflowCurrentView["recordIds"], primitiveId: string): PwnWorkflowAction {
   const tools = route === "direct-ret2win"
-    ? ["pwn_send", "pwn_recv", "pwn_crash_analyze"]
+    ? ["pwn_send", "pwn_recv", "pwn_crash_analyze", "pwn_rop_chain"]
     : route === "leak-base-rop"
-      ? ["pwn_send", "pwn_recv", "pwn_record_leak", "pwn_derive_base"]
-      : ["pwn_send", "pwn_recv", "pwn_crash_analyze", "pwn_record_primitive"];
+      ? ["pwn_send", "pwn_recv", "pwn_record_leak", "pwn_derive_base", "pwn_identify_libc", "pwn_rop_chain"]
+      : route === "format-string"
+        ? ["pwn_send", "pwn_recv", "pwn_fmtstr", "pwn_crash_analyze"]
+        : route === "heap"
+          ? ["pwn_send", "pwn_recv", "pwn_heap_calc", "pwn_crash_analyze"]
+          : ["pwn_send", "pwn_recv", "pwn_crash_analyze", "pwn_record_primitive"];
   return action("experiment.route-probe", "EXPERIMENT", tools, `Run one bounded ${route} probe and classify its result.`, "A new current-generation transcript, crash, leak, base, or validated route observation.", "Change one material input only; EOF, timeout, and a guessed shell are failure evidence.", [primitiveId, ...recordIds.primitives.slice(-2), ...recordIds.crashes.slice(-2), ...recordIds.leaks.slice(-2)]);
 }
 
-function chooseRoute(primitive: string, profiles: PwnBinaryProfileRecord[], leaks: PwnLeakRecord[], crash: PwnCrashRecord | undefined): PwnWorkflowRoute {
+function chooseRoute(primitive: string, profiles: PwnBinaryProfileRecord[], leaks: PwnLeakRecord[], crash: PwnCrashRecord | undefined, linkedKinds: ReadonlySet<DomainRecord["kind"]> = new Set()): PwnWorkflowRoute {
   if (/(?:heap|uaf|use[- ]after[- ]free|tcache|fastbin|unsorted|malloc|free\s*hook|fsop|house of)/i.test(primitive)) return "heap";
   if (/(?:format[- ]string|fmt\b|printf\s*\(|got\s*overwrite|format write)/i.test(primitive)) return "format-string";
   if (/(?:shellcode|execve|mprotect|seccomp)/i.test(primitive)) return "shellcode";
-  if (leaks.length > 0 || /(?:leak|libc|pie|ret2libc|ret2csu|rop|one_gadget)/i.test(primitive)) return "leak-base-rop";
+  if (leaks.length > 0 || linkedKinds.has("pwn_leak") || /(?:leak|libc|pie|ret2libc|ret2csu|rop|one_gadget)/i.test(primitive)) return "leak-base-rop";
   if (/(?:ret2win|win\b|return address|stack overflow|buffer overflow|control(?:led)?\s+(?:rip|eip|pc))/i.test(primitive)) return "direct-ret2win";
-  if (crash?.ripControlled && profiles.some((profile) => !hasEnabledCanary(profile))) return "direct-ret2win";
+  if ((crash?.ripControlled || linkedKinds.has("pwn_crash")) && profiles.some((profile) => !hasEnabledCanary(profile))) return "direct-ret2win";
   return "undetermined";
 }
 

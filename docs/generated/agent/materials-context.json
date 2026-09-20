@@ -6,7 +6,7 @@
     "src/app/demo.ts": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
     "src/app/fixture-task.ts": "77d62e1e632887c1a01251a6ac595050d61cee52cb1eb7977087ba6d01351c9e",
     "src/capabilities/backend.ts": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
-    "src/capabilities/binary.ts": "fbeaff814f7a7c5802f72018fbbc0c9f13264d5ae9eb53a5ccb7345bc1c87c6f",
+    "src/capabilities/binary.ts": "f9b136f184c7af628cc63739a09289a15cc16739b76ba599639b5b5c5734b34b",
     "src/capabilities/catalog.ts": "8e15da49583d6363df1f51ae55e33ff285b5919f4291900cd3b28d51ac14b092",
     "src/capabilities/firmware.ts": "cd97ee5a8360b37d1baca50003847d7e6c86eda17e72a4fe6670f6b58c409a8b",
     "src/capabilities/lifecycle.ts": "0ebcaf3fd4127068c8c46702649cd910036f070a989436695e65c082f39a0eff",
@@ -57,7 +57,7 @@
     "src/domain/types.ts": "ef8ae78d46f07c546be9c5de94f69dee35638e4c1c481d0fd941d7da353ef218",
     "src/domain/utils.ts": "fdd6f57ab57faf4d72dd3125a6b5cfc60321b19b6c76019f47e1c27fcd0b608b",
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
-    "src/effects/artifact-store.ts": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+    "src/effects/artifact-store.ts": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
     "src/effects/effect-journal.ts": "7c73e4b2946249ab397d3fcb994d7162be1c3445ef9afe13170f222b7ba9a392",
     "src/evaluation/ablation-ledger.ts": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
     "src/evaluation/ablation-policy.ts": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
@@ -102,11 +102,15 @@
     "src/orchestration/single-agent-loop.ts": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
     "src/pwn/analysis.ts": "ab4b1ad5964ddf9cddbef4f73cfc3146fd4c484b93cd61a6b41f2b9df84b158f",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
+    "src/pwn/elfmodel.ts": "a8188f54b6fff509f4480896b61cdfc8a5cba231821824245fa6152e741e9307",
+    "src/pwn/fmtstr.ts": "1020099d2d38c0e56de407f2ef190f0f060b0de54569c40ab0c94b21c8f14988",
+    "src/pwn/heap.ts": "e5a418d23f4863971e257f5a0a8c9fa88847e10e98497d15f70795f9622abfb9",
     "src/pwn/leak.ts": "b67fc75908ae4c4ddaee4efd58731525dc0bcb1e741d53e94dba5aca137415c2",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
     "src/pwn/pwn-session.ts": "f8b58bead54d35cd7281e6787bb0f7173c7adb83339765c1c204901a65baa726",
-    "src/pwn/pwn-tools.ts": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
-    "src/pwn/workflow.ts": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+    "src/pwn/pwn-tools.ts": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
+    "src/pwn/rop.ts": "2bcf86cf6af4aa7113d681c07ba03a131cc7334215722344f15ed082752e8261",
+    "src/pwn/workflow.ts": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
     "src/recovery/binding-transaction-coordinator.ts": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
     "src/recovery/binding-transaction.ts": "95a0a2e4cdc5a5cd71ab265ef482f79ded99378a800f7b3f735396e3f481d4fd",
     "src/recovery/external-resource-registry.ts": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
@@ -122,7 +126,7 @@
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/coding-lane.ts": "eaed40ee0225ca08e6ee3d7aa6026893f3417407ec82437d6bdf119d6ebda2ca",
-    "src/runtime/coding-resources.ts": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+    "src/runtime/coding-resources.ts": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
     "src/runtime/coding-turn-projection.ts": "9634c98b8440e19dc694ed92ed2521b54ba50c1b7974e338416441154586af22",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -132,10 +136,10 @@
     "src/runtime/provider-native.ts": "58b941e0c710aa193f370425ab926bb77adb5b5588c09f02fb879ab40fcd3092",
     "src/runtime/provider-scheduler.ts": "e4f36a666b297dd0dccf81f1fccaae7bf06f65cb4176ec24a8f592402b5dfaa5",
     "src/runtime/provider-transport.ts": "0c1652999beba307d5a760f294935fd85bee8c402f8cff3dfc0f61c477d891b3",
-    "src/runtime/pwn-coding-tools.ts": "c3b2ed78b732e89633adde70d4613389807bbde63fe833bcebab8c16ee709b9e",
+    "src/runtime/pwn-coding-tools.ts": "1ef2e85d81e90cdbc20d37213b14f5f7ea28c5c27bef559bc87999fe86e0ba62",
     "src/runtime/request-epoch.ts": "9b65d21be6256333066c62607579cab240d8ffdaaa61aa88db8a45960ef13c28",
     "src/runtime/scope.ts": "da8b245ede1e086b979fdd90e7c9bc3050abda0d4af9fa7e4f48dff513af5ca0",
-    "src/runtime/security-tool-profile.ts": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+    "src/runtime/security-tool-profile.ts": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
     "src/runtime/skill-routing.ts": "60b2aef35624046d9658cb4a90971f247a2ee1e20c512077058916413b62b97d",
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
@@ -634,6 +638,7 @@
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts"
@@ -751,6 +756,7 @@
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -788,11 +794,12 @@
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
       "line": 26,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": [
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts"
@@ -1022,6 +1029,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts"
@@ -1366,10 +1374,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 67,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 71,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ]
     },
@@ -1726,7 +1735,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 551,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -1807,6 +1816,7 @@
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -2012,6 +2022,7 @@
       "moduleHash": "56578671a8a249cda6a80af971a32b9f5779e889535713203c638e9a886b77b5",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ]
@@ -2740,7 +2751,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 34,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2754,21 +2765,21 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 36,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
       "id": "@proofblade/materials::constant::CODING_PWN_TOOL_NAMES",
       "name": "CODING_PWN_TOOL_NAMES",
       "kind": "constant",
-      "signature": "readonly [\"pwn_open\", \"pwn_send\", \"pwn_recv\", \"pwn_signal\", \"pwn_close\", \"pwn_list\", \"pwn_workflow\", \"pwn_cyclic\", \"pwn_crash_analyze\", \"pwn_record_leak\", \"pwn_derive_base\", \"pwn_record_primitive\", \"pwn_reproduce\"]",
+      "signature": "readonly [\"pwn_open\", \"pwn_send\", \"pwn_recv\", \"pwn_signal\", \"pwn_close\", \"pwn_list\", \"pwn_workflow\", \"pwn_cyclic\", \"pwn_crash_analyze\", \"pwn_record_leak\", \"pwn_derive_base\", \"pwn_record_primitive\", \"pwn_identify_libc\", \"pwn_rop_chain\", \"pwn_fmtstr\", \"pwn_heap_calc\", \"pwn_reproduce\"]",
       "summary": "Inferred summary: coding pwn tool names constant used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 40,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -2784,7 +2795,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 39,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/web-coding-tools.test.ts"
       ]
@@ -2800,7 +2811,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 37,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2814,7 +2825,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1739,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -2830,7 +2841,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 47,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2844,7 +2855,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 50,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -2860,7 +2871,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 54,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2874,7 +2885,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 48,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2888,7 +2899,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 51,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2902,7 +2913,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 53,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2916,7 +2927,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 52,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2930,7 +2941,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 45,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -2944,7 +2955,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 46,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -3164,6 +3175,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -5383,8 +5395,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 786,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 1055,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -5397,8 +5409,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 776,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 1045,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -5412,7 +5424,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 112,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -5425,8 +5437,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
-      "line": 357,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "line": 367,
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -5742,7 +5754,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1873,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5758,7 +5770,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1625,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -5776,7 +5788,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1646,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5792,7 +5804,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 177,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -5806,7 +5818,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 445,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5822,7 +5834,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 192,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5838,7 +5850,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 239,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5854,7 +5866,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 252,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5870,7 +5882,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1753,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -5886,7 +5898,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1857,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5902,7 +5914,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1847,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5918,7 +5930,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 213,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -5932,7 +5944,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 413,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5948,7 +5960,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1507,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -6434,7 +6446,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 462,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6450,7 +6462,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 721,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6466,7 +6478,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 471,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6482,7 +6494,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 732,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6498,7 +6510,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 433,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6514,7 +6526,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 682,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6530,7 +6542,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 454,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6546,7 +6558,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 421,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6562,7 +6574,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 358,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6578,7 +6590,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 364,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -6594,7 +6606,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 707,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -8377,6 +8389,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -8531,6 +8544,7 @@
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts",
@@ -8555,6 +8569,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts"
@@ -9769,6 +9784,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-native.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -10545,7 +10561,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
       "line": 7,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": []
     },
     {
@@ -10559,7 +10575,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
       "line": 18,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": []
     },
     {
@@ -12800,8 +12816,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 31,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 35,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -12814,8 +12830,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 45,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 49,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -12828,8 +12844,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 52,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 56,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -12842,8 +12858,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 57,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 61,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -12857,7 +12873,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 32,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -12871,7 +12887,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 42,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -12885,7 +12901,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 51,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -12899,7 +12915,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 58,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -12913,7 +12929,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 76,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -13819,7 +13835,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 89,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -13839,7 +13855,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 171,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -13853,7 +13869,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 185,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -13867,7 +13883,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 67,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -13881,7 +13897,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 75,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -13895,7 +13911,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 217,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": []
     },
     {
@@ -13909,7 +13925,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 225,
-      "moduleHash": "76224fdce1de4cdf9813019c4b91ea993b000e9183b08edcdf22f1efa985cf6f",
+      "moduleHash": "cda1ce8709bcf5d2502c20c725d74e91a2bd6229018695c9b56c20369a587136",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -14284,7 +14300,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 497,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": []
     },
     {
@@ -14298,7 +14314,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 42,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": []
     },
     {
@@ -14312,7 +14328,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 503,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": []
     },
     {
@@ -14326,7 +14342,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 21,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": []
     },
     {
@@ -14340,7 +14356,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 490,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": []
     },
     {
@@ -16561,6 +16577,7 @@
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -17495,6 +17512,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -17686,6 +17704,7 @@
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -18181,6 +18200,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -19233,6 +19253,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -19335,6 +19356,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -19455,6 +19477,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -19573,6 +19596,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -19626,6 +19650,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -19681,6 +19706,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -19882,6 +19908,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
@@ -19989,6 +20016,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -20187,6 +20215,7 @@
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts",
@@ -20264,6 +20293,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -20393,6 +20423,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -20504,6 +20535,7 @@
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts"
@@ -20702,6 +20734,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -20836,6 +20869,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -20955,6 +20989,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -21070,6 +21105,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -21170,6 +21206,7 @@
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -21326,6 +21363,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -21418,6 +21456,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -21481,6 +21520,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -21541,6 +21581,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -21642,6 +21683,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -22011,6 +22053,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -22080,6 +22123,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -22427,6 +22471,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -22578,6 +22623,23 @@
       ]
     },
     {
+      "id": "@proofblade/materials::method::ArtifactStore.putBytes",
+      "name": "ArtifactStore.putBytes",
+      "kind": "method",
+      "signature": "(runId: string, content: Uint8Array, meta?: ArtifactMeta): Promise<ArtifactRef>",
+      "summary": "Exact raw bytes for binary Artifacts (ELF images, packed payloads). Unlike",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/effects/artifact-store.ts",
+      "line": 77,
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
+      "testRefs": [
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::method::ArtifactStore.putText",
       "name": "ArtifactStore.putText",
       "kind": "method",
@@ -22588,7 +22650,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
       "line": 29,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -22604,6 +22666,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
@@ -22612,6 +22675,20 @@
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
+    },
+    {
+      "id": "@proofblade/materials::method::ArtifactStore.readBytes",
+      "name": "ArtifactStore.readBytes",
+      "kind": "method",
+      "signature": "(runId: string, artifact: ArtifactRef): Promise<Buffer>",
+      "summary": "Inferred summary: read bytes operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/effects/artifact-store.ts",
+      "line": 104,
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
+      "testRefs": []
     },
     {
       "id": "@proofblade/materials::method::ArtifactStore.readText",
@@ -22624,7 +22701,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
       "line": 67,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -22650,8 +22727,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
-      "line": 73,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "line": 110,
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": [
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -22669,7 +22746,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
       "line": 39,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": [
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/observability.test.ts",
@@ -22686,8 +22763,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/effects/artifact-store.ts",
-      "line": 85,
-      "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
+      "line": 122,
+      "moduleHash": "911cd4324ecfa909650d5e1ae85f53c55c7b03ac40df21f1bd456e244906e88f",
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -22817,6 +22894,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -23228,6 +23306,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -23305,6 +23384,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -23426,6 +23506,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -23667,6 +23748,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -23790,6 +23872,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -23911,6 +23994,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24032,6 +24116,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24153,6 +24238,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24290,6 +24376,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24474,6 +24561,7 @@
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24564,6 +24652,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24687,6 +24776,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -24996,6 +25086,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -25296,6 +25387,7 @@
       "line": 288,
       "moduleHash": "fab372313ce3674863e1d3689767294773d6bd621b04d442f05d97c014a9ba3d",
       "testRefs": [
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ]
@@ -25492,6 +25584,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -25685,6 +25778,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -25950,6 +26044,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
@@ -26015,6 +26110,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -26129,6 +26225,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -26746,6 +26843,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -26869,6 +26967,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -26948,6 +27047,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -27739,6 +27839,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -27862,6 +27963,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -28030,8 +28132,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 95,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 99,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28071,8 +28173,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 431,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 435,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/pwn-tools.test.ts"
       ]
@@ -28087,8 +28189,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 278,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 282,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28126,6 +28228,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -28155,11 +28258,59 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 543,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 547,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::PwnToolHandler.fmtstrPayload",
+      "name": "PwnToolHandler.fmtstrPayload",
+      "kind": "method",
+      "signature": "(input: { offset: number; bits?: 32 | 64; writes: Array<{ address: string; value: string; size?: number; }>; prefixHex?: string; badBytes?: string; maxPayload?: number; }): unknown",
+      "summary": "Deterministic format-string payload (byte-wise %hhn) with alignment and index math.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/pwn/pwn-tools.ts",
+      "line": 847,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
+      "testRefs": [
+        "packages/materials/tests/pwn-exploit-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::PwnToolHandler.heapCalc",
+      "name": "PwnToolHandler.heapCalc",
+      "kind": "method",
+      "signature": "(input: { operation: \"protect_ptr\" | \"reveal_ptr\" | \"malloc_request\"; position?: string; pointer?: string; request?: string; bits?: 32 | 64; }): unknown",
+      "summary": "Deterministic glibc heap arithmetic (safe-linking, request rounding, bin indexes).",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/pwn/pwn-tools.ts",
+      "line": 828,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
+      "testRefs": [
+        "packages/materials/tests/pwn-exploit-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::PwnToolHandler.identifyLibc",
+      "name": "PwnToolHandler.identifyLibc",
+      "kind": "method",
+      "signature": "(input: { sourceLeakId: string; libcArtifactId?: string; symbol?: string; resolve?: string[]; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ matched: false; fingerprint: { symbol: string; low12Bits: string; }; nextActions: string[]; } | { matched: true; symbol: string; symbolOffset: string; base: { recordId: string; leakId: string; value: string; pageAligned: boolean; reused: boolean; }; resolved: Record<string, string>; }>",
+      "summary": "Identify the leak's libc by matching its symbol against a current-generation",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/pwn/pwn-tools.ts",
+      "line": 625,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
+      "testRefs": [
+        "packages/materials/tests/pwn-exploit-tools.test.ts"
       ]
     },
     {
@@ -28172,8 +28323,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 289,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 293,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -28225,8 +28376,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 105,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 109,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -28276,6 +28427,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -28301,8 +28453,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 458,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 462,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -28315,9 +28467,10 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 509,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 513,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ]
@@ -28332,10 +28485,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 393,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 397,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ]
     },
@@ -28349,8 +28503,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 217,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 221,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -28369,8 +28523,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 315,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 319,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -28382,12 +28536,29 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::PwnToolHandler.ropChain",
+      "name": "PwnToolHandler.ropChain",
+      "kind": "method",
+      "signature": "(input: { binaryArtifactId: string; baseRecordId?: string; goal: { kind: \"call\" | \"syscall_execve\" | \"system_binsh\"; target?: string; args?: string[]; system?: string; binShAddress?: string; alignRet?: boolean; }; badBytes?: string; maxWords?: number; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ planArtifactId: string; ok: boolean; entries: RopEntry[]; payloadHex: string; payloadBytes: number; problems: string[]; }>",
+      "summary": "Scan a current-generation ELF Artifact for ROP gadgets and assemble a",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/pwn/pwn-tools.ts",
+      "line": 708,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
+      "testRefs": [
+        "packages/materials/tests/pwn-exploit-tools.test.ts"
       ]
     },
     {
@@ -28400,8 +28571,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 189,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 193,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
@@ -28424,8 +28595,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 259,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 263,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -28442,8 +28613,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 239,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 243,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28489,13 +28660,14 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 300,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 304,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
       ]
     },
@@ -28610,6 +28782,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -28855,6 +29028,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -29291,6 +29465,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -29614,6 +29789,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -30166,6 +30342,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -30463,6 +30640,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -30850,6 +31028,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -31240,6 +31419,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -31513,6 +31693,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -31627,6 +31808,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -31790,6 +31972,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -31904,6 +32087,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -32033,6 +32217,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -32154,6 +32339,7 @@
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-analysis.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -32301,7 +32487,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 554,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -32333,7 +32519,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 625,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -32349,7 +32535,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 598,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": [
         "packages/materials/tests/security-tool-profile.test.ts"
       ]
@@ -32391,6 +32577,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -32446,6 +32633,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -32647,6 +32835,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
@@ -32874,6 +33063,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -33042,6 +33232,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -33278,6 +33469,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -33572,6 +33764,7 @@
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -33667,6 +33860,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
@@ -33747,6 +33941,7 @@
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -33884,6 +34079,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -34012,6 +34208,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -34286,6 +34483,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -34858,6 +35056,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -35089,6 +35288,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -35279,6 +35479,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -35324,6 +35525,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -35384,6 +35586,7 @@
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -35724,6 +35927,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -35779,6 +35983,7 @@
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -35955,6 +36160,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -36161,6 +36367,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -36594,6 +36801,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -36902,6 +37110,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -36938,6 +37147,7 @@
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -37039,6 +37249,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -37170,6 +37381,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -37291,6 +37503,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -37385,6 +37598,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -37471,6 +37685,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -37571,6 +37786,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -37722,6 +37938,7 @@
         "packages/materials/tests/provider-retry.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -37871,6 +38088,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/provider-transport.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-exploit-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
@@ -39947,8 +40165,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 40,
-      "moduleHash": "5772b55ad1d0680f1631883666dfb02285cd6ae9e619d71b6dae2c69c20cb77d",
+      "line": 44,
+      "moduleHash": "2565b9f071f2e3f3a09dea377a19a79ccbbdd87c46affc34d1fb7ff11eb1aa15",
       "testRefs": []
     },
     {
@@ -39962,7 +40180,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 13,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -39976,7 +40194,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 15,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -39990,7 +40208,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/workflow.ts",
       "line": 23,
-      "moduleHash": "4780fe41e2f2107414c8b35d3865816c6e1d791a716165f71843b2e5b67b9720",
+      "moduleHash": "3ed975662c0bc5663e556db6b4fce35c1860187bb00805fe74fa8994f31063ae",
       "testRefs": []
     },
     {
@@ -40410,7 +40628,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/security-tool-profile.ts",
       "line": 12,
-      "moduleHash": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
+      "moduleHash": "0e0791a3d2b130f0c25eba0aec64445c365fd4e27ec3088bde2e41571446f632",
       "testRefs": []
     },
     {

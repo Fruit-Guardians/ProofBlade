@@ -310,7 +310,7 @@ function scanUtf16(bytes: Buffer, minLength: number, maxResults: number, output:
   }
 }
 
-function isElf(bytes: Buffer): boolean {
+export function isElf(bytes: Buffer): boolean {
   return bytes.length >= 20 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46 && (bytes[4] === 1 || bytes[4] === 2) && (bytes[5] === 1 || bytes[5] === 2);
 }
 
@@ -362,7 +362,7 @@ function peSymbols(bytes: Buffer): BinarySymbol[] | undefined {
   return result;
 }
 
-function elfSections(bytes: Buffer): BinarySection[] | undefined {
+export function elfSections(bytes: Buffer): BinarySection[] | undefined {
   if (!isElf(bytes)) return undefined;
   const bits = bytes[4] === 1 ? 32 : 64;
   const endian = bytes[5] === 2 ? "big" : "little";
@@ -380,7 +380,7 @@ function elfSections(bytes: Buffer): BinarySection[] | undefined {
   return raw.map((section, index) => ({ index, name: sectionName(bytes, stringSection, section.nameOffset), type: elfSectionType(section.type), flags: elfSectionFlags(section.flags), address: hex(section.address), offset: section.offset, size: section.size, alignment: section.align, link: section.link, entrySize: section.entrySize }));
 }
 
-function elfSymbols(bytes: Buffer): BinarySymbol[] | undefined {
+export function elfSymbols(bytes: Buffer): BinarySymbol[] | undefined {
   const sections = elfSections(bytes);
   if (!sections) return undefined;
   const bits = bytes[4] === 1 ? 32 : 64;
