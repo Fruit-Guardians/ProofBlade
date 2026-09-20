@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.22",
+  "version": "0.7.23",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-09-19T06:15:00.000Z",
+  "updatedAt": "2026-09-19T13:20:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 22,
-    "securityAuditCount": 22,
-    "lastBugAuditAt": "2026-09-19T06:15:00.000Z",
-    "lastSecurityAuditAt": "2026-09-19T06:15:00.000Z",
-    "sourceHash": "d699073d4c53005246237a3379675cacef8bf71c8da37c4b6589116466adc6a6",
+    "bugAuditCount": 23,
+    "securityAuditCount": 23,
+    "lastBugAuditAt": "2026-09-19T13:20:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T13:20:00.000Z",
+    "sourceHash": "f54851d8b659500209f9ff1a25ed46bbd347966c11024c8eee22be6c4fe75eb9",
     "result": "passed"
   }
 }
@@ -60,6 +60,7 @@
 - Server 启动必须在首个请求前调用 `DebugDataService.assertRuntimeShape()`，断言 `@proofblade/materials` 运行时暴露 `REQUIRED_CONTROL_METHODS` 的全部成员并打印解析到的包路径。缺失成员属于源码与 `dist` 的构建错配，必须 fail-fast；不得为该断言增加运行时兼容降级，降级会把构建问题重新变成难以定位的投影异常。`npm run gui` 先执行 `build:gui-deps` 保证产物一致，`gui:fast` 只用于已由 watcher 保证一致的场景。
 - 普通对话**不得**创建 `.proofblade-workspaces/<runId>`。`createConversation()` 构造的 TaskContract 使用用户选择的真实目录（`target`/`allowed_workspace` = 该目录、`inputs: []`），执行 cwd 由 `taskExecutionWorkspace()` 解析，因此无需 staging；即使填写了 `verificationCommand` 也仍是普通对话。staging 只服务附件验证任务，由 `startTask()` 经 `stageTaskWorkspace()` 创建，用于不可变附件、逐文件 sha256、符号链接拒绝与可重放 cwd。staging 根必须是 `dirname(runsRoot)` 而非 Run 目录内部——`JsonlControlStore` 会把任何已存在的 Run 目录当作既有 Run。该边界由回归测试**双向**锁定（普通对话不创建 + 附件任务仍创建），路径断言必须复用 `taskWorkspaceDir()`/`taskWorkspaceRoot()`，不得另写字面量以免与实现漂移。
 - `POST /api/conversations` **不得**加载 workspace 能力目录（`capabilityCatalog()`）。创建只做三件事：校验工作目录、创建最小 Run、保存调用方实际提交的偏好字段。因此 `WorkspaceSettingsStore.saveConversation()` 允许省略 `defaults`；省略时**不落地** `enabledTools`/`enabledSkills`/`enabledMcpServers`，这些列表在读取时由当前默认值解析。理由有两条：创建阶段扫描 Skills/MCP/Tool 目录属于用户尚未要求的开销；而把创建时的快照写进本地配置，会让此后新增的能力对该对话永久不可见。显式选择与已存值仍优先于默认值。
+- 后台轮询的可见状态规则必须经 `polling.ts` 的 `isPollingAllowed()` 判定，**不得在定时器回调里重新内联** `visibilityState` 比较：每个 tick 都会取回完整 RunDetail（实测一个 121 事件的 Run 为 145KB，其中 events 占 100KB），隐藏标签页不该调度这份开销。该规则由 `[contract:polling-hidden-document-is-idle]` 与 `gui-polling-idle-discipline` 契约锁定。服务端 `/api/runs/:id/events` 已支持 `afterSeq` 增量读取，但客户端**尚未采用**——采用它需要客户端累积事件并同步改动时间线与调试器，属行为变更，须浏览器验证。
 
 ## 验证
 

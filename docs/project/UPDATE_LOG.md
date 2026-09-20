@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T20:45:00+08:00
+> 状态更新时间：2026-09-19T21:20:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-018 | 2026-09-19T21:20:00+08:00 | PLAN-240 | perf/polling-visibility-rule | 本条记录所在提交 |
 | UPDATE-20260919-017 | 2026-09-19T20:45:00+08:00 | PLAN-240 | perf/archival-failure-semantics | 本条记录所在提交 |
 | UPDATE-20260919-016 | 2026-09-19T20:10:00+08:00 | PLAN-240 | perf/observer-diagnostics | 本条记录所在提交 |
 | UPDATE-20260919-015 | 2026-09-19T19:40:00+08:00 | PLAN-240 | perf/hot-path-budget-gate | 本条记录所在提交 |
@@ -73,6 +74,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-018
+
+时间：2026-09-19T21:20:00+08:00
+
+摘要：表项 I：轮询可见状态规则抽为可测谓词并登记门禁；核实增量半边服务端已支持但客户端未采用。
+
+### 变更
+
+- 核实结果：可见状态半边已存在（App.tsx 的 setInterval 回调本就有 visibilityState 早退），本轮把它抽为导出的 isPollingAllowed() 谓词，使规则可被断言而不是内联在组件里
+- App.tsx 后台定时器改为经该谓词判定；新增断言禁止把检查重新内联，否则谓词不再是唯一规则来源
+- 核实增量半边：服务端 /api/runs/:id/events 已支持 afterSeq（server.ts:365），但客户端无任何调用，refreshDetail 仍走全量 getRun
+- 新增 apps/gui/tests/polling.test.ts 三项断言，含 contract:polling-hidden-document-is-idle；契约登记为 gui-polling-idle-discipline
+
+### 验证
+
+- [x] npm run build:gui-deps、npm run typecheck --workspace=@proofblade/gui passed
+- [x] node --import tsx --test apps/gui/tests/polling.test.ts: 7/7 passed
+- [x] node --import tsx --test apps/gui/tests/*.test.ts: 97/97 passed
+- [x] npm run check:change-contracts passed（10 contracts）
+- [x] 明确标注局限：定时器接线用源码形状断言而非行为断言，因为 App.tsx 是 React 组件、本环境无法挂载；PR 中未声称具备行为覆盖
 
 ## UPDATE-20260919-017
 

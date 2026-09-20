@@ -32,6 +32,21 @@
       ]
     },
     {
+      "id": "gui-polling-idle-discipline",
+      "triggers": [
+        {
+          "path": "apps/gui/src/polling.ts",
+          "patterns": ["isPollingAllowed", "visibilityState", "SingleFlightPoller"]
+        },
+        {
+          "path": "apps/gui/src/App.tsx",
+          "patterns": ["isPollingAllowed", "visibilityState", "setInterval"]
+        }
+      ],
+      "testPaths": ["apps/gui/tests/"],
+      "scenarios": ["contract:polling-hidden-document-is-idle"]
+    },
+    {
       "id": "gui-shutdown-failure-cleanup",
       "triggers": [
         {

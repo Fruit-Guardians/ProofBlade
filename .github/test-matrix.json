@@ -215,6 +215,12 @@
       "command": "node --import tsx --test packages/materials/tests/app-server.test.ts packages/materials/tests/approval-policy.test.ts"
     },
     {
+      "id": "gui-polling",
+      "sourceGlobs": ["apps/gui/src/polling.ts"],
+      "testGlobs": ["apps/gui/tests/polling.test.ts"],
+      "command": "node --import tsx --test apps/gui/tests/polling.test.ts"
+    },
+    {
       "id": "gui-task-workspace",
       "sourceGlobs": ["apps/gui/src/task-workspace.ts"],
       "testGlobs": ["apps/gui/tests/debug-data.test.ts"],
