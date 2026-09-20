@@ -50,6 +50,18 @@
 | `test:ci-gates` | 40 通过 |
 | `test-matrix` | 23 rules |
 | `npm run build` | 无 `error TS` |
+| `npm run test:staged` | **1003 用例 / 997 通过 / 2 失败 / 4 跳过**（失败见下） |
+
+### 3.0 全量 `test:staged` 的两处失败：环境性，非本次改动引入
+
+| 失败用例 | 错误 |
+|---|---|
+| `shell_background returns immediately and shell_job polls then stops the real process` | `EBUSY: resource busy or locked, rmdir '…\Temp\proofblade-shell-bg-test-…'` |
+| `bash anchors an artifact only when output was actually withheld` | `EBUSY: resource busy or locked, rmdir '…\Temp\proofblade-anchor-test-…'` |
+
+两条都是**临时目录清理时 `EBUSY`**——Windows 上后台子进程尚未释放句柄，属环境限制而非断言逻辑失败。判定为非本次引入的依据：本次会话在干净基线 `e3ffb3c`（= 当前 `origin/main`）与 `1eaab04` 上分别跑过全量套件，**同样这两条失败**。
+
+**我不能给出的保证**：本次没有在最后一轮再跑一遍干净基线做同轮对照，上句依据的是本会话早前的两次基线运行。若需要严格同轮对照，请在 `e3ffb3c` 上复跑一次。
 
 **合并拓扑**：`origin/main` = `e3ffb3c`；`perf/plan-240-integration` = `589de5e`（`main` 之上 23 个提交）；本 PR 分支位于集成分支之上（提交数会随本文件自身更新而变化，故不写死——用 `git rev-list --count origin/perf/plan-240-integration..<分支>` 取）。
 
