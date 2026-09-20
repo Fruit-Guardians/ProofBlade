@@ -51,7 +51,9 @@
 | `test-matrix` | 23 rules |
 | `npm run build` | 无 `error TS` |
 
-**合并拓扑**：`origin/main` = `e3ffb3c`；`perf/plan-240-integration` = `589de5e`（`main` 上 23 个提交）；本 PR 分支 = 其上的 11 个提交。`git merge-base` = `e3ffb3c`，`rev-list --count integration..main` = **0**，`git merge-tree --write-tree main integration` **exit 0** —— 即**纯快进，无冲突**。
+**合并拓扑**：`origin/main` = `e3ffb3c`；`perf/plan-240-integration` = `589de5e`（`main` 之上 23 个提交）；本 PR 分支位于集成分支之上（提交数会随本文件自身更新而变化，故不写死——用 `git rev-list --count origin/perf/plan-240-integration..<分支>` 取）。
+
+判定依据：`git merge-base origin/main origin/perf/plan-240-integration` = `e3ffb3c`（即当前 `main` 顶点）；`git rev-list --count origin/perf/plan-240-integration..origin/main` = **0**；`git merge-tree --write-tree origin/main origin/perf/plan-240-integration` **exit 0**。即集成分支相对 `main` 是**纯快进，无冲突**。
 
 三个 baseline 脚本：`scripts/tool-hot-path-baseline.ts`（provider-free）、`scripts/tool-hot-path-real-run-baseline.ts`、`scripts/tool-hot-path-long-run-baseline.ts`。
 
