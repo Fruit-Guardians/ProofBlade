@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T16:10:00+08:00
+> 状态更新时间：2026-09-19T16:40:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-010 | 2026-09-19T16:40:00+08:00 | PLAN-240 | docs/tool-hot-path-cost-breakdown | 本条记录所在提交 |
 | UPDATE-20260919-009 | 2026-09-19T16:10:00+08:00 | PLAN-240 | perf/real-run-baseline | 本条记录所在提交 |
 | UPDATE-20260919-008 | 2026-09-19T15:35:00+08:00 | PLAN-240 | perf/tool-artifact-readback | 本条记录所在提交 |
 | UPDATE-20260919-007 | 2026-09-19T15:05:00+08:00 | PLAN-240 | perf/experiment-gate-deferred-projection | 本条记录所在提交 |
@@ -65,6 +66,29 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-010
+
+时间：2026-09-19T16:40:00+08:00
+
+摘要：工具热路径成本分解：把单次 read 的 25ms 落到具体提交与事件上，修正表项 T1 中不可达的「零同步提交」目标并给出 write-behind 队列设计。
+
+### 变更
+
+- 新增 docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md：真实 Run 上的提交/事件分解、T3 收益量化、T1 队列设计提案与验收条件
+- 实测确认一次 read 产生 4 条事件、2 个逻辑提交（ArtifactStore.putText 与 DeterministicObserver.observe），observer 已把 annotation/observation/evidence 合并进单一事务，该方向无剩余空间
+- 实测确认投影重写每次约 4.3ms（5 次强制投影 68.1ms vs 延后 46.8ms），为 PR #228 提供可复现的收益量化
+- 修正父计划表项 T1 与 §5.6.3：目标由「零同步提交」改为「最多一次同步提交」，并说明 artifact 注册不可延后的原因（Evidence/verifier 引用对象）
+- §7.2.2 验收条目同步修正：普通工具 commit 由 0 改为 <=1，并记录真实 Run 上 projection rewrite 已实测为 0
+- 建议 T1 排到 D1 之后实施，复用 D1 的有界缓冲与 flush 屏障定义
+- 明确 write-behind 队列必须 fail-closed，不得复用 fail-soft 的 ControlEventBatcher（其注释声明 control-plane 不使用该队列）
+
+### 验证
+
+- [x] 事件序列通过真实 ControlStore 追踪确认（artifact_registered / artifact_annotated / observation_added / evidence_added）
+- [x] 提交点通过包装 ControlStore 公共 API 并打印调用栈确认
+- [x] 投影重写收益在真实 ControlStore 上以 5 次连续 record 对比测得
+- [x] npm run check:project-reports、check:components passed
 
 ## UPDATE-20260919-009
 

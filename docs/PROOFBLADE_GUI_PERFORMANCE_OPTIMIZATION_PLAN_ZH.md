@@ -338,7 +338,7 @@ DSH 的 `bash`/`pwsh` 除工具定义说明外，还要求每次调用提供短�
 |---|---:|---|---|---|---|
 | A | P0 | 修复 GUI 与 workspace package 的构建一致性 | `package.json`、`apps/gui/package.json`、启动测试 | 消除 `loadProjectionHint` 运行时报错 | 启动前验证该方法存在；GUI HTTP 200；源码变化后不会加载旧 `dist` |
 | T0 | P0 | 增加工具分阶段计时，不经 ControlStore 持久化计时本身 | `coding-resources.ts`、Pi observability、benchmark | 精确区分命令耗时和框架开销 | 输出 execute/rewrite/artifact/control/observe/experiment/subscriber/total 时间 |
-| T1 | P0 | 普通工具结果启用零同步控制写快速路径 | `coding-resources.ts`、`tools/runtime.ts` | 毫秒命令不再等待多轮锁和 fsync | 小型成功 read/glob/grep/bash 的同步 ControlStore commit 为 0 |
+| T1 | P0 | 普通结果的派生观察延后到回合边界（最多一次同步提交） | `coding-resources.ts`、`tools/runtime.ts`、`knowledge/observer.ts` | 毫秒命令不再等待第二多轮锁和 fsync；收益约 12ms/次 | 小型成功 read/glob/grep/bash 的同步 ControlStore commit <= 1（实测现状为 2）；见 §5.6.3 与拆分文档 |
 | T2 | P0 | 将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit | ArtifactStore、Observer、ExperimentGate、ControlStore | 重要结果从多次事务降到一次 | 单个重要工具结果最多一次锁、一次 event append、零次 projection rewrite |
 | T3 | P0 | ExperimentGate 只对声明需要的安全实验启用，普通 coding chat 使用内存去重 | `experiment-gate.ts`、`coding-lane.ts` | 删除每次普通 bash 的投影重写 | 普通对话 bash 不产生同步 experiment projection |
 | T4 | P1 | 去除工具结果重复 hash、Artifact 回读和 telemetry snapshot | `coding-resources.ts`、`runtime.ts`、`pi-events.ts` | 降低 CPU、磁盘和 subscriber barrier | 同一输出只计算一次内容 hash；observer 直接接收已知内容；telemetry 不读 snapshot |
@@ -597,7 +597,11 @@ interface ToolResultCommit {
 5. 事务统一使用 `persistProjection:false`；回合结束、lane close、checkpoint 或 verifier barrier 再 `flushProjection()`。
 6. `tool_result_recorded` 直接使用 ToolResultCommit 中的 Artifact hash/Evidence 状态，不再调用 `snapshot()` 查回。
 
-#### 5.6.3 普通结果使用零同步提交
+#### 5.6.3 普通结果最多一次同步提交
+
+> **评审修订 3（实测修正）**：本节原写「零同步提交」。真实 Run 基线（PR #230）与成本分解（`docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md`）表明该目标在当前架构下**不可达**：一次 `read` 有 2 个逻辑提交（artifact 注册、派生观察），每次约 12ms；artifact 是后续 Evidence/verifier 的引用对象，不能在模型继续前不落盘。
+>
+> 因此目标修正为**「普通结果最多一次同步提交」**，理论收益从 25ms 降到约 13ms。完整分解与队列设计见拆分文档，本节只保留结论。
 
 满足以下全部条件时进入快速路径：
 
@@ -611,13 +615,17 @@ interface ToolResultCommit {
 快速路径行为：
 
 - Tool Result 立即返回模型。
-- 不同步创建自动 Evidence。
-- 不同步记录 Experiment。
-- Artifact/审计摘要进入 bounded write-behind 队列。
-- 队列在 turn end、agent end、显式 checkpoint 和进程关闭时 flush。
-- 队列满时批量 flush，而不是退化为每项单独事务。
+- **artifact 注册保持同步**（提交 1）：它是后续 Evidence 与 verifier 的引用对象，延后会让引用悬空。
+- 派生的 annotation / observation / evidence（提交 2）进入 bounded write-behind 队列，**不再同步**。
+- 不同步记录 Experiment（已由表项 T3 达成）。
+- 队列在 turn end、agent end、显式 checkpoint、lane close、pause、verifier handoff 和进程关闭时 flush。
+- 队列满时**降级为同步提交**，不得丢弃：Observation/Evidence 不是遥测，队列必须 fail-closed，不能复用 fail-soft 的 `ControlEventBatcher`（其注释明确 `Control-plane commands never use this class`）。
 
 Pi session 本身仍保存模型看到的 Tool Result，因此普通结果不会因为控制投影延迟而从对话历史消失。只有需要被最终结论引用的材料才在使用前提升为正式 Evidence。
+
+**模型可见行为变更**：派生观察延后后，`observationNotice` 不再能同步给出 observation/evidence ID，只能保留 `progressKey`（或标记为 pending）。这是本项唯一的模型可见变更，必须独立评审。
+
+**实施顺序**：建议排到表项 **D1（Session live buffer）之后**，复用 D1 建立的有界缓冲与 flush 屏障定义，而不是先造一套再改。
 
 #### 5.6.4 重要结果只允许一次同步事务
 
@@ -808,8 +816,9 @@ Tool execute
 
 | 指标 | 目标 |
 |---|---:|
-| 单个普通工具同步 ControlStore commit / fsync / projection rewrite | `0 / 0 / 0` |
+| 单个普通工具同步 ControlStore commit（已实测 2 → 目标 1） | `<= 1` |
 | 单个重要工具同步 ControlStore commit / event fsync / projection rewrite | `<=1 / <=1 / 0` |
+| 单个普通工具 projection rewrite（真实 Run 已实测 0） | 0 |
 | observer 同步磁盘/网络操作 | 0 次 |
 | Spill 失败导致成功 Tool 变为失败 | 0 次 |
 | 创建阶段 Skills/MCP/Tool Catalog 内容扫描 | 0 次 |
@@ -982,7 +991,7 @@ artifact_reads
    分离 canonical/model/presentation/durable，保证 finalize 和 observer 不做阻塞 I/O。  
    *测试入口*：§8.7 第 1–2 条（注入 I/O 即失败）。
 
-6. **PR 6：Session live buffer 与普通工具零同步写（表项 D1 + T1 + T3）**  
+6. **PR 6：Session live buffer 与普通工具最多一次同步写（表项 D1 + T1 + T3）**  
    让成功的小型 read/glob/grep/bash 先返回模型，在 turn/close/checkpoint 做明确 flush；ExperimentGate 限定适用范围。  
    *测试入口*：§8.7 第 3–4 条 + commit 计数测试。
 
