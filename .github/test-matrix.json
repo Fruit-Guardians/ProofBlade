@@ -35,9 +35,10 @@
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
-        "packages/materials/tests/competition-remote-query-matrix.test.ts"
+        "packages/materials/tests/competition-remote-query-matrix.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/competition-api.test.ts packages/materials/tests/dasctf-api.test.ts packages/materials/tests/competition-fleet.test.ts packages/materials/tests/competition-control-plane.test.ts packages/materials/tests/competition-solver.test.ts packages/materials/tests/environment-janitor.test.ts packages/materials/tests/competition-remote-query-matrix.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/competition-api.test.ts packages/materials/tests/dasctf-api.test.ts packages/materials/tests/competition-fleet.test.ts packages/materials/tests/competition-control-plane.test.ts packages/materials/tests/competition-solver.test.ts packages/materials/tests/environment-janitor.test.ts packages/materials/tests/competition-remote-query-matrix.test.ts packages/materials/tests/experiment-gate-projection.test.ts"
     },
     {
       "id": "runtime-recovery",

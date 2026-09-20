@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T14:40:00+08:00
+> 状态更新时间：2026-09-19T15:05:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-007 | 2026-09-19T15:05:00+08:00 | PLAN-240 | perf/experiment-gate-deferred-projection | 本条记录所在提交 |
 | UPDATE-20260919-006 | 2026-09-19T14:40:00+08:00 | PLAN-240 | perf/version-snapshot-cache | 本条记录所在提交 |
 | UPDATE-20260919-005 | 2026-09-19T14:15:00+08:00 | PLAN-240 | perf/conversation-create-minimal | 本条记录所在提交 |
 | UPDATE-20260919-004 | 2026-09-19T13:50:00+08:00 | PLAN-240 | test/conversation-staging-boundary | 本条记录所在提交 |
@@ -62,6 +63,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-007
+
+时间：2026-09-19T15:05:00+08:00
+
+摘要：ExperimentGate 记录不再同步重写 Run projection：该路径是每次普通 bash 都触发的最大可避免成本。
+
+### 变更
+
+- ExperimentGate.record() 的 dispatchTransaction 改为传 { persistProjection: false }；dispatchTransaction 只在显式 false 时跳过投影写入（control-store.ts:591/800）
+- ExperimentGateInput 新增可选 dispatch 选项，调用方可显式要求持久投影；默认值与文档写在类型上而非调用点
+- 对齐既有热路径约定：ArtifactStore、Effect Journal、Pi 可观测性与 checkpoint 早已使用 persistProjection:false，由 flushProjection() 在回合边界、checkpoint 或 lane 关闭时落盘
+- 新增 packages/materials/tests/experiment-gate-projection.test.ts 5 项断言
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test packages/materials/tests/experiment-gate-projection.test.ts: 5/5 passed
+- [x] 关键断言：记录实验后 projection.json 的 mtime+size 不变（热路径不重写）；事件日志仍增长；实验在折叠快照与纯事件日志重放中均可见；flushProjection() 后投影含该实验且封印完整；显式 persistProjection:true 立即落盘；两次失败后仍正确阻断
+- [x] node --import tsx --test competition-solver/control-store/coding-resources/competition-convergence: 94 passed / 2 failed，两项失败已在 1eaab04 worktree 上复现，非本次引入
+- [x] npm run check:changed-tests、check:components passed
 
 ## UPDATE-20260919-006
 

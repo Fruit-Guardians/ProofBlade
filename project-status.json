@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T14:40:00+08:00",
+  "updatedAt": "2026-09-19T15:05:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,29 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-007",
+      "occurredAt": "2026-09-19T15:05:00+08:00",
+      "summary": "ExperimentGate 记录不再同步重写 Run projection：该路径是每次普通 bash 都触发的最大可避免成本。",
+      "branch": "perf/experiment-gate-deferred-projection",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "ExperimentGate.record() 的 dispatchTransaction 改为传 { persistProjection: false }；dispatchTransaction 只在显式 false 时跳过投影写入（control-store.ts:591/800）",
+        "ExperimentGateInput 新增可选 dispatch 选项，调用方可显式要求持久投影；默认值与文档写在类型上而非调用点",
+        "对齐既有热路径约定：ArtifactStore、Effect Journal、Pi 可观测性与 checkpoint 早已使用 persistProjection:false，由 flushProjection() 在回合边界、checkpoint 或 lane 关闭时落盘",
+        "新增 packages/materials/tests/experiment-gate-projection.test.ts 5 项断言"
+      ],
+      "validation": [
+        "npm run build:gui-deps passed",
+        "node --import tsx --test packages/materials/tests/experiment-gate-projection.test.ts: 5/5 passed",
+        "关键断言：记录实验后 projection.json 的 mtime+size 不变（热路径不重写）；事件日志仍增长；实验在折叠快照与纯事件日志重放中均可见；flushProjection() 后投影含该实验且封印完整；显式 persistProjection:true 立即落盘；两次失败后仍正确阻断",
+        "node --import tsx --test competition-solver/control-store/coding-resources/competition-convergence: 94 passed / 2 failed，两项失败已在 1eaab04 worktree 上复现，非本次引入",
+        "npm run check:changed-tests、check:components passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-006",
       "occurredAt": "2026-09-19T14:40:00+08:00",
