@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T19:10:00+08:00",
+  "updatedAt": "2026-09-19T19:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,28 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-015",
+      "occurredAt": "2026-09-19T19:40:00+08:00",
+      "summary": "表项 J：把工具热路径的实测计数固化为 CI 门禁，并登记为 change-contract，使 #228/#229/#232/#234 的收益不会被静默改回。",
+      "branch": "perf/hot-path-budget-gate",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "新增 packages/materials/tests/hot-path-budget.test.ts：4 条带 [contract:...] 标识的门禁，覆盖事件预算、投影写入为 0、Artifact 回读为 0、Skill 目录只解析一次",
+        "门禁只断言计数，不断言耗时——耗时门禁在共享 runner 上测的是机器本身，且不稳定门禁最终会被关闭，比没有门禁更糟",
+        ".github/change-contracts.json 新增 hot-path-cost-budget 契约：改动 artifact-store/observer/pi-events/skills registry 时，必须保留这 4 条契约场景",
+        "新增一条断言把预算常量与成本分解文档绑定，避免门禁与其依据文档各自漂移",
+        "父计划表项 J 由 P3 提为 P2 并标记为已实施"
+      ],
+      "validation": [
+        "node --import tsx --test packages/materials/tests/hot-path-budget.test.ts: 5/5 passed",
+        "npm run check:change-contracts passed（9 contracts，含新增的 hot-path-cost-budget）",
+        "npm run check:changed-tests、check:components passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-014",
       "occurredAt": "2026-09-19T19:10:00+08:00",

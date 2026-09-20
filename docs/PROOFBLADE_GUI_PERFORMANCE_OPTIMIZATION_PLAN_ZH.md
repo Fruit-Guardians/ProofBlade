@@ -353,7 +353,7 @@ DSH 的 `bash`/`pwsh` 除工具定义说明外，还要求每次调用提供短�
 | G | ~~P1~~ **已关闭** | ~~Context 热路径去重~~ **实测无剩余空间**：observation queue 在空 Run 为 0 项、哈希 0.0016ms，`ObservationQueueCache` 已按 `lastSeq/generation/projectionHash` 命中（500 次请求仅 1 次重投影），快照本身也已缓存。剩余可省为亚毫秒级 | — | 无（已达标） | 见 `docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md` §6.1 |
 | H | P2 | GUI 详情接口按视图拆分 | `server.ts`、`debug-data.ts`、`api.ts`、`App.tsx` | 聊天页不读取调试器全量数据；**实测 `events` 占每次轮询载荷的 69%（100,160 / 144,901 字节）** | 聊天轮询不传完整事件流；时间线与调试器改为按需/增量拉取。**实施需客户端协同，且 UI 行为无法仅凭单元测试证明，须浏览器验证** |
 | I | P2 | 轮询改为增量和可见状态驱动 | `App.tsx`、`polling.ts` | 减少无效后台读取 | 非活动页停止详情轮询；使用 `lastSeq` 请求增量 |
-| J | P3 | 加入基准和预算门禁 | GUI/Materials tests、benchmark script | 防止性能回退 | CI 输出创建耗时、首轮初始化耗时、哈希和目录扫描次数 |
+| J | P2 | 加入基准和预算门禁 | `packages/materials/tests/hot-path-budget.test.ts`、`.github/change-contracts.json` | 防止性能回退；**已实施**（PR #236） | **门禁只断言计数，不断言耗时**（耗时门禁在共享 runner 上测的是机器）；4 条 `[contract:...]` 场景已登记进 change-contracts，改动相关源文件时必须保留 |
 
 ### 4.1 测试文件与回滚粒度（补充）
 

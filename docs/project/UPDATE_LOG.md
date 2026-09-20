@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T19:10:00+08:00
+> 状态更新时间：2026-09-19T19:40:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-015 | 2026-09-19T19:40:00+08:00 | PLAN-240 | perf/hot-path-budget-gate | 本条记录所在提交 |
 | UPDATE-20260919-014 | 2026-09-19T19:10:00+08:00 | PLAN-240 | docs/items-g-and-h-verified | 本条记录所在提交 |
 | UPDATE-20260919-013 | 2026-09-19T18:40:00+08:00 | PLAN-240 | perf/skill-registry-cache | 本条记录所在提交 |
 | UPDATE-20260919-012 | 2026-09-19T18:00:00+08:00 | PLAN-240 | docs/t2-infeasible | 本条记录所在提交 |
@@ -70,6 +71,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-015
+
+时间：2026-09-19T19:40:00+08:00
+
+摘要：表项 J：把工具热路径的实测计数固化为 CI 门禁，并登记为 change-contract，使 #228/#229/#232/#234 的收益不会被静默改回。
+
+### 变更
+
+- 新增 packages/materials/tests/hot-path-budget.test.ts：4 条带 [contract:...] 标识的门禁，覆盖事件预算、投影写入为 0、Artifact 回读为 0、Skill 目录只解析一次
+- 门禁只断言计数，不断言耗时——耗时门禁在共享 runner 上测的是机器本身，且不稳定门禁最终会被关闭，比没有门禁更糟
+- .github/change-contracts.json 新增 hot-path-cost-budget 契约：改动 artifact-store/observer/pi-events/skills registry 时，必须保留这 4 条契约场景
+- 新增一条断言把预算常量与成本分解文档绑定，避免门禁与其依据文档各自漂移
+- 父计划表项 J 由 P3 提为 P2 并标记为已实施
+
+### 验证
+
+- [x] node --import tsx --test packages/materials/tests/hot-path-budget.test.ts: 5/5 passed
+- [x] npm run check:change-contracts passed（9 contracts，含新增的 hot-path-cost-budget）
+- [x] npm run check:changed-tests、check:components passed
 
 ## UPDATE-20260919-014
 

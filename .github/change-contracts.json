@@ -2,6 +2,34 @@
   "schemaVersion": 1,
   "contracts": [
     {
+      "id": "hot-path-cost-budget",
+      "triggers": [
+        {
+          "path": "packages/materials/src/effects/artifact-store.ts",
+          "patterns": ["dispatch", "persistProjection", "putText"]
+        },
+        {
+          "path": "packages/materials/src/knowledge/observer.ts",
+          "patterns": ["dispatchTransaction", "annotation", "observation", "evidence"]
+        },
+        {
+          "path": "packages/materials/src/observability/pi-events.ts",
+          "patterns": ["ControlEventBatcher", "persistProjection", "snapshot", "resolve"]
+        },
+        {
+          "path": "packages/materials/src/skills/registry.ts",
+          "patterns": ["skillTreeRevision", "skillRegistryCache", "read"]
+        }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:hot-path-event-budget",
+        "contract:hot-path-projection-budget",
+        "contract:hot-path-readback-budget",
+        "contract:skill-catalog-parse-budget"
+      ]
+    },
+    {
       "id": "gui-shutdown-failure-cleanup",
       "triggers": [
         {
