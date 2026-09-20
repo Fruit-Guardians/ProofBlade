@@ -306,7 +306,7 @@ enqueue（工具返回前，仅内存）
 
 「有测试」和「测试能失败」是两件事。为了不在评审时把前者当后者，我对本计划交付的改动逐个做了**变异测试**：故意改坏源码，看对应测试是否会红。方法本身不需要新工具，只需「改坏 → 跑测试 → 还原」。
 
-**结果：10 个变异里 9 个被抓住。**
+**结果：16 个变异里 15 个被抓住。**
 
 | # | 变异（把正确行为改坏） | 对应测试 | 结果 |
 |---|---|---|---|
@@ -319,7 +319,15 @@ enqueue（工具返回前，仅内存）
 | M9 | 不再检测缺失的运行时成员 | `runtime-shape.test.ts` | ✅ 抓住 |
 | M10 | 无 defaults 时也冻结能力清单 | `workspace-settings.test.ts` | ✅ 抓住 |
 | M11 | revision 变化后仍复用 RunDetail 缓存 | `debug-data.test.ts` | ✅ 抓住 |
+| M12 | 遥测 payload 在 append 时立刻解析（回到关键路径） | `telemetry-lazy-payload.test.ts` | ✅ 抓住 |
+| M13 | 每次 experiment 记录都持久化投影 | `experiment-gate-projection.test.ts` | ✅ 抓住 |
+| M14 | 永不复用 skill registry 记忆化结果 | `skill-registry-cache.test.ts` | ✅ 抓住 |
+| M15 | 让归档失败逃逸出读取（成功的读被推翻） | `archival-failure-semantics.test.ts` | ✅ 抓住 |
+| M16 | artifact dispatch 不再遵守 `persistProjection` | `hot-path-budget.test.ts` | ✅ 抓住 |
+| M17 | 读取路径改为请求 eager 投影 | `hot-path-budget.test.ts` | ✅ 抓住 |
 | M6 | `#projectionAlreadyCurrent` 恒返回「不当前」 | — | ❌ **未抓住** |
+
+即 §7.2.2 那张不变量表上的计数门禁（事件预算、投影预算、回读预算、skill catalog 解析预算、归档失败语义、observer 诊断）**都经过变异验证确实能红**，不是"跑绿了所以有效"。
 
 ### 唯一未抓住的一项：不是断言弱，是路径不可达
 
@@ -337,9 +345,9 @@ enqueue（工具返回前，仅内存）
 
 同一轮里发现 `barrier-projection.test.ts` 那条「第二次屏障对已是最新的投影是 no-op」断言写的是 `settled.mtimeMs >= first.mtimeMs`——**文件被重写时同样通过**，正好与测试名声称的相反；而且它的前置步骤（re-defer 后再 flush）**本来就该发生一次写入**，注释描述的时序并未建立。现已改为先 flush 掉那次写入、再断言后续屏障不改变 mtime。
 
-### 尚未验证的部分
+### 仍未变异验证的部分
 
-上表覆盖 9 项改动。**`hot-path-budget.test.ts` 的 4 条计数门禁、`telemetry-lazy-payload`、`experiment-gate-projection`、`skill-registry-cache`、`archival-failure-semantics` 与 `read-path-parse-budget` 尚未做变异验证**——它们的断言是计数式的（例如「同步提交 ≤ 1」），预期同样可被抓住，但预期不等于验证。
+`read-path-parse-budget.test.ts` 与 `projection-hint-currency.test.ts` 的部分用例、以及 `debug-data.test.ts` 里与本计划无关的历史用例未逐一做变异。上表覆盖的是本计划**声明为门禁**的那些断言；其余属于既有测试面。
 
 ## 8. 参考
 
