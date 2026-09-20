@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T13:10:00+08:00
+> 状态更新时间：2026-09-19T13:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-003 | 2026-09-19T13:30:00+08:00 | PLAN-240 | docs/perf-plan-revision-2 | 本条记录所在提交 |
 | UPDATE-20260919-002 | 2026-09-19T13:10:00+08:00 | PLAN-240 | feat/tool-hot-path-timing | 本条记录所在提交 |
 | UPDATE-20260919-001 | 2026-09-19T12:40:00+08:00 | PLAN-240 | fix/gui-runtime-shape-assertion | 本条记录所在提交 |
 | UPDATE-20260912-001 | 2026-09-12T13:45:00+08:00 | PLAN-230 | codex/fix-chat-1789026563795 | 本条记录所在提交 |
@@ -58,6 +59,24 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-003
+
+时间：2026-09-19T13:30:00+08:00
+
+摘要：按实测结论回改性能计划：把「秒级放大」由待验证推断恢复为已确认事实，记录 PR 2 局部基线，并把 U1 迁移定为选项 B。
+
+### 变更
+
+- PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md §7.2：中心论断改为使用者已实测确认，§2.6 热路径分析与 T1/T2 优先级不再因基线未填而重排
+- §7.2.1 记录 PR 2 交付的 provider-free 局部基线，并明确它不能替代真实 Run 基线（无 ControlStore，落盘与 fsync 只被计数）
+- PROOFBLADE_BASH_DESCRIPTION_CONTRACT_ZH.md v1.1.0：§3.2 迁移方案由待选定改为已选定 B（先可选、后转必填），补充两轮实施要求与轮间判据
+- 该文档新增 §3.4 第一轮（可选参数）验收条件；原 §4 改为第二轮（转必填）验收条件，避免第一轮误用必填条目
+
+### 验证
+
+- [x] 文档一致性人工复核：三份文档（计划、U1 契约、DSH 可行性）结论无冲突
+- [x] npm run check:project-reports passed
 
 ## UPDATE-20260919-002
 

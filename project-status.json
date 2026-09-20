@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T13:10:00+08:00",
+  "updatedAt": "2026-09-19T13:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,26 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-003",
+      "occurredAt": "2026-09-19T13:30:00+08:00",
+      "summary": "按实测结论回改性能计划：把「秒级放大」由待验证推断恢复为已确认事实，记录 PR 2 局部基线，并把 U1 迁移定为选项 B。",
+      "branch": "docs/perf-plan-revision-2",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md §7.2：中心论断改为使用者已实测确认，§2.6 热路径分析与 T1/T2 优先级不再因基线未填而重排",
+        "§7.2.1 记录 PR 2 交付的 provider-free 局部基线，并明确它不能替代真实 Run 基线（无 ControlStore，落盘与 fsync 只被计数）",
+        "PROOFBLADE_BASH_DESCRIPTION_CONTRACT_ZH.md v1.1.0：§3.2 迁移方案由待选定改为已选定 B（先可选、后转必填），补充两轮实施要求与轮间判据",
+        "该文档新增 §3.4 第一轮（可选参数）验收条件；原 §4 改为第二轮（转必填）验收条件，避免第一轮误用必填条目"
+      ],
+      "validation": [
+        "文档一致性人工复核：三份文档（计划、U1 契约、DSH 可行性）结论无冲突",
+        "npm run check:project-reports passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-002",
       "occurredAt": "2026-09-19T13:10:00+08:00",
