@@ -188,6 +188,12 @@
       "command": "node --import tsx --test packages/materials/tests/demo.test.ts"
     },
     {
+      "id": "skill-registry",
+      "sourceGlobs": ["packages/materials/src/skills/**"],
+      "testGlobs": ["packages/materials/tests/skill-registry-cache.test.ts"],
+      "command": "node --import tsx --test packages/materials/tests/skill-registry-cache.test.ts"
+    },
+    {
       "id": "services-composition",
       "sourceGlobs": ["packages/materials/src/app/**"],
       "testGlobs": [

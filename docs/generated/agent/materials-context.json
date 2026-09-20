@@ -17,7 +17,7 @@
     "src/competition/api.ts": "00a3ead1c7666780af72153fce3012082e120436029dae5445431ca9d07e06d7",
     "src/competition/dasctf-api.ts": "538036302b118f2cf9942927c8ba5ca263384326d59b42d82586b1abb46af7b1",
     "src/competition/environment-janitor.ts": "e4d15beb8a2bb5e342fb453e42b5ba6916832493da525c848fb8ede334cac056",
-    "src/competition/experiment-gate.ts": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+    "src/competition/experiment-gate.ts": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
     "src/competition/fleet.ts": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
     "src/competition/http-body.ts": "f8ce3de1b667bdeb30b7f776b100d5e9f45757db5dbb1bc9efa5d7898663d79e",
     "src/competition/loop.ts": "75c2bda9293038705a0f7006368efdd61e71468a2bc6eb1a67d08c643e04b512",
@@ -85,7 +85,7 @@
     "src/knowledge/projection.ts": "ecd4a9ab8a1552439ba659d3ed8c90cc788d43b7df19780df3d9612b8dccc5be",
     "src/mcp/registry.ts": "f6c41569f7f1ec28072ae5a834e0447bade03e45a3dd6b941c8807518741e2a9",
     "src/observability/lifecycle-audit.ts": "ee884b37500e8dff1e02816156693818e58146e492ead9b1c17e597a9970d9b9",
-    "src/observability/pi-events.ts": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+    "src/observability/pi-events.ts": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
     "src/observability/run-telemetry.ts": "80ee72129627cc518c393d98dec30c7dfaf904dd36e99e4338a7533dc5d38b91",
     "src/observability/telemetry-backend.ts": "ca004d56be7d21359d5d254cbf160f6d4ee66564e19093b92133aa8cb56697d8",
     "src/observability/tool-timing.ts": "9a21d5ee75135cc7e69dccc36a40758944c5e49308fd501574d5e59e5b6b803e",
@@ -120,8 +120,8 @@
     "src/recovery/session-runtime-wire.ts": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
-    "src/runtime/coding-lane.ts": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
-    "src/runtime/coding-resources.ts": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+    "src/runtime/coding-lane.ts": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
+    "src/runtime/coding-resources.ts": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
     "src/runtime/coding-turn-projection.ts": "9634c98b8440e19dc694ed92ed2521b54ba50c1b7974e338416441154586af22",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -145,7 +145,7 @@
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
     "src/sandbox/fixture.ts": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
     "src/security/approval-policy.ts": "1f9d442218afddf3547d7bd481fc4121394b2fb0ad7bba66d7ab1934d6876e5c",
-    "src/skills/registry.ts": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+    "src/skills/registry.ts": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
     "src/storage/control-authority.ts": "8add37c36f821514cf985b4c9c96722351314ae4ffc516efd91d617a8c787647",
     "src/storage/jsonl-store.ts": "d58022379f230e4eda48081934dd6760a81e3ae828f3169259865772369cb493",
     "src/storage/spill-store.ts": "be10856f0ca4e4ef962033559921dbce390efca16d0b55b683013954031c0a51",
@@ -153,7 +153,7 @@
     "src/tools/contracts.ts": "809bb08337ad6b77cc4950cf336b680db418c97a3ba85d6deb2e88a52bf0ead1",
     "src/tools/errors.ts": "97ec5b71ec31248d5a7ec6e5f17fee57b579abf5a6c8135ff4e06e2c9ae5c225",
     "src/tools/output-rewrite.ts": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
-    "src/tools/runtime.ts": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+    "src/tools/runtime.ts": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
     "src/verification/browser-reproducer.ts": "d342fabacc36244352902bdd1205b15f070f683fddf0cfa04ffa874fc58a5637",
     "src/verification/claim-verification.ts": "fced1a8ed053e684d80733d40dc89538e048b747b7fe8d7d7b6dec71a2b14851",
     "src/verification/outcome-envelope.ts": "b436f6fea396edcc72623b63061193eeeeb9f0c5276ec39b255dd44af205e144",
@@ -494,10 +494,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 23,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "line": 40,
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts"
       ]
@@ -747,6 +748,7 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -754,6 +756,7 @@
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
@@ -1000,6 +1003,7 @@
       "line": 27,
       "moduleHash": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts"
@@ -1018,6 +1022,7 @@
       "line": 94,
       "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
@@ -1070,10 +1075,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 57,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 65,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
-        "packages/materials/tests/observability.test.ts"
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts"
       ]
     },
     {
@@ -1086,8 +1092,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 154,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 202,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts"
@@ -1634,7 +1640,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 88,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -1803,12 +1809,14 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 36,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 37,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts"
       ]
     },
@@ -1832,6 +1840,7 @@
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -1839,6 +1848,7 @@
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
@@ -1934,8 +1944,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 36,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -1982,6 +1993,7 @@
       "line": 865,
       "moduleHash": "fced1a8ed053e684d80733d40dc89538e048b747b7fe8d7d7b6dec71a2b14851",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -2784,7 +2796,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 70,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts"
       ]
@@ -2800,7 +2812,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 35,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2814,7 +2826,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 37,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2828,7 +2840,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 41,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -2844,7 +2856,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 40,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/web-coding-tools.test.ts"
       ]
@@ -2860,7 +2872,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 38,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2874,7 +2886,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1748,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -2890,7 +2902,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 48,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2904,7 +2916,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 51,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -2920,7 +2932,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 55,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2934,7 +2946,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 49,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2948,7 +2960,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 52,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2962,7 +2974,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 54,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2976,7 +2988,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 53,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -2990,7 +3002,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 46,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -3004,7 +3016,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 47,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -3152,6 +3164,7 @@
       "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -3203,6 +3216,7 @@
       "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -3218,6 +3232,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/observability.test.ts",
@@ -3232,6 +3247,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -3550,8 +3566,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 92,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "line": 109,
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": []
     },
     {
@@ -5077,8 +5093,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 366,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 414,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts"
       ]
@@ -5093,8 +5109,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 354,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 402,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts"
@@ -5738,8 +5754,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1286,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 1292,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5754,8 +5770,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1118,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 1124,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5770,8 +5786,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1029,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 1035,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -5787,8 +5803,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1171,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 1177,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -5803,8 +5819,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1325,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 1331,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5820,7 +5836,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1882,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5836,7 +5852,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1634,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -5854,7 +5870,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1655,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5870,7 +5886,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 178,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -5884,7 +5900,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 455,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5900,8 +5916,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 202,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts"
       ]
     },
@@ -5916,7 +5933,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 249,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5932,7 +5949,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 262,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5948,7 +5965,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1762,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -5964,7 +5981,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1866,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5980,7 +5997,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1856,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5996,7 +6013,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 223,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -6010,7 +6027,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 423,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -6026,7 +6043,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 1516,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -8201,7 +8218,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 5,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": []
     },
     {
@@ -8214,8 +8231,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 15,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "line": 32,
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": []
     },
     {
@@ -8457,6 +8474,7 @@
       "moduleHash": "cd46b4639fb9eed0c30a975bdd3ed74c3180e9750c2e020f60483cce56fed1da",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -8479,6 +8497,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -8502,6 +8521,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts",
@@ -9864,6 +9884,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -10376,7 +10397,8 @@
       "moduleHash": "39a298a6e6ea74fec2b8278f1fe342b2e3c2090e1b4fd5babd006d96059b842f",
       "testRefs": [
         "packages/materials/tests/competition-solver.test.ts",
-        "packages/materials/tests/evidence-search-index.test.ts"
+        "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts"
       ]
     },
     {
@@ -12420,8 +12442,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 118,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 166,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": []
     },
     {
@@ -12435,7 +12457,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
       "line": 13,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": []
     },
     {
@@ -13811,8 +13833,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 90,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -13832,7 +13855,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 172,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -13846,7 +13869,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 186,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -13860,7 +13883,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 68,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -13874,7 +13897,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 76,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -13888,7 +13911,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 227,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": []
     },
     {
@@ -13902,7 +13925,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 235,
-      "moduleHash": "49700b85f3414ad93206adc837b797a32bf18df07056150113e40d0bd5e814bf",
+      "moduleHash": "132d103ddb4bae7c91e7adabedf303a9f42b0c119ee967ec589085edddeb2b9a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -14573,8 +14596,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 30,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 31,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": []
     },
     {
@@ -14587,8 +14610,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 15,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 16,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": []
     },
     {
@@ -14601,8 +14624,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 22,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 23,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
         "packages/materials/tests/knowledge-read-bounds.test.ts"
       ]
@@ -14858,7 +14881,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 22,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -14872,7 +14895,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 31,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -16582,6 +16605,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -17386,6 +17410,7 @@
       "line": 138,
       "moduleHash": "0ebcaf3fd4127068c8c46702649cd910036f070a989436695e65c082f39a0eff",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -17469,6 +17494,7 @@
       "moduleHash": "0ebcaf3fd4127068c8c46702649cd910036f070a989436695e65c082f39a0eff",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -17495,6 +17521,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -17522,6 +17549,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -17713,6 +17741,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -17791,6 +17820,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts"
       ]
@@ -17809,6 +17839,7 @@
       "moduleHash": "9110ec4db9885795efc1f3d0ccd2b9401b15f101c8d0aac0230ece52e7e73730",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -17843,6 +17874,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -17894,6 +17926,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -18062,6 +18095,7 @@
       "line": 79,
       "moduleHash": "3ef428678dfa81eb39ad7d38a92b77bdebc09423d34f912aa75d3880f5aea11b",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -18190,6 +18224,7 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -18212,6 +18247,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -18258,6 +18294,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -18912,6 +18949,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -19100,6 +19138,7 @@
       "line": 548,
       "moduleHash": "e4d15beb8a2bb5e342fb453e42b5ba6916832493da525c848fb8ede334cac056",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -19203,11 +19242,12 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 67,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "line": 84,
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
-        "packages/materials/tests/competition-convergence.test.ts"
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts"
       ]
     },
     {
@@ -19220,8 +19260,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 48,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "line": 65,
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
@@ -19246,6 +19286,7 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -19268,6 +19309,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -19287,8 +19329,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 34,
-      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
+      "line": 51,
+      "moduleHash": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
       "testRefs": []
     },
     {
@@ -19367,7 +19409,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -19410,6 +19454,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -19448,6 +19493,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -19499,6 +19545,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -19562,6 +19609,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -19587,6 +19635,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -19606,7 +19655,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -19762,6 +19813,7 @@
       "line": 91,
       "moduleHash": "71da3ade3bf1e5b2a8b73638e5ebf04c1238126e6b1e9364852049fb75311af5",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -19914,6 +19966,7 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -20029,6 +20082,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -20094,6 +20148,7 @@
       "line": 47,
       "moduleHash": "c81ef7be99cae48d9e98393e10a600b3d882279c931d0c9a6e269a10945fc5e8",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -20240,6 +20295,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -20272,6 +20328,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -20313,6 +20370,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -20374,6 +20432,7 @@
       "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -20406,6 +20465,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -20444,6 +20504,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -20667,6 +20728,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -20705,6 +20767,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -20756,6 +20819,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -20820,6 +20884,7 @@
       "moduleHash": "578182c5ae5f0b4f6db939b91b582f90dfefe59534d37a2e133b2b5fbf4fb07a",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -20852,6 +20917,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -20890,6 +20956,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -21063,6 +21130,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21086,6 +21154,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -21118,6 +21187,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -21157,6 +21227,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21192,6 +21263,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -21227,6 +21299,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -21250,6 +21323,7 @@
       "line": 334,
       "moduleHash": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21333,6 +21407,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21356,6 +21431,7 @@
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -21380,6 +21456,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -21406,6 +21483,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21438,6 +21516,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -21479,6 +21558,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -21549,6 +21629,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -21567,6 +21648,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -21596,6 +21678,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts"
@@ -21634,6 +21717,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21667,6 +21751,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
@@ -21704,6 +21789,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts",
@@ -21920,6 +22006,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -21928,6 +22015,7 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -22003,6 +22091,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -22035,6 +22124,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -22076,6 +22166,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -22099,6 +22190,7 @@
       "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -22119,6 +22211,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -22136,6 +22229,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -22175,6 +22269,7 @@
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -22243,7 +22338,8 @@
       "line": 531,
       "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
       "testRefs": [
-        "packages/materials/tests/coding-resources.test.ts"
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts"
       ]
     },
     {
@@ -22278,6 +22374,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
@@ -22291,6 +22388,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/update-proposals.test.ts"
@@ -22309,7 +22407,8 @@
       "line": 637,
       "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
       "testRefs": [
-        "packages/materials/tests/control-store.test.ts"
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts"
       ]
     },
     {
@@ -22395,6 +22494,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -22453,6 +22553,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -22478,6 +22579,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -22497,7 +22599,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -22688,6 +22792,7 @@
       "line": 67,
       "moduleHash": "aa816615120f1b79b517a2cfccf8a25e18d61acd23430e02b0466ac80353fda3",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -22824,6 +22929,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -22856,6 +22962,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -22897,6 +23004,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -22919,6 +23027,7 @@
       "line": 93,
       "moduleHash": "7c73e4b2946249ab397d3fcb994d7162be1c3445ef9afe13170f222b7ba9a392",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -23141,6 +23250,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -23183,6 +23293,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -23236,6 +23347,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -23268,6 +23380,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -23309,6 +23422,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -23378,7 +23492,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -23428,6 +23544,7 @@
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -23454,6 +23571,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -23479,6 +23597,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -23498,7 +23617,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -23549,6 +23670,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -23671,6 +23793,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -23740,7 +23863,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -23786,6 +23911,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -23824,6 +23950,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -23875,6 +24002,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -23908,6 +24036,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -23946,6 +24075,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -23997,6 +24127,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -24030,6 +24161,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24068,6 +24200,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -24119,6 +24252,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -24152,6 +24286,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24190,6 +24325,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -24241,6 +24377,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -24304,6 +24441,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -24336,6 +24474,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -24377,6 +24516,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -24465,6 +24605,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -24491,6 +24632,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24526,6 +24668,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -24561,6 +24704,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -24617,6 +24761,7 @@
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -25007,6 +25152,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -25046,6 +25192,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -25088,7 +25235,9 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -25179,6 +25328,7 @@
       "line": 38,
       "moduleHash": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -25445,6 +25595,7 @@
       "line": 26,
       "moduleHash": "5a2abc66cc888e30026a969d5db5928587500423450313192f39f92234b85fa0",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
@@ -25457,6 +25608,7 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -25514,6 +25666,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts"
       ]
@@ -25657,6 +25810,7 @@
       "line": 367,
       "moduleHash": "f6c41569f7f1ec28072ae5a834e0447bade03e45a3dd6b941c8807518741e2a9",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -25772,7 +25926,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -25870,6 +26026,7 @@
       "line": 207,
       "moduleHash": "f6c41569f7f1ec28072ae5a834e0447bade03e45a3dd6b941c8807518741e2a9",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -25882,14 +26039,14 @@
       "id": "@proofblade/materials::method::ControlEventBatcher.append",
       "name": "ControlEventBatcher.append",
       "kind": "method",
-      "signature": "(type: TelemetryEvent[\"type\"], actor: TelemetryEvent[\"actor\"], payload: Record<string, unknown>): void",
-      "summary": "Inferred summary: append operation used to read or inspect state.",
-      "summarySource": "inferred",
+      "signature": "(type: TelemetryEvent[\"type\"], actor: TelemetryEvent[\"actor\"], payload: Record<string, unknown>, resolve?: () => Promise<Record<string, unknown>>): void",
+      "summary": "Queue one telemetry event.",
+      "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 68,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 87,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -25899,6 +26056,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -25907,6 +26065,7 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -25921,11 +26080,13 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 81,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 106,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts",
-        "packages/materials/tests/observability.test.ts"
+        "packages/materials/tests/experiment-gate-projection.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts"
       ]
     },
     {
@@ -25938,11 +26099,13 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 193,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 241,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts",
-        "packages/materials/tests/observability.test.ts"
+        "packages/materials/tests/experiment-gate-projection.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts"
       ]
     },
     {
@@ -25955,8 +26118,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 188,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 236,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": []
     },
     {
@@ -25969,8 +26132,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/observability/pi-events.ts",
-      "line": 181,
-      "moduleHash": "36d506c505e4cd1a4059eac1d56ea8b35a26e5a22a29f048930e46b3030a54f9",
+      "line": 229,
+      "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -26010,6 +26173,7 @@
       "moduleHash": "80ee72129627cc518c393d98dec30c7dfaf904dd36e99e4338a7533dc5d38b91",
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -26035,6 +26199,7 @@
         "packages/materials/tests/session-runtime-combined-host.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-evaluation-gates.test.ts",
@@ -26060,6 +26225,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26083,6 +26249,7 @@
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -26107,6 +26274,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -26142,6 +26310,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -26177,6 +26346,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26200,6 +26370,7 @@
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -26224,6 +26395,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -26295,6 +26467,7 @@
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/version-cache.test.ts"
@@ -26451,6 +26624,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts"
@@ -26513,6 +26687,7 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -26535,6 +26710,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -26603,6 +26779,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -26658,7 +26835,8 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
-        "packages/materials/tests/pwn-tools.test.ts"
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts"
       ]
     },
     {
@@ -26732,6 +26910,7 @@
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -27040,6 +27219,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -27102,6 +27282,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27141,6 +27322,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -27183,7 +27365,9 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -27215,6 +27399,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts"
@@ -27237,6 +27422,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27268,6 +27454,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -27382,6 +27569,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -27452,6 +27640,7 @@
       "line": 14,
       "moduleHash": "1af2274f0cd0d164fdc6754ff675133d6d55213862a19b31e1b2384671c771b1",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27524,6 +27713,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -27571,6 +27761,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -27675,6 +27866,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -27699,6 +27891,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -27722,6 +27915,7 @@
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -27848,6 +28042,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -27895,6 +28090,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -27937,6 +28133,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -28004,6 +28201,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -28028,6 +28226,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -28051,6 +28250,7 @@
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -28099,6 +28299,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28137,6 +28338,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -28188,6 +28390,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/text-bounds.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -28604,6 +28807,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -28629,6 +28833,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -28652,6 +28857,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -28684,6 +28890,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -28810,6 +29017,7 @@
       "line": 233,
       "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28874,6 +29082,7 @@
       "line": 206,
       "moduleHash": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -28902,6 +29111,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -28933,6 +29143,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -29048,6 +29259,7 @@
       "line": 98,
       "moduleHash": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -29149,6 +29361,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29180,6 +29393,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -29411,6 +29625,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -29586,6 +29801,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29618,6 +29834,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -29659,6 +29876,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -29740,6 +29958,7 @@
       "line": 66,
       "moduleHash": "44a4c3a7db82806c2ba9c9b33c43739ce44810eeee0e0768d6a64b08ce9e1b76",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -29911,6 +30130,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29943,6 +30163,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -29984,6 +30205,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -30065,6 +30287,7 @@
       "line": 195,
       "moduleHash": "1b1970c2da493e3417c39b948c0de27dc385d9159d91a390a0ec071b647c1429",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30299,6 +30522,7 @@
       "line": 89,
       "moduleHash": "a6f5f14a57af0ed76df31382bf020c15aff23a6baf1685cfa5f1cee41463d61d",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30466,6 +30690,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -30498,6 +30723,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -30539,6 +30765,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -30594,6 +30821,7 @@
       "line": 130,
       "moduleHash": "72209091a66db573787dca085190915960e2e8f7f23ac42cb930771a2d7a59df",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30765,6 +30993,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -30797,6 +31026,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -30838,6 +31068,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -30919,6 +31150,7 @@
       "line": 186,
       "moduleHash": "74f2b54c54980d5bfca344e51cf80207335e0d2f17ce670a6c8e2e7f1d747cea",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31076,6 +31308,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -31154,6 +31387,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -31186,6 +31420,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -31227,6 +31462,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -31374,6 +31610,7 @@
       "line": 244,
       "moduleHash": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31548,6 +31785,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -31579,6 +31817,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -31670,6 +31909,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -31692,6 +31932,7 @@
       "line": 184,
       "moduleHash": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31802,8 +32043,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 957,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 963,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -31836,8 +32077,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 969,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 975,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31905,8 +32146,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 961,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 967,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -31931,10 +32172,11 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 127,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -31967,6 +32209,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -32008,6 +32251,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -32027,8 +32271,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 965,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 971,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -32049,8 +32293,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 881,
-      "moduleHash": "120a369536e3865917f255317dbd1c5f9c53dba99c27a96a020c6a0c994b6809",
+      "line": 887,
+      "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -32214,6 +32458,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -32246,6 +32491,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -32287,6 +32533,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -32531,6 +32778,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -32597,6 +32845,7 @@
       "moduleHash": "da8b245ede1e086b979fdd90e7c9bc3050abda0d4af9fa7e4f48dff513af5ca0",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -32621,6 +32870,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -32650,6 +32900,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -32673,6 +32924,7 @@
       "line": 554,
       "moduleHash": "12afed5b836dddc9e784b75561307a66842fc9d1799684a4544b2d8d00510f45",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -32871,6 +33123,7 @@
       "line": 90,
       "moduleHash": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -33023,6 +33276,7 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -33193,6 +33447,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33226,6 +33481,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
@@ -33263,12 +33519,29 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::ProofBladeSkillRegistry.cacheStats",
+      "name": "ProofBladeSkillRegistry.cacheStats",
+      "kind": "method",
+      "signature": "(): { readonly parses: number; readonly hits: number; }",
+      "summary": "Loads that actually parsed the skill tree, and loads served from the memo.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/skills/registry.ts",
+      "line": 50,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
+      "testRefs": [
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ]
     },
     {
@@ -33281,8 +33554,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 128,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 169,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -33290,6 +33563,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts"
       ]
@@ -33304,8 +33578,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 132,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 173,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -33322,8 +33596,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 122,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 163,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -33355,6 +33629,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -33374,8 +33649,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 53,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 71,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -33424,7 +33699,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -33442,11 +33719,12 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 148,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
+      "line": 189,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts"
       ]
     },
@@ -33460,9 +33738,27 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 144,
-      "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
-      "testRefs": []
+      "line": 185,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
+      "testRefs": [
+        "packages/materials/tests/skill-registry-cache.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::ProofBladeSkillRegistry.resetCache",
+      "name": "ProofBladeSkillRegistry.resetCache",
+      "kind": "method",
+      "signature": "(): void",
+      "summary": "Reset the memo and its counters (tests and long-lived hosts).",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/skills/registry.ts",
+      "line": 55,
+      "moduleHash": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
+      "testRefs": [
+        "packages/materials/tests/skill-registry-cache.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::method::JsonlControlStore.#appendAuthorizedUnlocked",
@@ -33569,6 +33865,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -33577,6 +33874,7 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -33596,6 +33894,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33628,6 +33927,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -33669,6 +33969,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -33710,6 +34011,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
@@ -33723,6 +34025,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/update-proposals.test.ts"
@@ -33837,6 +34140,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -33926,6 +34230,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -33951,6 +34256,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -33970,7 +34276,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -34048,6 +34356,7 @@
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -34086,6 +34395,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34121,6 +34431,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -34156,6 +34467,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -34185,6 +34497,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts"
       ]
@@ -34224,6 +34537,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -34255,6 +34569,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
@@ -34346,6 +34661,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -34415,7 +34731,9 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -34438,6 +34756,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -34519,6 +34838,7 @@
       "line": 63,
       "moduleHash": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34543,6 +34863,7 @@
       "line": 49,
       "moduleHash": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34575,6 +34896,7 @@
       "line": 134,
       "moduleHash": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34599,6 +34921,7 @@
       "line": 78,
       "moduleHash": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34628,8 +34951,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 494,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 501,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -34642,8 +34965,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 224,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 231,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -34711,8 +35034,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 470,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 477,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -34726,7 +35049,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 74,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -34741,8 +35064,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 443,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 450,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -34755,8 +35078,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 229,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 236,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -34774,7 +35097,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 90,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34792,8 +35115,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 202,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 209,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -34810,7 +35133,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 70,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -34826,8 +35149,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 214,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 221,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -34840,8 +35163,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 210,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 217,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -34850,14 +35173,14 @@
       "id": "@proofblade/materials::method::ProofBladeToolRuntime.observeArtifact",
       "name": "ProofBladeToolRuntime.observeArtifact",
       "kind": "method",
-      "signature": "(input: { operation: string; artifactId: string; exitCode?: number | null; persistProjection?: boolean; annotation?: { name: string; summary: string; tags?: string[]; role?: \"supporting\" | \"intermediate\" | \"debug\" | \"result\"; relatedIds?: string[]; }; }): Promise<ObservationOutcome & { progressKey: string; }>",
+      "signature": "(input: { operation: string; artifactId: string; exitCode?: number | null; persistProjection?: boolean; annotation?: { name: string; summary: string; tags?: string[]; role?: \"supporting\" | \"intermediate\" | \"debug\" | \"result\"; relatedIds?: string[]; }; content?: string; }): Promise<ObservationOutcome & { progressKey: string; }>",
       "summary": "Observe an artifact produced by a coding-lane tool that did not originate",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 163,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 168,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/competition-solver.test.ts"
       ]
@@ -34872,8 +35195,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 281,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 288,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -34886,8 +35209,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 268,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 275,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -34903,8 +35226,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 255,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 262,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -34917,8 +35240,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 422,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 429,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts"
@@ -34934,8 +35257,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 193,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 200,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -34950,8 +35273,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 219,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 226,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -34967,7 +35290,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 78,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -34983,7 +35306,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 82,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/mcp.test.ts"
       ]
@@ -34998,8 +35321,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 188,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 195,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -35015,8 +35338,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 474,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 481,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts"
       ]
@@ -35031,8 +35354,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 449,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 456,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/knowledge-projection.test.ts"
       ]
@@ -35047,8 +35370,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 405,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 412,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
@@ -35144,8 +35467,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 197,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 204,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -35160,8 +35483,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 321,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 328,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -35179,8 +35502,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 312,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 319,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -35193,8 +35516,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 300,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 307,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -35210,8 +35533,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 389,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 396,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": []
     },
     {
@@ -35224,8 +35547,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 206,
-      "moduleHash": "6c6fedfd4eb568f5000cf2424cc8af612edb06a81e710b6cf5f045fcb65b4a88",
+      "line": 213,
+      "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -35422,6 +35745,7 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -35437,6 +35761,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -35479,6 +35804,7 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -35501,6 +35827,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -35846,6 +36173,7 @@
       "line": 43,
       "moduleHash": "d6ba5399ff0de16ea7a13300fe54c600757e2f4263ed0a3838f306dd958c0707",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -35985,6 +36313,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -36020,6 +36349,7 @@
       "line": 195,
       "moduleHash": "7e0be302baa27562683fd4442144e63381715c6eea0f3c514e8202d7330e377f",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36295,6 +36625,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -36334,6 +36665,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -36376,7 +36708,9 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -36444,6 +36778,7 @@
       "line": 397,
       "moduleHash": "13e6ef8b2f8284e98bd6a53b09201b9c2571bb551539751e980cb151a6de7cbd",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36510,6 +36845,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36542,6 +36878,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -36583,6 +36920,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -36678,6 +37016,7 @@
       "line": 360,
       "moduleHash": "13e6ef8b2f8284e98bd6a53b09201b9c2571bb551539751e980cb151a6de7cbd",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -36819,6 +37158,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -36893,6 +37233,7 @@
       "line": 207,
       "moduleHash": "c8ff04e6dd5eac6af1c609297cef1aeaacb3ceead221e92a9e2b473eda2cc473",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36945,6 +37286,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36977,6 +37319,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -37018,6 +37361,7 @@
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
@@ -37099,6 +37443,7 @@
       "line": 183,
       "moduleHash": "c8ff04e6dd5eac6af1c609297cef1aeaacb3ceead221e92a9e2b473eda2cc473",
       "testRefs": [
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37403,6 +37748,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37426,6 +37772,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -37458,6 +37805,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -37518,6 +37866,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37557,6 +37906,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -37599,7 +37949,9 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
@@ -37753,6 +38105,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37776,6 +38129,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -37808,6 +38162,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -37831,6 +38186,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37864,6 +38220,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
@@ -37901,6 +38258,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts",
@@ -38067,6 +38425,7 @@
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
@@ -38092,6 +38451,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38115,6 +38475,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -38147,6 +38508,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -38190,6 +38552,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -38233,6 +38596,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38266,6 +38630,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/exact-endpoint.test.ts",
+        "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
@@ -38303,6 +38668,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts",

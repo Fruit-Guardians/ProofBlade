@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T18:00:00+08:00
+> 状态更新时间：2026-09-19T18:40:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-013 | 2026-09-19T18:40:00+08:00 | PLAN-240 | perf/skill-registry-cache | 本条记录所在提交 |
 | UPDATE-20260919-012 | 2026-09-19T18:00:00+08:00 | PLAN-240 | docs/t2-infeasible | 本条记录所在提交 |
 | UPDATE-20260919-011 | 2026-09-19T17:20:00+08:00 | PLAN-240 | perf/tool-result-telemetry-lazy | 本条记录所在提交 |
 | UPDATE-20260919-010 | 2026-09-19T16:40:00+08:00 | PLAN-240 | docs/tool-hot-path-cost-breakdown | 本条记录所在提交 |
@@ -68,6 +69,31 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-013
+
+时间：2026-09-19T18:40:00+08:00
+
+摘要：Skill 目录解析按结构性 revision 记忆化：steade-state 单次加载从约 30ms 降到约 3ms，version snapshot 与每次 lane 创建均受益。
+
+### 变更
+
+- ProofBladeSkillRegistry.load() 新增进程级 memo：revision 由各 Skill 根下所有 SKILL.md 的路径+大小+mtime 组成，一次目录遍历得到，不读文件正文
+- 缓存键为「规范化项目根 + 目录列表」，不同根或不同 skillsDirs 不互相串用；缓存容量上限 8 并做 LRU 淘汰
+- 新增 cacheStats()/resetCache()：缓存行为用计数器断言，不依赖耗时断言
+- load() 解析逻辑拆到私有 read()，缓存层只负责命中判定
+- packages/materials/src/skills/COMPONENT.md 记录 revision 构成、共享实例安全性与计数器要求
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] 实测：ProofBladeSkillRegistry.load 连续 6 次由 60.8/29.8/27.8/30.0/29.6/30.6ms 降为 62.4/2.8/3.2/2.4/3.3/3.1ms（steady-state 约 30ms → 约 3ms）
+- [x] 同一实测中 McpProjectRegistry.load 约 1.5ms、ToolCatalog.load 约 0.1ms，故本次只缓存 Skill 解析
+- [x] node --import tsx --test packages/materials/tests/skill-registry-cache.test.ts: 9/9 passed
+- [x] 关键断言：第二次加载不再解析且返回同一实例；改/增/删 SKILL.md 各自触发重新解析；不同项目根与不同目录列表各自独立；缺失根产出空目录且可命中；命中结果与首次逐项一致
+- [x] node --import tsx --test demo/evaluation/runtime-scenario-evaluator/version-cache: 21/21 passed
+- [x] 已核对无消费方修改 diagnostics（所有 push 均在构造期）
+- [x] npm run check:changed-tests、check:components passed
 
 ## UPDATE-20260919-012
 

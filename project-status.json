@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T18:00:00+08:00",
+  "updatedAt": "2026-09-19T18:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,33 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-013",
+      "occurredAt": "2026-09-19T18:40:00+08:00",
+      "summary": "Skill 目录解析按结构性 revision 记忆化：steade-state 单次加载从约 30ms 降到约 3ms，version snapshot 与每次 lane 创建均受益。",
+      "branch": "perf/skill-registry-cache",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "ProofBladeSkillRegistry.load() 新增进程级 memo：revision 由各 Skill 根下所有 SKILL.md 的路径+大小+mtime 组成，一次目录遍历得到，不读文件正文",
+        "缓存键为「规范化项目根 + 目录列表」，不同根或不同 skillsDirs 不互相串用；缓存容量上限 8 并做 LRU 淘汰",
+        "新增 cacheStats()/resetCache()：缓存行为用计数器断言，不依赖耗时断言",
+        "load() 解析逻辑拆到私有 read()，缓存层只负责命中判定",
+        "packages/materials/src/skills/COMPONENT.md 记录 revision 构成、共享实例安全性与计数器要求"
+      ],
+      "validation": [
+        "npm run build:gui-deps passed",
+        "实测：ProofBladeSkillRegistry.load 连续 6 次由 60.8/29.8/27.8/30.0/29.6/30.6ms 降为 62.4/2.8/3.2/2.4/3.3/3.1ms（steady-state 约 30ms → 约 3ms）",
+        "同一实测中 McpProjectRegistry.load 约 1.5ms、ToolCatalog.load 约 0.1ms，故本次只缓存 Skill 解析",
+        "node --import tsx --test packages/materials/tests/skill-registry-cache.test.ts: 9/9 passed",
+        "关键断言：第二次加载不再解析且返回同一实例；改/增/删 SKILL.md 各自触发重新解析；不同项目根与不同目录列表各自独立；缺失根产出空目录且可命中；命中结果与首次逐项一致",
+        "node --import tsx --test demo/evaluation/runtime-scenario-evaluator/version-cache: 21/21 passed",
+        "已核对无消费方修改 diagnostics（所有 push 均在构造期）",
+        "npm run check:changed-tests、check:components passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-012",
       "occurredAt": "2026-09-19T18:00:00+08:00",

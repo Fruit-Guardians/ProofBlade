@@ -1,4 +1,5 @@
-import { realpath } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
+import type { Dirent } from "node:fs";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import {
   NodeExecutionEnv,
@@ -41,6 +42,23 @@ export class ProofBladeSkillRegistry {
   ) {}
 
   /**
+   * Loads that actually parsed the skill tree, and loads served from the memo.
+   *
+   * Exposed so tests and diagnostics can assert cache behaviour without timing
+   * assertions, which are flaky on shared runners.
+   */
+  public static cacheStats(): { readonly parses: number; readonly hits: number } {
+    return { parses: skillRegistryParses, hits: skillRegistryHits };
+  }
+
+  /** Reset the memo and its counters (tests and long-lived hosts). */
+  public static resetCache(): void {
+    skillRegistryCache.clear();
+    skillRegistryParses = 0;
+    skillRegistryHits = 0;
+  }
+
+  /**
    * Load skills from one or more directories, in PRECEDENCE order. The default
    * loads the hand-curated `skills/` dir first (ProofBlade's customized
    * ctf-reverse and evidence-triage), then the vendored `skills-library/ctf-skills`
@@ -56,11 +74,34 @@ export class ProofBladeSkillRegistry {
   ): Promise<ProofBladeSkillRegistry> {
     const root = await canonicalOrResolved(projectRoot);
     const dirList = Array.isArray(skillsDirs) ? skillsDirs : [skillsDirs];
+    const requestedDirs = dirList.map((dir) => (isAbsolute(dir) ? dir : resolve(root, dir)));
+    // Parsing every skill's front matter costs ~30ms on this tree and the result
+    // only changes when a SKILL.md appears, disappears or changes, so the parse
+    // is memoized on a cheap structural revision. Both the version snapshot and
+    // every lane creation load this registry.
+    const revision = await skillTreeRevision(requestedDirs);
+    const cached = skillRegistryCache.get(cacheKey(root, dirList));
+    if (cached && cached.revision === revision && cached.projectRoot === root) {
+      skillRegistryHits += 1;
+      return cached.registry;
+    }
+    const registry = await ProofBladeSkillRegistry.read(root, requestedDirs);
+    skillRegistryParses += 1;
+    const key = cacheKey(root, dirList);
+    skillRegistryCache.delete(key);
+    skillRegistryCache.set(key, { revision, projectRoot: root, registry });
+    while (skillRegistryCache.size > SKILL_REGISTRY_CACHE_LIMIT) {
+      const oldest = skillRegistryCache.keys().next().value;
+      if (oldest === undefined) break;
+      skillRegistryCache.delete(oldest);
+    }
+    return registry;
+  }
+
+  /** Parse the skill roots without consulting the cache. */
+  private static async read(root: string, requestedDirs: readonly string[]): Promise<ProofBladeSkillRegistry> {
     const roots = await Promise.all(
-      dirList.map(async (dir, index) => {
-        const requestedDir = isAbsolute(dir) ? dir : resolve(root, dir);
-        return { index, allowedRoot: await canonicalOrResolved(requestedDir), requestedDir };
-      }),
+      requestedDirs.map(async (requestedDir, index) => ({ index, allowedRoot: await canonicalOrResolved(requestedDir), requestedDir })),
     );
     const env = portableSkillEnv(new NodeExecutionEnv({ cwd: root }));
     const loaded = await loadSkills(env, roots.map((entry) => entry.requestedDir));
@@ -166,10 +207,70 @@ export class ProofBladeSkillRegistry {
   }
 }
 
+/**
+ * Process-level memo for parsed skill registries.
+ *
+ * Keyed by canonical project root plus the requested directory list; invalidated
+ * by {@link skillTreeRevision}. Bounded because a long-lived host may be pointed
+ * at many project roots over its lifetime.
+ */
+const SKILL_REGISTRY_CACHE_LIMIT = 8;
+const skillRegistryCache = new Map<string, { revision: string; projectRoot: string; registry: ProofBladeSkillRegistry }>();
+let skillRegistryParses = 0;
+let skillRegistryHits = 0;
+
+function cacheKey(root: string, dirList: readonly string[]): string {
+  return `${root}\u0000${dirList.join("\u0000")}`;
+}
+
+/**
+ * A cheap structural revision of every skill root.
+ *
+ * Walks the roots for `SKILL.md` files and records each one's path, size and
+ * mtime. That catches every change the parse depends on — a skill added,
+ * removed, renamed or edited — without reading any file body. A `mtimeMs + size`
+ * key is acceptable here where it was not for the version snapshot: skills are
+ * repository content, and the snapshot itself still hashes file contents, so a
+ * same-metadata edit cannot silently change what a Run records.
+ *
+ * @param roots - absolute skill root directories.
+ * @returns a digest that changes whenever the skill set or any skill file does.
+ */
+async function skillTreeRevision(roots: readonly string[]): Promise<string> {
+  const entries: string[] = [];
+  for (const root of roots) await collectSkillFiles(root, entries);
+  entries.sort();
+  return sha256(entries.join("\n"));
+}
+
+async function collectSkillFiles(directory: string, into: string[]): Promise<void> {
+  let listing: Dirent[];
+  try {
+    listing = await readdir(directory, { withFileTypes: true });
+  } catch {
+    // A missing root contributes nothing: the parser treats it as an empty
+    // catalog, so its absence must not invalidate an otherwise identical tree.
+    return;
+  }
+  for (const entry of listing) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) {
+      await collectSkillFiles(path, into);
+      continue;
+    }
+    if (entry.name !== "SKILL.md") continue;
+    try {
+      const stats = await stat(path);
+      into.push(`${path}\u0000${stats.size}\u0000${stats.mtimeMs}`);
+    } catch {
+      // Raced with a deletion; the next load recomputes the revision.
+    }
+  }
+}
+
 async function canonicalOrResolved(path: string): Promise<string> {
   try {
-    return resolve(await realpath(path));
-  } catch {
+    return resolve(await realpath(path));  } catch {
     return resolve(path);
   }
 }
