@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T21:50:00+08:00
+> 状态更新时间：2026-09-19T22:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-020 | 2026-09-19T22:30:00+08:00 | PLAN-240 | perf/long-run-baseline | 本条记录所在提交 |
 | UPDATE-20260919-019 | 2026-09-19T21:50:00+08:00 | PLAN-240 | perf/plan-240-integration | 本条记录所在提交 |
 | UPDATE-20260919-018 | 2026-09-19T21:20:00+08:00 | PLAN-240 | perf/polling-visibility-rule | 本条记录所在提交 |
 | UPDATE-20260919-017 | 2026-09-19T20:45:00+08:00 | PLAN-240 | perf/archival-failure-semantics | 本条记录所在提交 |
@@ -75,6 +76,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-020
+
+时间：2026-09-19T22:30:00+08:00
+
+摘要：补齐长 Run 基线：工具热路径不随历史退化（10,000 事件仍约 37ms），但重放回退在长 Run 上约 9.3s，为「秒级放大」定位到具体机制。
+
+### 变更
+
+- 新增 scripts/tool-hot-path-long-run-baseline.ts 与 npm run baseline:tools:longrun：在真实 ControlStore 上按 10/1000/5000/10000 事件取点，分别测量真实 read、snapshot() 与 replay()
+- 实测结论一：read 在 10 与 10000 事件下均为约 29–37ms、snapshot() 恒为 0.2–0.3ms，即工具热路径不随 Run 历史退化；原因是 #withWrite 提交后用 committed.reduce 刷新快照缓存
+- 实测结论二：replay() 随历史线性增长，10,000 事件约 9.3s；control-store.ts:743 在投影无法校验时回退到 eventStore.replay()，故投影缺失或判为无效时一次读取会付出全量重放
+- 计划 §7.2.1 回填长 Run 基线表与两条结论，并建议新增一项 P0：长 Run 的重放回退必须有界或可避免（原计划没有此项）
+
+### 验证
+
+- [x] npm run baseline:tools:longrun -- --points 10,1000,5000,10000 输出四行测量表
+- [x] 重复运行确认稳定（read 26–38ms 区间，与首次一致）
+- [x] 回退机制经代码核实：control-store.ts:743 为 replay 回退点；saveProjection 内部调用 events() 取全量事件
+- [x] npm run check:project-reports passed
 
 ## UPDATE-20260919-019
 
