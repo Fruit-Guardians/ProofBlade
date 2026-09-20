@@ -89,27 +89,59 @@ test("[contract:barrier-persists-deferred-projection] a barrier writes the proje
   }
 });
 
-test("a second barrier on an already-current projection is a no-op", async () => {
-  const { root, control, projectionPath } = await run("BARRIER-2");
+test("a barrier is a no-op once the projection is current again", async () => {  const { root, control, projectionPath } = await run("BARRIER-2");
   try {
     await deferred(control, "BARRIER-2", 1);
     await control.flushProjection("BARRIER-2");
-    const first = await stat(projectionPath);
 
-    // Re-defer without changing state, then flush: the cheap check should find
-    // the projection already current and skip the write. mtime is the observable
-    // signal for "did not rewrite".
+    // Re-defer, then flush: this barrier DOES owe a write, because the deferred
+    // event moved the stream past the projection.
     await deferred(control, "BARRIER-2", 2);
-    await control.flushProjection("BARRIER-2");
     await control.flushProjection("BARRIER-2");
     const settled = await stat(projectionPath);
 
-    assert.ok(settled.size > 0);
-    assert.ok(settled.mtimeMs >= first.mtimeMs);
+    // Nothing is deferred now. This pins only the cheap early return at
+    // `flushProjection`'s `deferredProjectionRuns` guard -- NOT the
+    // `#projectionAlreadyCurrent()` check further in. Mutating that check to
+    // always report "not current" still leaves this test green, because the
+    // guard returns first. See the note below.
+    await control.flushProjection("BARRIER-2");
+    const after = await stat(projectionPath);
+
+    assert.ok(after.size > 0);
+    assert.equal(after.mtimeMs, settled.mtimeMs, "a current projection must not be rewritten");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+/**
+ * NOT PINNED HERE, deliberately -- and the gap is larger than it first looked.
+ *
+ * The barrier-cost fix moves `#projectionAlreadyCurrent()` ahead of
+ * `loadProjection()`, which parses the whole event stream and re-hashes the
+ * complete event prefix (13ms at 100 events, 328ms at 10,000).
+ *
+ * Three mutations were run against these tests, and NO test caught the third:
+ *   * disable the memoised version cache      -> caught (version-cache.test.ts)
+ *   * serve a rejected build from cache       -> caught (version-cache.test.ts)
+ *   * make `#projectionAlreadyCurrent` always report "not current" -> NOT caught
+ *
+ * The reason is not a weak assertion but an unreachable path: a deferred append
+ * moves the stream past the projection, so by the time the barrier reaches that
+ * check in deferred mode the answer is always "not current". Reachability was
+ * not established, so the check may be dead in practice -- if so, the fix's real
+ * saving comes from `loadProjection` being avoided on the absent/stale-hint
+ * path, not from this predicate.
+ *
+ * Pinning it needs a hash-call or hashed-event counter on the barrier path (a
+ * source instrument, not an assertion) plus a reachability case. Both belong in
+ * their own change rather than being smuggled in here as a test that cannot
+ * fail.
+ *
+ * What IS pinned: an already-current projection is not rewritten, and a stale
+ * one is persisted.
+ */
 
 test("a barrier repairs a deleted projection rather than throwing", async () => {
   // The cheap check must fail closed: no projection file means "not current",

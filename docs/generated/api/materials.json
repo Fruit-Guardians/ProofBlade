@@ -27312,7 +27312,6 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
-        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -29645,6 +29644,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -32123,6 +32123,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -32715,7 +32716,9 @@
         "@proofblade/atoms",
         "node:path"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts"
+      ],
       "structureHash": "8935c5714b2293f683be0d1b89f94e160ae8cbb8f55d4b7863f7b933e1d12c7a",
       "parentId": "@proofblade/materials::class::ControlStore"
     },
@@ -36638,6 +36641,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -39247,6 +39251,7 @@
         "@earendil-works/pi-agent-core/node"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -48037,6 +48042,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",

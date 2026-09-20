@@ -17958,7 +17958,6 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
-        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -19833,6 +19832,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -21801,6 +21801,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -22173,7 +22174,9 @@
       "module": "src/control/control-store.ts",
       "line": 671,
       "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
-      "testRefs": []
+      "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::method::ControlStore.#readSnapshot",
@@ -25092,6 +25095,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27055,6 +27059,7 @@
       "line": 275,
       "moduleHash": "9a21d5ee75135cc7e69dccc36a40758944c5e49308fd501574d5e59e5b6b803e",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -33765,6 +33770,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
