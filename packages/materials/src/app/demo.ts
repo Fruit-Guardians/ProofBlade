@@ -7,7 +7,7 @@ import { ArtifactStore } from "../effects/artifact-store.js";
 import { EffectJournal, type VerifierEffectJournal, type VerifierEffectTestHarness } from "../effects/effect-journal.js";
 import { LocalFixtureSandbox, type SandboxPort } from "../sandbox/fixture.js";
 import type { ProofBladeConfig } from "../config.js";
-import { createRunVersionSnapshot } from "../runtime/version.js";
+import { createCachedRunVersionSnapshot, type RunVersionSnapshotCache } from "../runtime/version.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { resolveControlAuthority } from "../storage/control-authority.js";
@@ -38,6 +38,14 @@ export interface AppServices {
   browserRuntimeRequired?: boolean;
   sandbox: SandboxPort;
   runsRoot: string;
+  /**
+   * Revision-keyed cache behind the version snapshot every Run carries.
+   *
+   * Exposed so diagnostics and tests can observe how often the snapshot was
+   * rebuilt: the snapshot must be built once per distinct revision, not once per
+   * Run.
+   */
+  versionSnapshotCache: RunVersionSnapshotCache;
 }
 
 /** Direct-import test composition; intentionally excluded from the package root. */
@@ -65,6 +73,8 @@ export interface CreateServicesOptions {
   sessionRuntimeRequired?: boolean;
   /** Preserve fail-closed semantics when runtime.browserBroker has no token. */
   browserRuntimeRequired?: boolean;
+  /** Override the version-snapshot revision cache (config path, capacity). */
+  versionSnapshotOptions?: { configPath?: string; maxRevisionEntries?: number };
 }
 
 export function createServices(root: string, config: ProofBladeConfig, options: CreateServicesOptions | import("../effects/effect-journal.js").EffectFaultInjector = {}): AppServices {
@@ -82,9 +92,13 @@ function createServicePlane(root: string, config: ProofBladeConfig, options: Cre
   const resolved: CreateServicesOptions = typeof options === "function" ? { effectFault: options } : options;
   const runsRoot = join(root, config.storage.runsDir);
   const authoritySecret = resolveControlAuthority(resolved.authoritySecret, resolved.authorityStateDirectory);
+  // One cached version snapshot per process, not per Run: the snapshot only
+  // changes when its configuration inputs change, and `createRun` otherwise
+  // rescans Skills, `.mcp.json` and the tool catalog for every Run created.
+  const versionSnapshotCache = createCachedRunVersionSnapshot(root, config, resolved.versionSnapshotOptions ?? {});
   const { control, verifier, verifierEffects, fixtureControl, verificationRecovery, updateEvaluation } = ControlStore.create(
     new JsonlControlStore(runsRoot),
-    async () => await createRunVersionSnapshot(root, config),
+    versionSnapshotCache.provider,
     authoritySecret,
   );
   const artifacts = new ArtifactStore(runsRoot, control);
@@ -110,6 +124,7 @@ function createServicePlane(root: string, config: ProofBladeConfig, options: Cre
     verifierTestHarness,
     sandbox,
     runsRoot,
+    versionSnapshotCache,
   };
 }
 

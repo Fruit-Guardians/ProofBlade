@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T14:15:00+08:00
+> 状态更新时间：2026-09-19T14:40:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-006 | 2026-09-19T14:40:00+08:00 | PLAN-240 | perf/version-snapshot-cache | 本条记录所在提交 |
 | UPDATE-20260919-005 | 2026-09-19T14:15:00+08:00 | PLAN-240 | perf/conversation-create-minimal | 本条记录所在提交 |
 | UPDATE-20260919-004 | 2026-09-19T13:50:00+08:00 | PLAN-240 | test/conversation-staging-boundary | 本条记录所在提交 |
 | UPDATE-20260919-003 | 2026-09-19T13:30:00+08:00 | PLAN-240 | docs/perf-plan-revision-2 | 本条记录所在提交 |
@@ -61,6 +62,29 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-006
+
+时间：2026-09-19T14:40:00+08:00
+
+摘要：Run 版本快照改为进程级 revision 缓存：相同配置下连续创建 Run 只构建一次，revision 由内容推导。
+
+### 变更
+
+- 新增 createCachedRunVersionSnapshot()：single-flight + revision 键控缓存，构建失败的 promise 不入缓存
+- revision 由 proofblade.config.json、.mcp.json、tool-catalog.json 与 skills/*/SKILL.md 的内容哈希组成；mtimeMs + size 仅作预筛，元数据变化时才重读字节
+- 明确不用纯 mtime 作为键的理由：NTFS mtime 粒度与外部编辑会使内容变化而元数据不变，长期供应陈旧快照
+- createServicePlane 改为使用该缓存并把 versionSnapshotCache 暴露到 AppServices，便于诊断与测试观察构建次数
+- CreateServicesOptions 新增 versionSnapshotOptions（configPath、maxRevisionEntries）
+- 新增 packages/materials/tests/version-cache.test.ts 13 项断言
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test packages/materials/tests/version-cache.test.ts: 13/13 passed
+- [x] node --import tsx --test packages/materials/tests/demo.test.ts packages/materials/tests/control-store.test.ts: 20/20 passed
+- [x] 关键断言：三次调用只构建一次；并发四个调用者共享同一 in-flight 构建；改 Skill、增 Skill、改 config、改 .mcp.json 均触发重建；写入完全相同字节不触发重建（证明 revision 由内容推导而非元数据）；缓存的返回值与直接构建深度相等
+- [x] npm run check:changed-tests passed
 
 ## UPDATE-20260919-005
 

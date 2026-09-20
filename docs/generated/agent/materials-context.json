@@ -3,7 +3,7 @@
   "package": "@proofblade/materials",
   "sourceRoot": "packages/materials",
   "moduleHashes": {
-    "src/app/demo.ts": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
+    "src/app/demo.ts": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
     "src/app/fixture-task.ts": "77d62e1e632887c1a01251a6ac595050d61cee52cb1eb7977087ba6d01351c9e",
     "src/capabilities/backend.ts": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
     "src/capabilities/binary.ts": "fbeaff814f7a7c5802f72018fbbc0c9f13264d5ae9eb53a5ccb7345bc1c87c6f",
@@ -139,7 +139,7 @@
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
-    "src/runtime/version.ts": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
+    "src/runtime/version.ts": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
@@ -3031,8 +3031,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 11,
-      "moduleHash": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
+      "line": 13,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
       "testRefs": []
     },
     {
@@ -3045,8 +3045,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 14,
-      "moduleHash": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
+      "line": 16,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
       "testRefs": []
     },
     {
@@ -3059,8 +3059,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 10,
-      "moduleHash": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
+      "line": 12,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
       "testRefs": []
     },
     {
@@ -3073,8 +3073,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 13,
-      "moduleHash": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
+      "line": 15,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
       "testRefs": []
     },
     {
@@ -3087,8 +3087,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 12,
-      "moduleHash": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
+      "line": 14,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
       "testRefs": []
     },
     {
@@ -3148,8 +3148,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 70,
-      "moduleHash": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
+      "line": 80,
+      "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -3199,8 +3199,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 116,
-      "moduleHash": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
+      "line": 131,
+      "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -3249,8 +3249,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 137,
-      "moduleHash": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
+      "line": 152,
+      "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/demo.test.ts"
@@ -6726,6 +6726,39 @@
       ]
     },
     {
+      "id": "@proofblade/materials::function::createCachedRunVersionSnapshot",
+      "name": "createCachedRunVersionSnapshot",
+      "kind": "function",
+      "signature": "(projectRoot: string, config: ProofBladeConfig, options?: { configPath?: string; maxRevisionEntries?: number; }): RunVersionSnapshotCache",
+      "summary": "Wrap {@link createRunVersionSnapshot} in a single-flight, revision-keyed cache.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "param",
+          "text": "projectRoot - project root holding `skills/`, `.mcp.json` and the tool catalog."
+        },
+        {
+          "name": "param",
+          "text": "config - resolved runtime config."
+        },
+        {
+          "name": "param",
+          "text": "options - optional config path and revision-cache capacity."
+        },
+        {
+          "name": "returns",
+          "text": "the cached provider plus counters for tests and diagnostics."
+        }
+      ],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/version.ts",
+      "line": 87,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "testRefs": [
+        "packages/materials/tests/version-cache.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::function::createRunVersionSnapshot",
       "name": "createRunVersionSnapshot",
       "kind": "function",
@@ -6735,9 +6768,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 23,
-      "moduleHash": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
-      "testRefs": []
+      "line": 25,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "testRefs": [
+        "packages/materials/tests/version-cache.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::function::globWorkspace",
@@ -7435,7 +7470,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
       "line": 18,
-      "moduleHash": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
+      "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts"
@@ -7451,8 +7486,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 48,
-      "moduleHash": "4ddb610f33a49ed0d4e52a2d3c7a382575b4899b9cb27726223005b0a2433756",
+      "line": 56,
+      "moduleHash": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
       "testRefs": []
     },
     {
@@ -8469,6 +8504,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -10387,7 +10423,9 @@
       "module": "src/domain/types.ts",
       "line": 176,
       "moduleHash": "39a298a6e6ea74fec2b8278f1fe342b2e3c2090e1b4fd5babd006d96059b842f",
-      "testRefs": []
+      "testRefs": [
+        "packages/materials/tests/version-cache.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::interface::SessionRecord",
@@ -14313,6 +14351,20 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::interface::RunVersionSnapshotCache",
+      "name": "RunVersionSnapshotCache",
+      "kind": "interface",
+      "signature": "RunVersionSnapshotCache",
+      "summary": "Revision and cache state for {@link createCachedRunVersionSnapshot}.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/version.ts",
+      "line": 53,
+      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::interface::WorkspaceGlobResult",
       "name": "WorkspaceGlobResult",
       "kind": "interface",
@@ -16534,6 +16586,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -17664,6 +17717,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -18162,6 +18216,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -18871,6 +18926,7 @@
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -19216,6 +19272,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -19449,6 +19506,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -19552,6 +19610,7 @@
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -19596,7 +19655,8 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
-        "packages/materials/tests/verification-recovery.test.ts"
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -19974,6 +20034,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -20255,6 +20316,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -20388,6 +20450,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -20700,6 +20763,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -20832,6 +20896,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -21053,6 +21118,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -21166,6 +21232,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
@@ -21319,6 +21386,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
@@ -21414,6 +21482,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -21459,7 +21528,8 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
-        "packages/materials/tests/verification-recovery.test.ts"
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -21527,7 +21597,8 @@
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/verification-recovery.test.ts"
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -21635,6 +21706,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -22007,6 +22079,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -22066,6 +22139,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -22427,6 +22501,7 @@
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -22825,6 +22900,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -23236,6 +23312,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -23357,7 +23434,8 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -23424,6 +23502,7 @@
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -23803,6 +23882,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -23924,6 +24004,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -24045,6 +24126,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -24166,6 +24248,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -24297,6 +24380,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -24482,6 +24566,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
@@ -24573,6 +24658,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -25009,6 +25095,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -25953,6 +26040,7 @@
         "packages/materials/tests/update-evaluation-gates.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
     },
@@ -26025,6 +26113,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
@@ -26067,6 +26156,7 @@
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -26140,6 +26230,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
@@ -26205,7 +26296,8 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/tool-timing.test.ts"
+        "packages/materials/tests/tool-timing.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -26447,6 +26539,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -27097,6 +27190,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -27216,6 +27310,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -27293,6 +27388,7 @@
         "packages/materials/tests/update-evaluation-gates.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -27630,6 +27726,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -27958,6 +28055,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -28097,6 +28195,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -28585,6 +28684,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -28875,6 +28975,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -29121,6 +29222,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -29323,6 +29425,7 @@
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -29559,6 +29662,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -29883,6 +29987,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -30437,6 +30542,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -30735,6 +30841,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -31123,6 +31230,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -31513,6 +31621,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -31902,6 +32011,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -32180,6 +32290,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -32421,6 +32532,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -32543,6 +32655,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -32651,7 +32764,8 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
-        "packages/materials/tests/verification-recovery.test.ts"
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -33151,6 +33265,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -33557,6 +33672,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -33759,7 +33875,9 @@
       "module": "src/storage/jsonl-store.ts",
       "line": 70,
       "moduleHash": "d58022379f230e4eda48081934dd6760a81e3ae828f3169259865772369cb493",
-      "testRefs": []
+      "testRefs": [
+        "packages/materials/tests/version-cache.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::method::JsonlControlStore.runPath",
@@ -33856,6 +33974,7 @@
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -34042,6 +34161,7 @@
         "packages/materials/tests/tool-scheduler.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
@@ -34177,6 +34297,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -35318,7 +35439,8 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/tool-timing.test.ts"
+        "packages/materials/tests/tool-timing.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -35383,6 +35505,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -36260,6 +36383,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -36462,6 +36586,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -36896,6 +37021,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -37332,6 +37458,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -37479,6 +37606,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts",
@@ -37680,6 +37808,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -37774,6 +37903,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -38017,6 +38147,7 @@
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -38174,6 +38305,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"

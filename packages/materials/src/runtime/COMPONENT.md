@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.27",
+  "version": "0.10.28",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-09-19T05:10:00.000Z",
+  "updatedAt": "2026-09-19T06:40:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 24,
-    "securityAuditCount": 24,
-    "lastBugAuditAt": "2026-09-19T05:10:00.000Z",
-    "lastSecurityAuditAt": "2026-09-19T05:10:00.000Z",
-    "sourceHash": "dfc85bf6887a974789d3a7b13242142b1e83f5a6c9602919219c47a15e651b55",
+    "bugAuditCount": 25,
+    "securityAuditCount": 25,
+    "lastBugAuditAt": "2026-09-19T06:40:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T06:40:00.000Z",
+    "sourceHash": "0fadcbf9622806c79e4c88a44b7da8c4e0dec0fc2576494551bb637112a94ca3",
     "result": "passed"
   }
 }
@@ -39,6 +39,7 @@
 - `bash` 是分析逃生通道而不是第二个控制面：其输出只能进入不受信任的 Artifact/Observation；运行时会拦截常见的脚本/重定向写入 `domain_record` 或 Control Store 的尝试。真正的 Web/Pwn 领域记录必须由结构化 Tool 或受信 verifier 通过 ControlStore 写入，静态 guard 不是 verifier 权限的替代品。
 - 安全约束由持久化 `TaskContract` 的权限、范围和验证策略判定，不能依赖 executor prompt 是否包含安全领域关键词；这样安全评估和 evidence-first replan 不会因提示词投影变化而失效。
 - 普通 `coding_assistant` 任务不因 `target_kind` 标签或用户消息中的领域词语自动进入专用工作流；安全画像只用于按需推荐能力，不能改变通用 Agent Loop 的基本语义。
+- `version.ts` 的 `createCachedRunVersionSnapshot()` 为每个进程提供一份 revision 键控的版本快照：`createRun` 原本每次都要重扫 Skills、`.mcp.json` 与 tool catalog 并重算四个 catalog hash，而这些输入不变时快照也不变。**revision 必须由内容推导，不能只用 `mtimeMs + size`**——NTFS 的 mtime 粒度与外部编辑都会让内容变化而元数据不变，从而长期供应陈旧快照；`mtimeMs + size` 只用作预筛，元数据变化时才重读字节。构建失败的 promise 绝不入缓存，避免一次瞬时读失败变成永久失败。缓存是透明的：`createCachedRunVersionSnapshot()` 的返回值必须与直接 `createRunVersionSnapshot()` 深度相等。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - Coding Lane 把已校验的工作目录作为 Capability 可见根，并复用共享 Control Store、Artifact Store 和 Effect Journal；`.proofblade`、路径越界、硬链接和 Backend 绑定保护与 Fixture Solver 一致。当前 Coding Capability Runtime 不隐式导入未启用 MCP，MCP 仍由会话级 `mcp_call` 集合控制。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
