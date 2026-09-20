@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T20:10:00+08:00
+> 状态更新时间：2026-09-19T20:45:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-017 | 2026-09-19T20:45:00+08:00 | PLAN-240 | perf/archival-failure-semantics | 本条记录所在提交 |
 | UPDATE-20260919-016 | 2026-09-19T20:10:00+08:00 | PLAN-240 | perf/observer-diagnostics | 本条记录所在提交 |
 | UPDATE-20260919-015 | 2026-09-19T19:40:00+08:00 | PLAN-240 | perf/hot-path-budget-gate | 本条记录所在提交 |
 | UPDATE-20260919-014 | 2026-09-19T19:10:00+08:00 | PLAN-240 | docs/items-g-and-h-verified | 本条记录所在提交 |
@@ -72,6 +73,30 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-017
+
+时间：2026-09-19T20:45:00+08:00
+
+摘要：表项 D2：核实并修复归档失败语义——大输出归档失败不再把已完成的 read 变成失败调用。
+
+### 变更
+
+- 实测确认缺口：artifactStore.putText 失败时 read 直接抛出，小文件与大文件都一样；这违反计划 §5.7.3「spill 失败保留工具成功和有界内联结果」
+- read 路径改为归档 best-effort：失败时返回有界内联结果 + UNARCHIVED_READ_NOTICE（说明无可引用 artifact id），details 标记 archivalFailed
+- 失败通过 observerDiagnostics 上报，原始存储错误不泄漏进模型内容
+- 新增 packages/materials/tests/archival-failure-semantics.test.ts 3 项断言；contract:archival-failure-keeps-read-successful 登记进 hot-path-cost-budget 契约（scenarios 增至 6 条）
+- packages/materials/src/runtime/COMPONENT.md 记录「归档是传输手段，不是读取前提」及内联回退的有界性依据
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] 实测对照：修复前 small/big + 存储失败均为 THREW；修复后均为 ok isError=undefined 且 hasArtifactRef=false，模型文本 183/310 字节
+- [x] node --import tsx --test packages/materials/tests/archival-failure-semantics.test.ts: 3/3 passed
+- [x] 反向验证：临时在 catch 中重新抛出后，第 1、3 项断言失败，确认门禁真正守住该路径
+- [x] 有界性依据：readCompleteFile 已把可见文本限制在 MAX_COMPLETE_READ_BYTES（256 KiB），故内联回退不会把无界内容推入上下文；第 3 项断言以 400KB 文件验证
+- [x] node --import tsx --test coding-resources/hot-path-budget/observer-diagnostics/artifact-readback: 49 passed / 2 failed，两项为既有失败（已在 clean worktree 多次复现）
+- [x] npm run check:change-contracts、check:changed-tests、check:components passed
 
 ## UPDATE-20260919-016
 

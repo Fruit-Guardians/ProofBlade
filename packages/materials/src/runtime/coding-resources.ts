@@ -1819,20 +1819,36 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
         return result;
       }
       const previousComplete = context.completedReads?.get(pathKey);
-      const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
-        filename: `read-${toolCallId}.txt`,
-        mime: "text/plain",
-        sensitivity: "public",
-        semantic: {
-          name: `文件读取 · ${pathTitle(input.path)}`,
-          summary: `读取 ${input.path}${readRange(input)} 的文本结果，${Buffer.byteLength(visible)} bytes。`,
-          tags: ["read", "file-content", pathTitle(input.path)],
-          role: "intermediate",
-          relatedIds: [],
-          annotatedBy: "harness",
-        },
-        persistProjection: false,
-      });
+      let artifact: Awaited<ReturnType<typeof pipeline.artifactStore.putText>>;
+      try {
+        artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
+          filename: `read-${toolCallId}.txt`,
+          mime: "text/plain",
+          sensitivity: "public",
+          semantic: {
+            name: `文件读取 · ${pathTitle(input.path)}`,
+            summary: `读取 ${input.path}${readRange(input)} 的文本结果，${Buffer.byteLength(visible)} bytes。`,
+            tags: ["read", "file-content", pathTitle(input.path)],
+            role: "intermediate",
+            relatedIds: [],
+            annotatedBy: "harness",
+          },
+          persistProjection: false,
+        });
+      } catch (error) {
+        // Archival is the transport for a large result, not a precondition for
+        // reading a file. When it fails the model already holds the content, so
+        // the read must stay successful rather than turning a completed file read
+        // into a failed solve. The failure is reported, not swallowed, and the
+        // notice tells the model the content carries no citable artifact id.
+        context.observerDiagnostics?.record("artifact-observation", pipeline.runId, error);
+        if (complete && context.completedReads) context.completedReads.set(pathKey, { artifactId: "", contentHash, bytes: Buffer.byteLength(visible) });
+        return {
+          ...result,
+          content: [...result.content, { type: "text" as const, text: UNARCHIVED_READ_NOTICE }],
+          details: { ...(result.details ?? {}), complete, contentHash, archivalFailed: true },
+        };
+      }
       const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"], visible);
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
@@ -2293,6 +2309,14 @@ function repeatedArtifactNotice(artifactId: string, count: number): string {
 }
 
 const MAX_ARTIFACT_REPLAY_KEYS = 512;
+
+/**
+ * Model-facing notice when a tool result could not be archived.
+ *
+ * Says what happened and what it costs the model (no citable id), so it does not
+ * have to guess whether the missing artifact id means the read failed.
+ */
+const UNARCHIVED_READ_NOTICE = "[ProofBlade read unarchived: artifact storage was unavailable, so this content was returned inline and has no artifact id to cite. Re-read the file if you need a citable copy.]";
 
 async function finalizeAndArchive(
   pipeline: NonNullable<CodingResourceContext["outputRewrite"]>,
