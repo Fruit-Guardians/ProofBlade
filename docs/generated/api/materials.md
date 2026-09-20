@@ -2778,7 +2778,7 @@
 ### hostMatches
 - Kind: `function`
 - Signature: `(host: string, pattern: string): boolean`
-- Source: [src/pwn/pwn-tools.ts:767](../../../packages/materials/src/pwn/pwn-tools.ts:767)
+- Source: [src/pwn/pwn-tools.ts:786](../../../packages/materials/src/pwn/pwn-tools.ts:786)
 - Export: `@proofblade/materials`
 - Summary: Host allow-match: exact, "*" wildcard-all, or "*.suffix" subdomain wildcard.
 - Summary source: `tsdoc`
@@ -2786,7 +2786,7 @@
 ### parseEndpoint
 - Kind: `function`
 - Signature: `(endpoint: string): { host: string; port: number; } | undefined`
-- Source: [src/pwn/pwn-tools.ts:757](../../../packages/materials/src/pwn/pwn-tools.ts:757)
+- Source: [src/pwn/pwn-tools.ts:776](../../../packages/materials/src/pwn/pwn-tools.ts:776)
 - Export: `@proofblade/materials`
 - Summary: Parse "host:port" (rejecting IPv6/garbage) for scope checks.
 - Summary source: `tsdoc`
@@ -11924,7 +11924,7 @@
 ### PwnToolHandler.analyzeCrash
 - Kind: `method`
 - Signature: `(input: { transcript: string; pattern?: string; patternLength?: number; alphabet?: string; n?: number; endian?: "little" | "big"; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<PwnCrashReport & { recordId: string; artifactId: string; }>`
-- Source: [src/pwn/pwn-tools.ts:430](../../../packages/materials/src/pwn/pwn-tools.ts:430)
+- Source: [src/pwn/pwn-tools.ts:431](../../../packages/materials/src/pwn/pwn-tools.ts:431)
 - Export: `@proofblade/materials`
 - Summary: Parse a bounded debugger transcript and persist its crash facts as a Pwn record.
 - Summary source: `tsdoc`
@@ -11942,7 +11942,7 @@
 ### PwnToolHandler.deriveBase
 - Kind: `method`
 - Signature: `(input: { sourceLeakId: string; knownOffset: string; label?: string; confidence?: number; id?: string; tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ leakId: string; recordId: string; value: string; reused: boolean; pageAligned: boolean; }>`
-- Source: [src/pwn/pwn-tools.ts:542](../../../packages/materials/src/pwn/pwn-tools.ts:542)
+- Source: [src/pwn/pwn-tools.ts:543](../../../packages/materials/src/pwn/pwn-tools.ts:543)
 - Export: `@proofblade/materials`
 - Summary: Derive a base from a previously recorded leak and persist the formula.
 - Summary source: `tsdoc`
@@ -11969,7 +11969,7 @@
 ### PwnToolHandler.recordCrash
 - Kind: `method`
 - Signature: `(input: { report: PwnCrashReport; transcript: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ recordId: string; artifactId: string; }>`
-- Source: [src/pwn/pwn-tools.ts:457](../../../packages/materials/src/pwn/pwn-tools.ts:457)
+- Source: [src/pwn/pwn-tools.ts:458](../../../packages/materials/src/pwn/pwn-tools.ts:458)
 - Export: `@proofblade/materials`
 - Summary: Persist a crash analysis without treating it as exploit success.
 - Summary source: `tsdoc`
@@ -11977,7 +11977,7 @@
 ### PwnToolHandler.recordLeak
 - Kind: `method`
 - Signature: `(input: { sourceHex: string; format: LeakFormat; addressKind: AddressKind; confidence: number; id?: string; symbol?: string; derivation?: { expression: string; sourceLeakIds: string[]; }; tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<{ leakId: string; recordId: string; value: string; reused: boolean; }>`
-- Source: [src/pwn/pwn-tools.ts:508](../../../packages/materials/src/pwn/pwn-tools.ts:508)
+- Source: [src/pwn/pwn-tools.ts:509](../../../packages/materials/src/pwn/pwn-tools.ts:509)
 - Export: `@proofblade/materials`
 - Summary: Parse and persist one leak, reusing the existing reasoning/evidence graph.
 - Summary source: `tsdoc`

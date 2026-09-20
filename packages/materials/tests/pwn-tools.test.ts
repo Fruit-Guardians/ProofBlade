@@ -379,6 +379,118 @@ test("pwn leak ids and base derivations are isolated by fixture generation", asy
   }
 });
 
+test("pwn primitive preconditions must belong to the current run and generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-precondition-generation-"));
+  try {
+    const runId = "PWN-PRECONDITION-GENERATION";
+    const plane = ControlStore.create(new JsonlControlStore(join(root, "runs")));
+    const control = plane.control;
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const registry = new SessionRegistry(runId, new EchoTubeRuntime("flag{x}", "/flag") as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(
+      runId,
+      registry,
+      new PwnReproducer(control),
+      () => ({ ...REF, runId, generation: 0 }),
+      "executor",
+      undefined,
+      undefined,
+      undefined,
+      artifacts,
+      control,
+      undefined,
+      undefined,
+      false,
+      graph,
+    );
+
+    const oldArtifact = await artifacts.putText(runId, "generation 0 recon", { filename: "old-recon.txt" });
+    const oldLeak = await handler.recordLeak({
+      sourceHex: "30f4e1f7ff7f0000",
+      format: "le64",
+      addressKind: "libc",
+      confidence: 0.8,
+      artifactIds: [oldArtifact.id],
+    });
+    const oldCrash = await handler.analyzeCrash({
+      transcript: [
+        "Program received signal SIGSEGV, Segmentation fault.",
+        "rip            0x6161617461616173",
+        "rsp            0x7fffffffe000",
+        "Cannot access memory at address 0x41414141",
+      ].join("\n"),
+    });
+    const oldPrimitive = await handler.recordPrimitive({
+      primitive: "stack buffer overflow with direct ret2win control",
+      confidence: 0.8,
+      artifactIds: [oldArtifact.id],
+      preconditionRecordIds: [oldLeak.recordId, oldCrash.recordId],
+    });
+    assert.equal((await control.snapshot(runId)).domainRecords[oldPrimitive.recordId]?.generation, 0);
+
+    await plane.fixtureControl.assertResetAllowed(runId);
+    await plane.fixtureControl.reset(runId, 1);
+    const currentArtifact = await artifacts.putText(runId, "generation 1 recon", { filename: "current-recon.txt" });
+
+    for (const stalePreconditionId of [oldLeak.recordId, oldCrash.recordId, oldPrimitive.recordId]) {
+      await assert.rejects(
+        () => handler.recordPrimitive({
+          primitive: "cross-generation precondition must be rejected",
+          confidence: 0.5,
+          artifactIds: [currentArtifact.id],
+          preconditionRecordIds: [stalePreconditionId],
+        }),
+        /generation/i,
+        `stale precondition ${stalePreconditionId} must be rejected after a fixture reset`,
+      );
+    }
+    await assert.rejects(
+      () => handler.recordPrimitive({
+        primitive: "unknown precondition must be rejected",
+        confidence: 0.5,
+        artifactIds: [currentArtifact.id],
+        preconditionRecordIds: ["PWN-LEAK-NO-SUCH-RECORD"],
+      }),
+      /unknown precondition record/i,
+    );
+    await assert.rejects(
+      () => handler.recordLeak({
+        sourceHex: "30f4e1f7ff7f0000",
+        format: "le64",
+        addressKind: "libc",
+        confidence: 0.8,
+        artifactIds: [currentArtifact.id],
+        derivation: { expression: "libc_old = puts_leak - 0x84430", sourceLeakIds: [oldLeak.leakId] },
+      }),
+      /generation/i,
+      "a leak derivation must not reference a stale source leak record",
+    );
+
+    const newLeak = await handler.recordLeak({
+      sourceHex: "30f4e1f7ff7f0000",
+      format: "le64",
+      addressKind: "libc",
+      confidence: 0.8,
+      artifactIds: [currentArtifact.id],
+    });
+    const newPrimitive = await handler.recordPrimitive({
+      primitive: "stack buffer overflow with direct ret2win control",
+      confidence: 0.8,
+      artifactIds: [currentArtifact.id],
+      preconditionRecordIds: [newLeak.recordId],
+    });
+    const snapshot = await control.snapshot(runId);
+    const stored = snapshot.domainRecords[newPrimitive.recordId];
+    assert.equal(stored?.kind, "pwn_primitive");
+    assert.equal(stored?.generation, 1);
+    assert.deepEqual(stored?.kind === "pwn_primitive" ? stored.preconditionRecordIds : [], [newLeak.recordId]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("pwn workflow advances from recon to a generation-bound direct route", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-pwn-workflow-route-"));
   try {
