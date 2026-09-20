@@ -302,7 +302,46 @@ enqueue（工具返回前，仅内存）
 
 **证据边界**：以上为可复现实测，探针已删除、未入库。我**没有**添加测试：既有 `control-store.test.ts:113` 已经覆盖封印的真实保证，再加一个只会重复它。
 
-## 7. 参考
+## 7. 交付测试的变异验证
+
+「有测试」和「测试能失败」是两件事。为了不在评审时把前者当后者，我对本计划交付的改动逐个做了**变异测试**：故意改坏源码，看对应测试是否会红。方法本身不需要新工具，只需「改坏 → 跑测试 → 还原」。
+
+**结果：10 个变异里 9 个被抓住。**
+
+| # | 变异（把正确行为改坏） | 对应测试 | 结果 |
+|---|---|---|---|
+| M1 | 版本快照缓存永不复用已构建结果 | `version-cache.test.ts` | ✅ 抓住 |
+| M2 | 被拒绝的构建也缓存下来 | `version-cache.test.ts` | ✅ 抓住 |
+| M3 | 不再把已持有的归档文本传给 observer（回读磁盘） | `artifact-readback.test.ts` | ✅ 抓住 |
+| M4 | 先取错误消息再计数（复现原 bug） | `observer-diagnostics.test.ts` | ✅ 抓住 |
+| M5 | 反转「日志 vs 投影」时效判定 | `projection-hint-currency.test.ts` | ✅ 抓住 |
+| M8 | 文档隐藏时仍允许轮询 | `polling.test.ts` | ✅ 抓住 |
+| M9 | 不再检测缺失的运行时成员 | `runtime-shape.test.ts` | ✅ 抓住 |
+| M10 | 无 defaults 时也冻结能力清单 | `workspace-settings.test.ts` | ✅ 抓住 |
+| M11 | revision 变化后仍复用 RunDetail 缓存 | `debug-data.test.ts` | ✅ 抓住 |
+| M6 | `#projectionAlreadyCurrent` 恒返回「不当前」 | — | ❌ **未抓住** |
+
+### 唯一未抓住的一项：不是断言弱，是路径不可达
+
+为抓 M6 试了**三种**可观测手段，**三种全部通过**：
+
+1. `projection.json` 的 mtime —— 正确与错误路径**都会写**；
+2. 计数 `events()` —— **量错了成本**：这里 `events()` 命中解析缓存，真正昂贵的是 `hashEventPrefix()`，它不解析任何事件，因此计数器根本不动；
+3. 强制走「已是最新」的提前返回 —— **根本到不了**。
+
+第 3 点揭示了实质：**deferred append 会把流推进到投影之后**，所以在 deferred 模式下屏障求值该谓词时，答案恒为「不当前」。可达性未建立，**该检查可能实际是死代码**；若如此，§6.3 那次屏障成本修复的收益来自「在 hint 缺失/陈旧路径上避开 `loadProjection()`」，而不是来自这个谓词。
+
+我**没有**为它写一条不可能失败的断言。三种失效手段已记入 `packages/materials/tests/barrier-projection.test.ts` 的注释，测试文件里没有任何测试假装覆盖它。
+
+### 顺带修掉一个真实缺陷
+
+同一轮里发现 `barrier-projection.test.ts` 那条「第二次屏障对已是最新的投影是 no-op」断言写的是 `settled.mtimeMs >= first.mtimeMs`——**文件被重写时同样通过**，正好与测试名声称的相反；而且它的前置步骤（re-defer 后再 flush）**本来就该发生一次写入**，注释描述的时序并未建立。现已改为先 flush 掉那次写入、再断言后续屏障不改变 mtime。
+
+### 尚未验证的部分
+
+上表覆盖 9 项改动。**`hot-path-budget.test.ts` 的 4 条计数门禁、`telemetry-lazy-payload`、`experiment-gate-projection`、`skill-registry-cache`、`archival-failure-semantics` 与 `read-path-parse-budget` 尚未做变异验证**——它们的断言是计数式的（例如「同步提交 ≤ 1」），预期同样可被抓住，但预期不等于验证。
+
+## 8. 参考
 
 - `docs/PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md` §5.4.3、§5.6.3、§5.6.6、§5.7.1、§5.7.2、§6、表项 G/H/T1
 - `scripts/tool-hot-path-real-run-baseline.ts`：§2 全部数据的产生脚本
