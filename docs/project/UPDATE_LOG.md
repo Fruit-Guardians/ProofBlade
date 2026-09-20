@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T22:30:00+08:00
+> 状态更新时间：2026-09-19T23:05:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-021 | 2026-09-19T23:05:00+08:00 | PLAN-240 | perf/replay-fallback-cost | 本条记录所在提交 |
 | UPDATE-20260919-020 | 2026-09-19T22:30:00+08:00 | PLAN-240 | perf/long-run-baseline | 本条记录所在提交 |
 | UPDATE-20260919-019 | 2026-09-19T21:50:00+08:00 | PLAN-240 | perf/plan-240-integration | 本条记录所在提交 |
 | UPDATE-20260919-018 | 2026-09-19T21:20:00+08:00 | PLAN-240 | perf/polling-visibility-rule | 本条记录所在提交 |
@@ -76,6 +77,24 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-021
+
+时间：2026-09-19T23:05:00+08:00
+
+摘要：端到端实测重放回退代价：10,000 事件下投影存在与否让一次 GUI 读取相差 10 倍（211.6ms → 2095.8ms），并指出投影延迟写入与回退风险是同一枚硬币的两面。
+
+### 变更
+
+- 在 10,000 事件 Run 上走真实 GUI 读取路径（DebugDataService.getRun）实测回退代价：冷缓存 + 投影存在 = 211.6ms；冷缓存 + 投影被删除 = 2095.8ms，相差 10 倍，而 projection.json 仅 4.6 KB
+- 计划 §7.2.1 补充该端到端数据，并点明反直觉后果：T1/T2/T3 把 persistProjection:false 铺到热路径后，projection.json 会长期陈旧，故「投影缺失或陈旧」在正常运行下即会出现，冷缓存时会付出全量重放
+- 明确新 P0 应同时考虑在明确屏障处补齐投影，而不只优化回退本身
+
+### 验证
+
+- [x] 探针在 10,000 事件 Run 上对比两次冷缓存 getRun（投影存在 / 删除后），并打印 projection.json 大小
+- [x] 沿用 UPDATE-20260919-020 的 replay 线性增长数据作交叉印证
+- [x] npm run check:project-reports passed
 
 ## UPDATE-20260919-020
 
