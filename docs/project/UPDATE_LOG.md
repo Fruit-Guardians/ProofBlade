@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T12:40:00+08:00
+> 状态更新时间：2026-09-19T13:10:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-002 | 2026-09-19T13:10:00+08:00 | PLAN-240 | feat/tool-hot-path-timing | 本条记录所在提交 |
 | UPDATE-20260919-001 | 2026-09-19T12:40:00+08:00 | PLAN-240 | fix/gui-runtime-shape-assertion | 本条记录所在提交 |
 | UPDATE-20260912-001 | 2026-09-12T13:45:00+08:00 | PLAN-230 | codex/fix-chat-1789026563795 | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -57,6 +58,32 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-002
+
+时间：2026-09-19T13:10:00+08:00
+
+摘要：新增工具热路径分阶段计时器与 provider-free 基线脚本，为 PLAN-240 提供可复现的性能基线与次数门禁。
+
+### 变更
+
+- 新增 packages/materials/src/observability/tool-timing.ts：ToolTimingRecorder 有界内存环形缓冲、ToolTimingHandle 逐调用计时句柄、nearest-rank percentile 与按组聚合摘要
+- 计时器刻意只驻留内存，不写 ControlStore、事件日志或文件系统，避免记录行为引入它正要消除的同步屏障
+- 只报告两端都已埋点的阶段；finish() 合成的 subscribersEnd 不产生阶段，防止把未埋点跨度凭空计时
+- withToolTiming/withToolTimingOnTools 在未提供 recorder 时返回原对象，未开启计时的 lane 与出厂行为一致，工具契约哈希不变
+- createCodingTools 新增可选 timingRecorder；支持调用级 label，使同名工具的不同用例（如 read-1B 与 read-64KiB）不被合并统计
+- 新增 scripts/tool-hot-path-baseline.ts 与 npm run baseline:tools：用真实 NodeExecutionEnv 与 exec 替身覆盖 read/bash 四个用例，输出阶段耗时与验收计数器表
+- 新增 packages/materials/tests/tool-timing.test.ts 21 项断言，覆盖百分位、有界性、并发隔离、错误语义与计时透明性
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] npm run typecheck --workspace=@proofblade/materials passed
+- [x] npx tsc -b passed
+- [x] node --import tsx --test packages/materials/tests/tool-timing.test.ts: 21/21 passed
+- [x] npm run baseline:tools -- --iterations 30 produced the baseline tables
+- [x] coding-resources.test.ts: 36 passed / 2 failed, both reproduced on a clean HEAD worktree (shell_background and bash artifact-anchor cases)
+- [x] component, change-contract and changed-test checks passed
 
 ## UPDATE-20260919-001
 

@@ -4,15 +4,15 @@
 {
   "id": "materials-observability",
   "name": "Runtime Observability",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-29T10:18:09.178Z",
+  "updatedAt": "2026-09-19T05:10:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 6,
-    "securityAuditCount": 6,
-    "lastBugAuditAt": "2026-08-29T10:18:09.178Z",
-    "lastSecurityAuditAt": "2026-08-29T10:18:09.178Z",
-    "sourceHash": "dc99000e770dcd8d69c9ddc900f61f818973adb4463f50314c2ffae37339d3ab",
+    "bugAuditCount": 7,
+    "securityAuditCount": 7,
+    "lastBugAuditAt": "2026-09-19T05:10:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T05:10:00.000Z",
+    "sourceHash": "4293a96f0890b699546a99d50837a1ac871cc11dd7bfd3fa2733eb5396a44b18",
     "result": "passed"
   }
 }
@@ -35,6 +35,9 @@
 
 Frame 事件只保存 role/source/content hash/visible length/estimated tokens 和 Artifact/Evidence 引用；禁止将 Provider payload、候选文本、凭据或完整工具正文写入 ControlStore。
 
+`tool-timing.ts` 是工具热路径的进程内分段计时器，与上面的 durable telemetry 明确分离：它只写入有界内存环形缓冲，不触碰 ControlStore、事件日志或文件系统。理由是测量工具延迟本身不得成为一次 durable 写——否则记录器会引入它正要消除的同步屏障，并改变被测对象。`percentile` 使用 nearest-rank，保证报告的每个数值都是实际观测到的时长；只报告两端都已埋点的阶段，`finish()` 合成的 `subscribersEnd` 不产生阶段，避免把未埋点跨度凭空计时。`withToolTiming` 在未提供 recorder 时返回原对象本身，保证未开启计时的 lane 与出厂行为逐字节一致，工具契约哈希不受影响。
+
 ```powershell
-node --import tsx --test packages/materials/tests/observability.test.ts
+node --import tsx --test packages/materials/tests/observability.test.ts packages/materials/tests/tool-timing.test.ts
+npm run baseline:tools
 ```

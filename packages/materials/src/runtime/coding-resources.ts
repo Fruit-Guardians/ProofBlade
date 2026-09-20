@@ -25,6 +25,7 @@ import type { DomainPhase, Lane, RawEffectResult, TargetKind } from "../domain/t
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
+import { withToolTimingOnTools, type ToolTimingRecorder } from "../observability/tool-timing.js";
 import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
@@ -187,10 +188,19 @@ export interface CodingToolOptions {
   externalSubmissionEnabled?: boolean;
   webReproductionEnabled?: boolean;
   webSessionEnabled?: boolean;
+  /**
+   * Opt-in stage-timing sink for tool calls.
+   *
+   * Absent by default so the shipped tool list is byte-identical to the
+   * unwrapped one; the tool contract hash depends on that list. Supplying a
+   * recorder wraps every tool in {@link withToolTiming}, which forwards
+   * behaviour unchanged and only appends an in-memory sample.
+   */
+  timingRecorder?: ToolTimingRecorder;
 }
 
 export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
-  return [
+  return withToolTimingOnTools([
     ...builtinTools(),
     updatePhaseTool,
     verifyResultTool,
@@ -206,7 +216,7 @@ export function createCodingTools(options: CodingToolOptions = {}): AgentHarness
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
     // Registered only when a trusted destination is configured.
     ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool] : []),
-  ];
+  ], options.timingRecorder);
 }
 
 /** First-class tool name for an MCP server tool: mcp__<server>__<tool>. */

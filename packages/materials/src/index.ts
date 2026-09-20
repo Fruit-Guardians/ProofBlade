@@ -109,6 +109,7 @@ export * from "./observability/pi-events.js";
 export * from "./observability/run-telemetry.js";
 export * from "./observability/telemetry-backend.js";
 export * from "./observability/lifecycle-audit.js";
+export * from "./observability/tool-timing.js";
 export * from "./capabilities/catalog.js";
 export * from "./capabilities/router.js";
 export * from "./capabilities/backend.js";

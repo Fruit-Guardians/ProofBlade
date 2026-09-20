@@ -50,6 +50,7 @@
     "demo": "npm run cli -- run demo",
     "gui": "npm run build:gui-deps && npm run dev --workspace=@proofblade/gui --",
     "gui:fast": "npm run dev --workspace=@proofblade/gui --",
+    "baseline:tools": "npm run build:gui-deps --silent && tsx scripts/tool-hot-path-baseline.ts",
     "browser:smoke": "npm run build --silent && tsx scripts/browser-runtime-smoke.ts",
     "browser:smoke:required": "npm run build --silent && tsx scripts/browser-runtime-smoke.ts --required",
     "pwn:docker:smoke": "npm run build --silent && tsx scripts/pwn-docker-smoke.ts",
