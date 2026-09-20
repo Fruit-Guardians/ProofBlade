@@ -47,6 +47,19 @@ type StoredProjection = RunSnapshot & {
 
 const EVENT_CACHE_LIMIT = 64;
 
+/**
+ * Lifetime parse counters for the event stream, aggregated per process.
+ *
+ * These are module-level rather than per-instance because the question they
+ * answer is "did this process deserialize the event stream", not "did this
+ * object". A GUI server builds several stores over the same runs root
+ * (`createServices` and the debug data service each hold one), and a
+ * per-instance counter would report a reassuring zero for the very read that
+ * paid the cost.
+ */
+let parsedEventCount = 0;
+let parsedEventBytes = 0;
+
 export class JsonlControlStore {
   private readonly runsRoot: string;
   private readonly writes = new KeyedOperationQueue();
@@ -60,6 +73,28 @@ export class JsonlControlStore {
   public constructor(runsRoot: string, options: { lock?: FileLockOptions } = {}) {
     this.runsRoot = runsRoot;
     this.lockOptions = options.lock ?? {};
+  }
+
+  /**
+   * Lifetime parse counters for the event stream, for this process.
+   *
+   * A read that answers a question about a Run must not pay to deserialize the
+   * whole stream first. Timing cannot gate that: a duration threshold measures
+   * the runner and gets disabled on slower machines. These are counts instead,
+   * so a test can assert "this read parsed N events" the same way
+   * `SkillRegistry.cacheStats()` asserts catalog re-parses.
+   *
+   * Every cache miss re-parses the complete `events.jsonl`, and that is exactly
+   * what the counter makes visible.
+   *
+   * It is an observation only: it changes no read path, and it is never reset
+   * implicitly, so a value read after two operations is the sum of both. A zero
+   * therefore means "nothing was parsed here", never "the counter was cleared"
+   * -- `parsedBytes` moves with `parsedEvents` so a broken counter cannot look
+   * like a healthy cache.
+   */
+  public readStats(): { parsedEvents: number; parsedBytes: number } {
+    return { parsedEvents: parsedEventCount, parsedBytes: parsedEventBytes };
   }
 
   public runPath(runId: string): string {
@@ -166,6 +201,8 @@ export class JsonlControlStore {
         if (!line) continue;
         try {
           events.push(JSON.parse(line) as HarnessEvent);
+          parsedEventCount += 1;
+          parsedEventBytes += Buffer.byteLength(line, "utf8");
         } catch (error) {
           // A process can be terminated after an append has written part of
           // the final UTF-8 record but before the newline reaches durable

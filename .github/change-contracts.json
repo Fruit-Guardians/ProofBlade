@@ -30,7 +30,9 @@
         "contract:observer-failure-is-diagnostic-only",
         "contract:archival-failure-keeps-read-successful",
         "contract:projection-hint-currency",
-        "contract:barrier-persists-deferred-projection"
+        "contract:barrier-persists-deferred-projection",
+        "contract:read-path-parse-is-counted",
+        "contract:cold-read-parse-budget"
       ]
     },
     {
@@ -168,6 +170,17 @@
         "contract:fixture-runtime-gate",
         "contract:runtime-scenario-baseline",
         "contract:runtime-scenario-failure-isolation"
+      ]
+    },
+    {
+      "id": "read-path-parse-budget",
+      "triggers": [
+        { "path": "packages/materials/src/storage/jsonl-store.ts", "patterns": ["readStats", "loadEvents", "parsedEvent", "eventCache"] }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:read-path-parse-is-counted",
+        "contract:cold-read-parse-budget"
       ]
     }
   ]
