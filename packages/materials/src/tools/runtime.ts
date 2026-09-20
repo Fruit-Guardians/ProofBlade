@@ -159,6 +159,11 @@ export class ProofBladeToolRuntime {
    * in the Effect Journal (for example read/bash output rewriting). The
    * synthetic effect id is derived from the immutable artifact id, so retries
    * are idempotent and the observer never emits duplicate evidence.
+   *
+   * `content` lets a caller that still holds the exact bytes it just archived
+   * skip the read-back. The observer only inspects bounded stdout/stderr for
+   * candidate and failure signatures, so re-reading the artifact from disk to
+   * feed it the same characters is pure overhead on the tool hot path.
    */
   public async observeArtifact(input: {
     operation: string;
@@ -166,11 +171,13 @@ export class ProofBladeToolRuntime {
     exitCode?: number | null;
     persistProjection?: boolean;
     annotation?: { name: string; summary: string; tags?: string[]; role?: "supporting" | "intermediate" | "debug" | "result"; relatedIds?: string[] };
+    /** The artifact's text, when the caller already has it. Omit to read it back. */
+    content?: string;
   }): Promise<ObservationOutcome & { progressKey: string }> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[input.artifactId];
     if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
-    const stored = await this.artifactStore.readText(this.runId, artifact);
+    const stored = input.content ?? await this.artifactStore.readText(this.runId, artifact);
     const observed = await this.observer.observe(this.runId, {
       operation: input.operation,
       artifactId: artifact.id,

@@ -1824,7 +1824,7 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
         },
         persistProjection: false,
       });
-      const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
+      const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"], visible);
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
       const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, artifact.id, isBoundedReadResult(result));
@@ -2021,8 +2021,9 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
         const failure = shellFailureDetails(visible);
-        const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
-        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
+        const archived = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
+        const { archivedText, ...outputRewrite } = archived;
+        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"], typeof archivedText === "string" ? archivedText : undefined);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
         const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0), "error");
         await context.experimentGate?.record({
@@ -2051,8 +2052,12 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outsideWorkspace = sourceScope.status === "outside_workspace";
-      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, outsideWorkspace ? "debug" : "intermediate");
-      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), outsideWorkspace ? "bash:outside-workspace" : "bash", 0, `${outsideWorkspace ? "外部环境" : "命令"}输出 · ${commandTitle(input.command)}`, outsideWorkspace ? "输出包含任务工作区之外的运行环境数据，仅可用于诊断，不能作为任务结果的权威来源。" : "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", outsideWorkspace ? "debug" : "intermediate", ["bash", "command-output", ...(outsideWorkspace ? ["outside-workspace"] : [])]);
+      const archived = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, outsideWorkspace ? "debug" : "intermediate");
+      // Keep the archived text out of `details`: it is the full raw output, and
+      // `details` is persisted with the session and rendered in the debug view.
+      // The observer is the only consumer that needs it, and it has it here.
+      const { archivedText, ...outputRewrite } = archived;
+      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), outsideWorkspace ? "bash:outside-workspace" : "bash", 0, `${outsideWorkspace ? "外部环境" : "命令"}输出 · ${commandTitle(input.command)}`, outsideWorkspace ? "输出包含任务工作区之外的运行环境数据，仅可用于诊断，不能作为任务结果的权威来源。" : "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", outsideWorkspace ? "debug" : "intermediate", ["bash", "command-output", ...(outsideWorkspace ? ["outside-workspace"] : [])], typeof archivedText === "string" ? archivedText : undefined);
       const receipt = await artifactReceipt(context, toolCallId, `命令输出 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
@@ -2200,6 +2205,14 @@ async function observeCodingArtifact(
   summary: string,
   role: "intermediate" | "debug",
   tags: string[],
+  /**
+   * The archived text, when the caller still holds it.
+   *
+   * The observer only inspects bounded stdout for candidate and failure
+   * signatures, so reading the artifact back from disk to hand it the same
+   * characters is pure overhead on the tool hot path.
+   */
+  content?: string,
 ): Promise<AutomaticArtifactDetails> {
   const details: AutomaticArtifactDetails = {};
   const previous = artifactHash ? context.artifactOutputRefs?.get(artifactHash) : undefined;
@@ -2226,6 +2239,7 @@ async function observeCodingArtifact(
         artifactId,
         exitCode,
         persistProjection: false,
+        ...(content === undefined ? {} : { content }),
         annotation: { name, summary, role, tags: [...tags, "auto-reviewed"] },
       });
       // Automatic observations are bookkeeping, not solver milestones.
@@ -2304,6 +2318,10 @@ async function finalizeAndArchive(
     rawBytes: finalized.rawBytes,
     visibleBytes: finalized.visibleBytes,
     savedBytes,
+    // The exact text written to the artifact, so the observer can classify it
+    // without reading the file back. Deliberately not enumerated in any
+    // model-facing projection: this return value only feeds `details`.
+    archivedText: finalized.rawOutput,
     savingsRate: finalized.rawBytes > 0 ? Number((savedBytes / finalized.rawBytes).toFixed(4)) : 0,
     rawTruncated: finalized.rawTruncated,
     artifactId: artifact.id,

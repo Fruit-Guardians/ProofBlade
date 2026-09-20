@@ -175,9 +175,10 @@
       "testGlobs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/tool-catalog.test.ts"
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/artifact-readback.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/tool-repeat-breaker.test.ts packages/materials/tests/tool-catalog.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/tool-repeat-breaker.test.ts packages/materials/tests/tool-catalog.test.ts packages/materials/tests/artifact-readback.test.ts"
     },
     {
       "id": "materials-public-surface",

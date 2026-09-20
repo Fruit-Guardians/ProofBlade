@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T15:05:00+08:00
+> 状态更新时间：2026-09-19T15:35:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-008 | 2026-09-19T15:35:00+08:00 | PLAN-240 | perf/tool-artifact-readback | 本条记录所在提交 |
 | UPDATE-20260919-007 | 2026-09-19T15:05:00+08:00 | PLAN-240 | perf/experiment-gate-deferred-projection | 本条记录所在提交 |
 | UPDATE-20260919-006 | 2026-09-19T14:40:00+08:00 | PLAN-240 | perf/version-snapshot-cache | 本条记录所在提交 |
 | UPDATE-20260919-005 | 2026-09-19T14:15:00+08:00 | PLAN-240 | perf/conversation-create-minimal | 本条记录所在提交 |
@@ -63,6 +64,29 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-008
+
+时间：2026-09-19T15:35:00+08:00
+
+摘要：工具热路径去掉 Artifact 回读：观察器改为接收调用方已持有的归档文本，不再从磁盘读回同一份内容。
+
+### 变更
+
+- ProofBladeToolRuntime.observeArtifact() 新增可选 content；省略时仍回读，既有调用点行为不变
+- observeCodingArtifact() 新增可选 content 参数；read 路径传入已归档的 visible 文本，bash 成功/失败路径传入 finalizeAndArchive 返回的 archivedText
+- finalizeAndArchive() 返回 archivedText（写入 Artifact 的精确字节），供观察器直接消费
+- 两条 bash 返回路径从 outputRewrite 中解构掉 archivedText，避免完整原始输出进入 details —— details 会随 Session 持久化并在调试视图渲染，把大输出放进去会与「大输出外置」的既有设计冲突
+- 新增 packages/materials/tests/artifact-readback.test.ts：用 spy 统计 ArtifactStore.readText 次数
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test packages/materials/tests/artifact-readback.test.ts: 2/2 passed
+- [x] 反向验证：临时改回无条件回读后，断言 reads === 0 的用例失败，确认该测试真正守住这条路径
+- [x] node --import tsx --test coding-resources/observability/control-store: 58 passed / 2 failed，两项为既有失败（已在 clean worktree 多次复现）
+- [x] 关键断言：普通 read 的 reads === 0；观察器仍能识别 flag{...} 候选值（candidateKinds === ["flag-shaped-value"]），证明去掉回读没有让观察器失明
+- [x] npm run check:changed-tests、check:components passed
 
 ## UPDATE-20260919-007
 
