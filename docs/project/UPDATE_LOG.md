@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T15:35:00+08:00
+> 状态更新时间：2026-09-19T16:10:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-009 | 2026-09-19T16:10:00+08:00 | PLAN-240 | perf/real-run-baseline | 本条记录所在提交 |
 | UPDATE-20260919-008 | 2026-09-19T15:35:00+08:00 | PLAN-240 | perf/tool-artifact-readback | 本条记录所在提交 |
 | UPDATE-20260919-007 | 2026-09-19T15:05:00+08:00 | PLAN-240 | perf/experiment-gate-deferred-projection | 本条记录所在提交 |
 | UPDATE-20260919-006 | 2026-09-19T14:40:00+08:00 | PLAN-240 | perf/version-snapshot-cache | 本条记录所在提交 |
@@ -64,6 +65,30 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-009
+
+时间：2026-09-19T16:10:00+08:00
+
+摘要：补齐真实 Run 工具热路径基线：在隔离项目中对真实 ControlStore 测量每次调用的事件数、投影写入、回读与延迟。
+
+### 变更
+
+- 新增 scripts/tool-hot-path-real-run-baseline.ts 与 npm run baseline:tools:real：驱动真实 read/bash 通过真实 ControlStore，输出每次调用的 durable 事件数、投影重写、Artifact 回读与分阶段延迟
+- 测量锚定在 events.jsonl 行数而非 ControlStore 公共方法调用：ArtifactStore、Effect Journal 与 observer port 都经由内部路径写入，包住公共 API 会静默报 0
+- 新增 read-1B 对照组，使框架固定成本可与载荷成本分离
+- 新增 assertMeasured()：若某用例每次都失败则直接报错，避免把「什么都没跑」的 0 误读成「不花钱」
+- 临时根使用独立 runs/ 目录，测量不会写入仓库的证据链；Windows 下清理失败不再吞掉已取得的测量
+- docs/PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md §7.2.1 回填真实 Run 基线数据与三条结论
+
+### 验证
+
+- [x] npm run baseline:tools:real -- --iterations 8 输出三用例测量表
+- [x] read-1B 与 read-32KiB 事件数相同（各 4 条/次）而延迟 25.1ms → 43.0ms，分离出固定链路成本约 25ms
+- [x] projection 重写在真实 Run 上为 0，验证 UPDATE-20260919-007（T3 延后投影）生效
+- [x] Artifact 回读为 0，与 UPDATE-20260919-008 一致
+- [x] bash-noop framework−command ≈ 4ms，说明其 p95 2.9s 主要来自进程启动与磁盘抖动而非 ProofBlade 附加开销
+- [x] npm run check:change-contracts、check:changed-tests passed
 
 ## UPDATE-20260919-008
 

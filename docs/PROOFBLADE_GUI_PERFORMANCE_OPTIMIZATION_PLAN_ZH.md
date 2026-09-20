@@ -773,13 +773,29 @@ Tool execute
 
 测试条件：本机 release-like 构建，至少 100 个历史 Run，一个 10,000 条事件的长对话。
 
-**已完成的局部基线（PR 2，provider-free）**：命令执行本身为亚毫秒到毫秒级，`scheduled → executionStart` 框架调度开销可忽略。这排除了「命令执行慢」这一解释，把放大来源锁定在 `executionEnd` 之后的控制链路。
+**已完成的局部基线（PR 2，provider-free）**：命令执行本身为亚毫秒到毫秒级，`scheduled → executionStart` 框架调度开销可忽略。
+
+**已完成的真实 Run 基线（`npm run baseline:tools:real`）**：在隔离临时项目中驱动真实 ControlStore，8 次/用例：
+
+| 用例 | 每次调用 durable 事件 | projection 重写 | Artifact 回读 | command p50 | framework p50 | p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| read-1B | 4 | 0 | 0 | 25.1ms | 26.5ms | 34.7ms |
+| read-32KiB | 4 | 0 | 0 | 43.0ms | 44.9ms | 49.5ms |
+| bash-noop（`echo baseline`） | 5 | 0 | 0 | 532ms | 536ms | 2.9s |
+
+三条可直接使用的结论：
+
+1. **控制链路每次调用是固定成本，约 25ms**，与载荷大小几乎无关。`read-1B` 与 `read-32KiB` 事件数完全相同（各 4 条），但延迟只从 25ms 增长到 43ms——增量来自 32KiB 的归档 I/O，**固定部分才是链路本身**。
+2. **`projection 重写 = 0`**：这直接验证了表项 T3（`ExperimentGate` 延后投影）在真实 Run 上生效。全量投影重写已不在工具热路径上。
+3. **`bash` 的 p95（2.9s）与 p50（532ms）严重脱节**，而 `framework − command` 仅约 4ms。也就是说这条尾巴来自命令执行/进程启动与磁盘抖动，**不是** ProofBlade 附加开销。§2.6 提到的「杀毒软件、索引服务、磁盘写入抖动」在这里得到量化。
+
+**基线尚缺的部分**：真实 Run 基线目前只用了一个 Run、一个短会话。§7.2.1 要求的「至少 100 个历史 Run + 一个 10,000 条事件的长对话」尚未构造，因此**长 Run 下投影与快照随历史增长的成本仍未测量**，§7.2.3 的目标阈值仍不应签署。
 
 | 待测指标 | 基线值 | 状态 |
 |---|---:|---|
 | 普通对话创建 API p50 / p95 | — | **待测** |
-| 底层命令 <= 10 ms 时，普通工具总耗时 p50 / p95 | — | **待测（真实 Run）** |
-| 普通工具 ProofBlade 附加耗时 p50 / p95 / p99 | — | **待测（真实 Run）** |
+| 底层命令 <= 10 ms 时，普通工具总耗时 p50 / p95 | 见上表（bash 受进程启动主导） | 已测局部 |
+| 普通工具 ProofBlade 附加耗时 p50 / p95 / p99 | read ≈ 25ms 固定；bash ≈ 4ms | **已测局部** |
 | 重要工具结果单次提交 p95 | — | **待测** |
 | 普通 Tool Result 从 command complete 到 model-visible p95 | — | **待测** |
 | 首次点击发送到 Provider 请求发出 p50 / p95 | — | **待测** |
