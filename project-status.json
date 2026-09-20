@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-12T13:45:00+08:00",
+  "updatedAt": "2026-09-19T12:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -271,9 +271,61 @@
         "PLAN-130",
         "PLAN-200"
       ]
+    },
+    {
+      "id": "PLAN-240",
+      "title": "对话创建、工具执行与控制链路性能优化",
+      "status": "in_progress",
+      "priority": "P0",
+      "milestone": "Milestone 4",
+      "owner": "unassigned",
+      "progress": 5,
+      "updatedAt": "2026-09-19T12:40:00+08:00",
+      "objective": "消除普通对话创建的安全任务级初始化，并把普通工具调用的 ProofBlade 同步附加开销从秒级压回毫秒级，同时保留全部跨信任边界的完整性与 verifier 哈希。",
+      "deliverables": [
+        "GUI 启动前的 workspace 构建一致性与材料运行时形状断言",
+        "工具热路径分阶段计时与基线采集，取代未实测的性能阈值",
+        "普通工具结果零同步控制写快速路径与 write-behind 队列",
+        "Artifact/annotation/Observation/Evidence/Experiment 单次 ToolResultCommit",
+        "普通对话创建最小事务与上游 Pi 工作目录/会话复用",
+        "Catalog、版本快照与 Context 派生值按 revision 缓存",
+        "GUI 详情接口按视图拆分与增量轮询"
+      ],
+      "acceptance": [
+        "运行时不再出现源码与 dist 的 API 错配，且错配在启动时立即失败",
+        "普通工具返回前没有同步 ControlStore commit、fsync 或 projection rewrite",
+        "重要工具结果的派生记录在一个批量事务中完成",
+        "性能基线已实测填入，目标阈值据基线评审",
+        "每个改动源文件都有对应测试文件"
+      ],
+      "dependencies": [
+        "PLAN-230"
+      ]
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-001",
+      "occurredAt": "2026-09-19T12:40:00+08:00",
+      "summary": "修复 GUI 与 @proofblade/materials 的构建产物错配：新增构建前置命令与材料运行时形状断言，让陈旧 dist 在启动时立即失败。",
+      "branch": "fix/gui-runtime-shape-assertion",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "新增 `build:gui-deps` 只构建 atoms、molecules 和 materials，`npm run gui` 先执行它再启动 GUI，`gui:fast` 保留给已由 watcher 保证产物一致的开发场景",
+        "新增 apps/gui/src/runtime-shape.ts：探测 @proofblade/materials 解析到的实际入口，报告 REQUIRED_CONTROL_METHODS 中缺失或不可调用的成员，并给出 `npm run build:gui-deps` 修复提示",
+        "DebugDataService.assertRuntimeShape() 在 server 首次请求前断言材料运行时形状并打印解析到的包路径；缺失 loadProjectionHint 不再表现为请求处理期的 `is not a function`",
+        "按计划评审修订 1 的结论不提供运行时兼容降级：降级会掩盖构建错配，与 PLAN-240 完成定义冲突",
+        "新增 apps/gui/tests/runtime-shape.test.ts 八项断言，含对已安装 materials 构建的契约校验"
+      ],
+      "validation": [
+        "npm run build:gui-deps passed",
+        "node --import tsx --test apps/gui/tests/runtime-shape.test.ts: 8/8 passed",
+        "installed-build contract assertion passed against the refreshed materials dist"
+      ]
+    },
     {
       "id": "UPDATE-20260912-001",
       "occurredAt": "2026-09-12T13:45:00+08:00",

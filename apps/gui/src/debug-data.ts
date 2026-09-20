@@ -38,6 +38,7 @@ import {
   projectionHash,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
+import { assertMaterialsRuntime, type RuntimeShapeReport } from "./runtime-shape.js";
 import { stageTaskWorkspace, type TaskWorkspaceInput } from "./task-workspace.js";
 import type {
   ActiveRunInfo,
@@ -139,6 +140,23 @@ export class DebugDataService {
       control: this.services.control,
       approvals: new ApprovalPolicy({ ledgerPath: join(this.services.runsRoot, "approvals.json") }),
     });
+  }
+
+  /**
+   * Verify the `@proofblade/materials` runtime the GUI actually loaded exposes
+   * every member the GUI calls unconditionally.
+   *
+   * Run once from the server entry before the first request. A stale workspace
+   * build otherwise surfaces as `loadProjectionHint is not a function` inside a
+   * request handler, which reads like corrupt projection data rather than a
+   * build problem. This fails the boot instead, naming the member and the
+   * module that was resolved.
+   *
+   * @returns the probe report, so a caller can log what was resolved.
+   * @throws when any required member is missing.
+   */
+  public assertRuntimeShape(): RuntimeShapeReport {
+    return assertMaterialsRuntime(this.services.control);
   }
 
   public updateModelProfile(profile: ModelProfileConfig): void {

@@ -1,12 +1,12 @@
 # 项目计划
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-12T13:45:00+08:00
+> 状态更新时间：2026-09-19T12:40:00+08:00
 
 ## 概览
 
-- 计划总数：10
-- 进行中：6
+- 计划总数：11
+- 进行中：7
 - 待开始：1
 - 受阻：1
 - 已完成：2
@@ -19,6 +19,7 @@
 | PLAN-110 | P0 | Milestone 2 debt | 进行中 | 35% | unassigned | 2026-08-09T15:15:00+08:00 |
 | PLAN-120 | P0 | Milestone 4 | 进行中 | 35% | unassigned | 2026-08-12T16:30:00+08:00 |
 | PLAN-220 | P0 | Milestone 2 / 5 | 进行中 | 45% | unassigned | 2026-08-20T12:15:00+08:00 |
+| PLAN-240 | P0 | Milestone 4 | 进行中 | 5% | unassigned | 2026-09-19T12:40:00+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-200 | P1 | Milestone 6 | 进行中 | 45% | unassigned | 2026-08-25T13:05:00+08:00 |
 | PLAN-230 | P1 | Milestone 6 | 进行中 | 35% | unassigned | 2026-08-29T11:55:00+08:00 |
@@ -101,6 +102,30 @@
 - [ ] 活动租约阻止重复 claim，过期租约可被恢复流程重新认领
 - [ ] 工作图变化会使旧 Handoff 失效并生成新的结构化动作
 - [ ] Competition Loop 在成功、阻塞、Provider 失败和耗尽路径都留下明确 WorkItem 终态
+
+## PLAN-240 对话创建、工具执行与控制链路性能优化
+
+目标：消除普通对话创建的安全任务级初始化，并把普通工具调用的 ProofBlade 同步附加开销从秒级压回毫秒级，同时保留全部跨信任边界的完整性与 verifier 哈希。
+
+依赖：PLAN-230
+
+### 交付物
+
+- GUI 启动前的 workspace 构建一致性与材料运行时形状断言
+- 工具热路径分阶段计时与基线采集，取代未实测的性能阈值
+- 普通工具结果零同步控制写快速路径与 write-behind 队列
+- Artifact/annotation/Observation/Evidence/Experiment 单次 ToolResultCommit
+- 普通对话创建最小事务与上游 Pi 工作目录/会话复用
+- Catalog、版本快照与 Context 派生值按 revision 缓存
+- GUI 详情接口按视图拆分与增量轮询
+
+### 验收条件
+
+- [ ] 运行时不再出现源码与 dist 的 API 错配，且错配在启动时立即失败
+- [ ] 普通工具返回前没有同步 ControlStore commit、fsync 或 projection rewrite
+- [ ] 重要工具结果的派生记录在一个批量事务中完成
+- [ ] 性能基线已实测填入，目标阈值据基线评审
+- [ ] 每个改动源文件都有对应测试文件
 
 ## PLAN-130 真实 Sandbox 与清理生命周期
 

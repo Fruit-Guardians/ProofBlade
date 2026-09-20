@@ -23,6 +23,8 @@ const providerSettings = await ProviderSettingsStore.create(config);
 config.modelProfiles.executor = providerSettings.modelProfile();
 const workspaceSettings = await WorkspaceSettingsStore.create();
 const data = new DebugDataService(projectRoot, config, configPath);
+const runtimeShape = data.assertRuntimeShape();
+console.log(`Materials runtime: ${runtimeShape.specifier} -> ${runtimeShape.resolvedPath ?? "unresolved"}`);
 const ablation = new AblationService(projectRoot, config, providerSettings);
 const competitionSettings = await CompetitionSettingsStore.create(projectRoot, config);
 const competitionBackend = competitionSettings.backend();

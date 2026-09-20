@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-12T13:45:00+08:00
+> 状态更新时间：2026-09-19T12:40:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-001 | 2026-09-19T12:40:00+08:00 | PLAN-240 | fix/gui-runtime-shape-assertion | 本条记录所在提交 |
 | UPDATE-20260912-001 | 2026-09-12T13:45:00+08:00 | PLAN-230 | codex/fix-chat-1789026563795 | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -56,6 +57,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-001
+
+时间：2026-09-19T12:40:00+08:00
+
+摘要：修复 GUI 与 @proofblade/materials 的构建产物错配：新增构建前置命令与材料运行时形状断言，让陈旧 dist 在启动时立即失败。
+
+### 变更
+
+- 新增 `build:gui-deps` 只构建 atoms、molecules 和 materials，`npm run gui` 先执行它再启动 GUI，`gui:fast` 保留给已由 watcher 保证产物一致的开发场景
+- 新增 apps/gui/src/runtime-shape.ts：探测 @proofblade/materials 解析到的实际入口，报告 REQUIRED_CONTROL_METHODS 中缺失或不可调用的成员，并给出 `npm run build:gui-deps` 修复提示
+- DebugDataService.assertRuntimeShape() 在 server 首次请求前断言材料运行时形状并打印解析到的包路径；缺失 loadProjectionHint 不再表现为请求处理期的 `is not a function`
+- 按计划评审修订 1 的结论不提供运行时兼容降级：降级会掩盖构建错配，与 PLAN-240 完成定义冲突
+- 新增 apps/gui/tests/runtime-shape.test.ts 八项断言，含对已安装 materials 构建的契约校验
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] node --import tsx --test apps/gui/tests/runtime-shape.test.ts: 8/8 passed
+- [x] installed-build contract assertion passed against the refreshed materials dist
 
 ## UPDATE-20260912-001
 
