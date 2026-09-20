@@ -28,7 +28,9 @@
         "contract:hot-path-readback-budget",
         "contract:skill-catalog-parse-budget",
         "contract:observer-failure-is-diagnostic-only",
-        "contract:archival-failure-keeps-read-successful"
+        "contract:archival-failure-keeps-read-successful",
+        "contract:projection-hint-currency",
+        "contract:barrier-persists-deferred-projection"
       ]
     },
     {

@@ -410,8 +410,22 @@ export class JsonlControlStore {
         stat(join(this.runsRoot, runId, "projection.json")),
         stat(this.runPath(runId)),
       ]);
+      // A projection older than the event log cannot be current. This is a
+      // temporal heuristic, and it is not sufficient on its own: coarse
+      // filesystem timestamp granularity (or any clock adjustment) can make the
+      // two mtimes compare EQUAL while the projection is still behind, which
+      // this comparison accepts. The content check below is what actually
+      // establishes currency.
       if (projectionStat.mtimeMs < eventsStat.mtimeMs) return undefined;
       const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
+      // Establish currency from content, not from time. The seal proves a
+      // projection is authentic and internally consistent, not that it covers
+      // the whole log: a projection sealed at lastSeq 1 stays perfectly valid
+      // after 10,000 more events. Comparing the projection's lastSeq with the
+      // log's last event closes that gap for the cost of one bounded tail read,
+      // independent of timestamp granularity.
+      const streamLastSeq = await this.lastEventSeq(runId);
+      if (streamLastSeq !== undefined && streamLastSeq !== stored.lastSeq) return undefined;
       const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
       const snapshot = snapshotFields as RunSnapshot;
       // Recompute the projection content hash before trusting any stored hash.
@@ -444,6 +458,47 @@ export class JsonlControlStore {
     }
   }
 
+
+  /**
+   * The `seq` of the newest event in the log, or `undefined` when it cannot be
+   * determined.
+   *
+   * Reads a bounded tail rather than the whole file: the last record fits in the
+   * final chunk for any realistic event, and this must stay cheaper than parsing
+   * the stream, which is the whole point of the fast hint path. `undefined`
+   * means "unknown", and callers must treat that as "cannot confirm currency"
+   * rather than as "current".
+   */
+  private async lastEventSeq(runId: string): Promise<number | undefined> {
+    const TAIL_BYTES = 64 * 1024;
+    let handle;
+    try {
+      const path = this.runPath(runId);
+      const stats = await stat(path);
+      if (stats.size === 0) return undefined;
+      const start = Math.max(0, stats.size - TAIL_BYTES);
+      const length = stats.size - start;
+      handle = await open(path, "r");
+      const buffer = Buffer.alloc(length);
+      await handle.read(buffer, 0, length, start);
+      const lines = buffer.toString("utf8").split("\n").filter((line) => line.trim().length > 0);
+      // The first line of a non-zero offset chunk is almost certainly partial.
+      const candidates = start > 0 ? lines.slice(1) : lines;
+      for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        try {
+          const parsed = JSON.parse(candidates[index]!) as { seq?: unknown };
+          if (typeof parsed.seq === "number" && Number.isInteger(parsed.seq)) return parsed.seq;
+        } catch {
+          // A torn or partial trailing line: keep walking back.
+        }
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    } finally {
+      await handle?.close().catch(() => undefined);
+    }
+  }
 
   public async projectionDigest(runId: string): Promise<string> {
     return sha256(canonicalJson(await this.replay(runId)));

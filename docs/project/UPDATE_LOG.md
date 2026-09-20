@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T23:40:00+08:00
+> 状态更新时间：2026-09-20T00:20:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260920-001 | 2026-09-20T00:20:00+08:00 | PLAN-240 | fix/projection-hint-currency | 本条记录所在提交 |
 | UPDATE-20260919-022 | 2026-09-19T23:40:00+08:00 | PLAN-240 | perf/barrier-cheap-check | 本条记录所在提交 |
 | UPDATE-20260919-021 | 2026-09-19T23:05:00+08:00 | PLAN-240 | perf/replay-fallback-cost | 本条记录所在提交 |
 | UPDATE-20260919-020 | 2026-09-19T22:30:00+08:00 | PLAN-240 | perf/long-run-baseline | 本条记录所在提交 |
@@ -78,6 +79,30 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260920-001
+
+时间：2026-09-20T00:20:00+08:00
+
+摘要：修复 loadProjectionHint 的时效判定：仅靠 mtime 会让落后于事件日志的投影被当作最新，改为同时比对事件日志末条 seq。
+
+### 变更
+
+- 问题：loadProjectionHint 的封印只证明投影真实且内部自洽，不证明它覆盖整条日志——一个封在 lastSeq=1 的投影在新增 10,000 条事件后依然有效；其唯一时效守卫是「投影 mtime >= 事件 mtime」这一时间启发式
+- 实测确认可达：把投影与事件日志 mtime 置为相等（粗粒度时间戳或时钟调整的产物）后，守卫放行，hint 返回 lastSeq=1 而权威快照为 61——GUI 列表视图会展示陈旧状态
+- 在 persistProjection:false 已铺到热路径的前提下，投影按设计落后是常态，因此该窗口并非罕见
+- 修法：新增私有 lastEventSeq()（有界读取事件日志尾部 64KB，解析最后一条有效记录），将投影 lastSeq 与日志末条 seq 比对；mtime 比较保留为廉价预筛并注释说明其不足
+- 新增 packages/materials/tests/projection-hint-currency.test.ts 5 项断言，含 contract:projection-hint-currency
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] 修复前：hint 返回 lastSeq=1，权威快照 61（陈旧 hint 被接受）；修复后：hint 返回 undefined（正确扣留）
+- [x] 回归确认正常路径未破：新建 Run hint=1/snapshot=1；延后写入后正确扣留；屏障后 hint=41/snapshot=41
+- [x] 篡改投影正文仍被拒绝（内容哈希校验未受影响）
+- [x] node --import tsx --test projection-hint-currency.test.ts: 5/5 passed
+- [x] node --import tsx --test control-store/control-store-concurrency/durability/barrier-projection/hot-path-budget: 39/39 passed
+- [x] npm run check:changed-tests、api:index:check passed
 
 ## UPDATE-20260919-022
 

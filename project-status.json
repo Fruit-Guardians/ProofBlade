@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T23:40:00+08:00",
+  "updatedAt": "2026-09-20T00:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,32 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260920-001",
+      "occurredAt": "2026-09-20T00:20:00+08:00",
+      "summary": "修复 loadProjectionHint 的时效判定：仅靠 mtime 会让落后于事件日志的投影被当作最新，改为同时比对事件日志末条 seq。",
+      "branch": "fix/projection-hint-currency",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "问题：loadProjectionHint 的封印只证明投影真实且内部自洽，不证明它覆盖整条日志——一个封在 lastSeq=1 的投影在新增 10,000 条事件后依然有效；其唯一时效守卫是「投影 mtime >= 事件 mtime」这一时间启发式",
+        "实测确认可达：把投影与事件日志 mtime 置为相等（粗粒度时间戳或时钟调整的产物）后，守卫放行，hint 返回 lastSeq=1 而权威快照为 61——GUI 列表视图会展示陈旧状态",
+        "在 persistProjection:false 已铺到热路径的前提下，投影按设计落后是常态，因此该窗口并非罕见",
+        "修法：新增私有 lastEventSeq()（有界读取事件日志尾部 64KB，解析最后一条有效记录），将投影 lastSeq 与日志末条 seq 比对；mtime 比较保留为廉价预筛并注释说明其不足",
+        "新增 packages/materials/tests/projection-hint-currency.test.ts 5 项断言，含 contract:projection-hint-currency"
+      ],
+      "validation": [
+        "npm run build:gui-deps passed",
+        "修复前：hint 返回 lastSeq=1，权威快照 61（陈旧 hint 被接受）；修复后：hint 返回 undefined（正确扣留）",
+        "回归确认正常路径未破：新建 Run hint=1/snapshot=1；延后写入后正确扣留；屏障后 hint=41/snapshot=41",
+        "篡改投影正文仍被拒绝（内容哈希校验未受影响）",
+        "node --import tsx --test projection-hint-currency.test.ts: 5/5 passed",
+        "node --import tsx --test control-store/control-store-concurrency/durability/barrier-projection/hot-path-budget: 39/39 passed",
+        "npm run check:changed-tests、api:index:check passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-022",
       "occurredAt": "2026-09-19T23:40:00+08:00",
