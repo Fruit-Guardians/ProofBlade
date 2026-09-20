@@ -39,7 +39,7 @@
     "src/context/model-receipt.ts": "65a8fee2381ac0f50490145d162c2232343106cec18f8d1b05d23d9ce8c2c996",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
-    "src/control/control-store.ts": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+    "src/control/control-store.ts": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
     "src/control/lease-manager.ts": "71e1e334b21ce9a2083ccd5ef3dc4ba31de239f8352bac24aef8bc731561734c",
     "src/control/phase-machine.ts": "870185bade60194a641f4552fe772bcfcfe870144af914950ca82b67ec6fc9e2",
     "src/control/reducer.ts": "ffe52d053482f449f37cf16ecbf1802c4d445adc30c12708a4ab03c06101d814",
@@ -741,9 +741,10 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 246,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/control-authority-migration.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
@@ -1862,6 +1863,7 @@
       "line": 50,
       "moduleHash": "d58022379f230e4eda48081934dd6760a81e3ae828f3169259865772369cb493",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/control-authority-migration.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
@@ -3272,6 +3274,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -3937,8 +3940,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 2343,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 2365,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/durability.test.ts",
@@ -8536,6 +8539,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -9262,7 +9266,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 222,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9276,7 +9280,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 227,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9290,7 +9294,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 99,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9304,7 +9308,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 81,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9318,7 +9322,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 234,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9332,7 +9336,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 95,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9346,7 +9350,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 89,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -9360,7 +9364,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 64,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/competition-sandbox.test.ts"
       ]
@@ -9376,7 +9380,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 73,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -16337,6 +16341,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -16524,6 +16529,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -16808,6 +16814,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -16995,6 +17002,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -17182,6 +17190,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -17369,6 +17378,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -17581,6 +17591,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -17930,6 +17941,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -18295,6 +18307,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -18366,6 +18379,7 @@
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -19361,6 +19375,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -19462,6 +19477,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -19555,6 +19571,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -19712,6 +19729,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -19828,6 +19846,7 @@
       "moduleHash": "71da3ade3bf1e5b2a8b73638e5ebf04c1238126e6b1e9364852049fb75311af5",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -20408,6 +20427,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -20548,6 +20568,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -20849,6 +20870,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21008,6 +21030,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21149,6 +21172,7 @@
       "moduleHash": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21257,6 +21281,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21357,6 +21382,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21456,6 +21482,7 @@
       "testRefs": [
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21543,6 +21570,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21622,6 +21650,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21772,6 +21801,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -21863,6 +21893,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21974,8 +22005,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 748,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 770,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -21988,8 +22019,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 763,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 785,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22002,8 +22033,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 859,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 881,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22016,8 +22047,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 893,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 915,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22030,8 +22061,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 874,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 896,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22044,8 +22075,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 836,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 858,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22058,8 +22089,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 804,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 826,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22073,7 +22104,21 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 333,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::method::ControlStore.#projectionAlreadyCurrent",
+      "name": "ControlStore.#projectionAlreadyCurrent",
+      "kind": "method",
+      "signature": "(runId: string, snapshot: RunSnapshot): Promise<boolean>",
+      "summary": "Whether the on-disk projection already matches `snapshot`, cheaply.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/control/control-store.ts",
+      "line": 671,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22086,8 +22131,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 691,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 713,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22100,8 +22145,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 656,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 678,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22114,8 +22159,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
-      "line": 661,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "line": 683,
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22129,7 +22174,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 474,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22143,8 +22188,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 567,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/control-authority-migration.test.ts",
@@ -22179,7 +22225,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 437,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22193,7 +22239,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 350,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22207,7 +22253,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 328,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22221,7 +22267,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 393,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22235,12 +22281,13 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 262,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -22338,11 +22385,12 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 290,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -22404,7 +22452,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 515,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -22452,7 +22500,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 519,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -22473,7 +22521,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 555,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -22490,7 +22538,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 531,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts"
@@ -22507,10 +22555,11 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 345,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -22560,8 +22609,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 637,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts"
       ]
@@ -22577,8 +22627,9 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 310,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts"
       ]
     },
@@ -22593,7 +22644,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 323,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22607,7 +22658,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 610,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts"
       ]
@@ -22623,10 +22674,11 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 305,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -22687,7 +22739,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 599,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -22703,12 +22755,13 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 301,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -22777,7 +22830,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 465,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -22791,7 +22844,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 511,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {
@@ -23090,6 +23143,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -23463,6 +23517,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -23520,6 +23575,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -23621,6 +23677,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -23747,6 +23804,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -23994,6 +24052,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -24090,6 +24149,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24218,6 +24278,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24346,6 +24407,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24474,6 +24536,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24632,6 +24695,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -24826,6 +24890,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -25066,6 +25131,7 @@
       "moduleHash": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -25350,6 +25416,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -25888,6 +25955,7 @@
       "moduleHash": "f6c41569f7f1ec28072ae5a834e0447bade03e45a3dd6b941c8807518741e2a9",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26087,6 +26155,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -26330,6 +26399,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26450,6 +26520,7 @@
       "line": 87,
       "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/control-authority-migration.test.ts",
@@ -26486,6 +26557,7 @@
       "line": 106,
       "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/observability.test.ts",
@@ -26505,6 +26577,7 @@
       "line": 241,
       "moduleHash": "421054a7d3a945587f26667d89fbe06591a8eeb84bb20167d7ced2b7ca476608",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/observability.test.ts",
@@ -26578,6 +26651,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -26631,6 +26705,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26756,6 +26831,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27081,6 +27157,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27199,6 +27276,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -27708,6 +27786,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27948,6 +28027,7 @@
       "moduleHash": "0f07876e25cefa4c164d24ee32e90e735293a90305e7db96362b0a99847b3ad7",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -28307,6 +28387,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -28441,6 +28522,7 @@
       "line": 135,
       "moduleHash": "6d5eccd273b0263314155c82a25c6381a8ee6450c7b2d406be831ba537e794fb",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -28580,6 +28662,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -28651,6 +28734,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -28724,6 +28808,7 @@
       "line": 130,
       "moduleHash": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -28751,6 +28836,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28913,6 +28999,7 @@
       "moduleHash": "f8b58bead54d35cd7281e6787bb0f7173c7adb83339765c1c204901a65baa726",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29162,6 +29249,7 @@
       "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29288,6 +29376,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29475,6 +29564,7 @@
       "testRefs": [
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30275,6 +30365,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -30609,6 +30700,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -31174,6 +31266,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -31482,6 +31575,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -31881,6 +31975,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -32581,6 +32676,7 @@
       "moduleHash": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -32678,6 +32774,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -32866,6 +32963,7 @@
       "moduleHash": "60e932b2c4abd0f46fa9da411645085f12279d3fc7f0590c3de5c2063f252b35",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -32963,6 +33061,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33117,6 +33216,7 @@
       "moduleHash": "25ff381a7445336d2b63c5cde0daa77a866142a4f064152fe7b7c1050e64be78",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33353,6 +33453,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33545,6 +33646,7 @@
       "moduleHash": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33828,6 +33930,7 @@
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -33967,6 +34070,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -34177,6 +34281,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -34382,6 +34487,7 @@
       "line": 238,
       "moduleHash": "d58022379f230e4eda48081934dd6760a81e3ae828f3169259865772369cb493",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/control-authority-migration.test.ts",
@@ -34422,6 +34528,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -34523,6 +34630,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34574,6 +34682,7 @@
       "line": 365,
       "moduleHash": "d58022379f230e4eda48081934dd6760a81e3ae828f3169259865772369cb493",
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts"
       ]
     },
@@ -34648,6 +34757,7 @@
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -34761,6 +34871,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -34877,6 +34988,7 @@
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -34928,6 +35040,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -35224,6 +35337,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -35520,6 +35634,7 @@
       "moduleHash": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -35929,6 +36044,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36285,6 +36401,7 @@
       "moduleHash": "fced1a8ed053e684d80733d40dc89538e048b747b7fe8d7d7b6dec71a2b14851",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -36336,6 +36453,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36976,6 +37094,7 @@
       "moduleHash": "7e0be302baa27562683fd4442144e63381715c6eea0f3c514e8202d7330e377f",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37183,6 +37302,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37407,6 +37527,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37854,6 +37975,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38191,6 +38313,7 @@
       "moduleHash": "bb5c9bcf79b3da924fbabc316408ac7e8861e96ccfcbb5b0b2372c0da4a1ca6d",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38321,6 +38444,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38442,6 +38566,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38597,6 +38722,7 @@
       "moduleHash": "791428c83e17cdc93d83775b7ffecd460b21fba5fbf08f1dd6031ece4d535914",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38684,6 +38810,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38768,6 +38895,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38892,6 +39020,7 @@
       "moduleHash": "b821c4c0753b000ce8934141553e5cc356a84b2361a391881130909a0143b51c",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -39036,6 +39165,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -39116,6 +39246,7 @@
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -39184,6 +39315,7 @@
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -39773,7 +39905,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/control/control-store.ts",
       "line": 144,
-      "moduleHash": "d9b06040c7dcfc399ca058d9b5b4b2ca3c67fb0d1fa69eaa51f8fb423daed76b",
+      "moduleHash": "bafd204cc833c755ec85d481c194afb59278ad671dfb21b4e7c9d6d5f6afebb1",
       "testRefs": []
     },
     {

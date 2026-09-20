@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T23:05:00+08:00
+> 状态更新时间：2026-09-19T23:40:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-022 | 2026-09-19T23:40:00+08:00 | PLAN-240 | perf/barrier-cheap-check | 本条记录所在提交 |
 | UPDATE-20260919-021 | 2026-09-19T23:05:00+08:00 | PLAN-240 | perf/replay-fallback-cost | 本条记录所在提交 |
 | UPDATE-20260919-020 | 2026-09-19T22:30:00+08:00 | PLAN-240 | perf/long-run-baseline | 本条记录所在提交 |
 | UPDATE-20260919-019 | 2026-09-19T21:50:00+08:00 | PLAN-240 | perf/plan-240-integration | 本条记录所在提交 |
@@ -77,6 +78,30 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-022
+
+时间：2026-09-19T23:40:00+08:00
+
+摘要：投影屏障改为先做廉价判断：flushProjection 不再无条件付出全量事件前缀校验，10,000 事件下屏障由 328ms 降至 173ms。
+
+### 变更
+
+- flushProjection() 原本用 loadProjection() 判断投影是否最新，而该方法会解析整条事件流并重算完整事件前缀哈希以重验封印；延后模式下答案几乎总是「非最新」，该开销被白花
+- 新增 #projectionAlreadyCurrent()：先用 loadProjectionHint()（只认证投影文件本身与小型 task 契约守卫，不解析事件）确认 lastSeq 一致，只有可能为最新时才做全量重验
+- 廉价检查 fail-closed：投影缺失或被篡改时返回「非最新」，走向写入而非静默成功
+- 新增 packages/materials/tests/barrier-projection.test.ts 5 项断言，含 contract:barrier-persists-deferred-projection
+- packages/materials/src/control/COMPONENT.md 记录该顺序要求与 fail-closed 语义
+
+### 验证
+
+- [x] npm run build:gui-deps passed
+- [x] 实测屏障耗时：105 事件 13.4→8.8ms、1005 事件 47.7→23.8ms、5005 事件 196.8→107.0ms、10005 事件 328.3→173.0ms
+- [x] 实测延后写入保持平坦（105–10005 事件均为约 5–8ms），故热路径不受影响
+- [x] 实测确认 projection.json 在所有规模下均为约 4.5KB，即投影是 O(状态) 而非 O(历史)——这解释了为何它值得被写新
+- [x] node --import tsx --test barrier-projection.test.ts: 5/5 passed
+- [x] node --import tsx --test control-store/control-store-concurrency/durability/hot-path-budget/experiment-gate-projection/version-cache: 52/52 passed
+- [x] npm run check:changed-tests、check:components passed
 
 ## UPDATE-20260919-021
 

@@ -642,8 +642,7 @@ export class ControlStore {
       await this.#migrateLegacyRunBestEffort(runId);
       await this.eventStore.withRunLock(runId, async (writer) => {
         const snapshot = await this.#readSnapshot(runId, { skipMigration: true });
-        const persisted = await this.loadProjection(runId).catch(() => undefined);
-        if (persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot)) {
+        if (await this.#projectionAlreadyCurrent(runId, snapshot)) {
           this.deferredProjectionRuns.delete(runId);
           return;
         }
@@ -651,6 +650,29 @@ export class ControlStore {
         this.deferredProjectionRuns.delete(runId);
       });
     });
+  }
+
+  /**
+   * Whether the on-disk projection already matches `snapshot`, cheaply.
+   *
+   * `loadProjection()` answers the same question but pays for it: it parses the
+   * whole event stream and re-hashes the complete event prefix to revalidate the
+   * seal, which measured 13ms at 100 events and 328ms at 10,000. Almost always
+   * the answer is "not current" — that is what deferred mode means — so the
+   * expensive check is gated behind a cheap one.
+   *
+   * `loadProjectionHint()` authenticates the projection file itself (its own hash
+   * plus the small task-contract guard) without parsing events. If it does not
+   * return a projection for the same `lastSeq`, the full check cannot succeed
+   * either, because a matching prefix requires a matching `lastSeq`. Only when
+   * the cheap check says "maybe current" is the full event-prefix revalidation
+   * worth its cost, and that is exactly the case where it lets us skip a write.
+   */
+  async #projectionAlreadyCurrent(runId: string, snapshot: RunSnapshot): Promise<boolean> {
+    const hinted = await this.loadProjectionHint(runId).catch(() => undefined);
+    if (!hinted || hinted.lastSeq !== snapshot.lastSeq) return false;
+    const persisted = await this.loadProjection(runId).catch(() => undefined);
+    return Boolean(persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot));
   }
 
   #recordProjectionMode(runId: string, persistProjection: boolean | undefined): void {
