@@ -123,7 +123,7 @@
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/coding-lane.ts": "347cecc0d1e2ee7d61c83443827a829381ec3924eefb7a880877704c04e3441f",
-    "src/runtime/coding-resources.ts": "28e2a4aab6134e7dc013251c742275a415d18a9a6fa8d97c3d535a21182aa88e",
+    "src/runtime/coding-resources.ts": "ed2c8db8bb2a888a1cd43e6c5190549eb16e8c75461a03abcd446ef19e138f3e",
     "src/runtime/coding-turn-projection.ts": "9634c98b8440e19dc694ed92ed2521b54ba50c1b7974e338416441154586af22",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -632,6 +632,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/hot-path-budget.test.ts",
@@ -1401,6 +1402,7 @@
         "../domain/types.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -1433,6 +1435,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -1509,6 +1512,7 @@
       "tags": [],
       "imports": [],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts"
       ]
     },
@@ -2862,6 +2866,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -2933,6 +2938,7 @@
         "./verification-key.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -5164,6 +5170,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -5237,6 +5244,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -9222,7 +9230,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1891,
+      "line": 1907,
       "signature": "(command: string): string | undefined",
       "summary": "Bash is intentionally an analysis escape hatch, not a second control-plane",
       "summarySource": "tsdoc",
@@ -9487,6 +9495,7 @@
         "typebox"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/hot-path-budget.test.ts",
@@ -9639,7 +9648,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1875,
+      "line": 1891,
       "signature": "(command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.",
       "summarySource": "tsdoc",
@@ -9685,7 +9694,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1865,
+      "line": 1881,
       "signature": "(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "When a bash command TIMED OUT and the command looks like it was holding a",
       "summarySource": "tsdoc",
@@ -13469,6 +13478,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -15422,6 +15432,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -21348,6 +21359,7 @@
         "typebox"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/hot-path-budget.test.ts",
@@ -26833,6 +26845,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27269,6 +27282,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -29323,6 +29337,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -29744,6 +29759,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -29803,6 +29819,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -30069,6 +30086,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -30388,6 +30406,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30569,6 +30588,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -30743,6 +30763,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -31008,6 +31029,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31177,6 +31199,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31475,6 +31498,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31594,6 +31618,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31702,6 +31727,7 @@
         "./contracts.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31818,6 +31844,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31905,6 +31932,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -32074,6 +32102,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -32178,6 +32207,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -32940,6 +32970,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -33062,6 +33093,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -33962,6 +33994,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -34214,6 +34247,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34325,6 +34359,7 @@
         "./artifact-store.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34668,6 +34703,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -34721,6 +34757,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -34785,6 +34822,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -35458,6 +35496,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -35594,6 +35633,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -35737,6 +35777,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -35892,6 +35933,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -36073,6 +36115,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -36298,6 +36341,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -36927,6 +36971,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -37572,6 +37617,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -37894,6 +37940,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38217,6 +38264,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -38271,6 +38319,7 @@
       "tags": [],
       "imports": [],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -38393,6 +38442,7 @@
       "imports": [],
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -38651,6 +38701,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38713,6 +38764,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38857,6 +38909,7 @@
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -39370,6 +39423,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -39486,6 +39540,7 @@
         "../domain/intent.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -40055,6 +40110,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -40212,6 +40268,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -40456,6 +40513,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -40638,6 +40696,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -40815,6 +40874,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -41152,6 +41212,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -41206,6 +41267,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -41294,6 +41356,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -41432,6 +41495,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -42134,6 +42198,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -42434,6 +42499,7 @@
         "./pwn-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -42521,6 +42587,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -42562,6 +42629,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -42752,6 +42820,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -42875,6 +42944,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -43447,6 +43517,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -43553,6 +43624,7 @@
         "./session-runtime-wire.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -43841,6 +43913,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -43957,6 +44030,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -44550,6 +44624,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -44661,6 +44736,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -44918,6 +44994,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -45027,6 +45104,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -45384,6 +45462,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -45568,6 +45647,7 @@
         "node:http"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -45881,6 +45961,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -46554,6 +46635,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -47021,6 +47103,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -47473,6 +47556,7 @@
       "imports": [],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -47564,6 +47648,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47830,6 +47915,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -47889,6 +47975,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -48250,6 +48337,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -48904,6 +48992,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -49621,6 +49710,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -49796,6 +49886,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -50171,6 +50262,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -50209,6 +50301,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -50255,6 +50348,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -50293,6 +50387,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -53125,6 +53220,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -53372,6 +53468,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -53478,6 +53575,7 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -53904,6 +54002,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -54015,6 +54114,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -54508,6 +54608,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -54652,6 +54753,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -54941,6 +55043,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -55036,6 +55139,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -55371,6 +55475,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -55546,6 +55651,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",

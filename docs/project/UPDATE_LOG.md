@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-09-19T21:20:00+08:00
+> 状态更新时间：2026-09-19T21:50:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260919-019 | 2026-09-19T21:50:00+08:00 | PLAN-240 | perf/plan-240-integration | 本条记录所在提交 |
 | UPDATE-20260919-018 | 2026-09-19T21:20:00+08:00 | PLAN-240 | perf/polling-visibility-rule | 本条记录所在提交 |
 | UPDATE-20260919-017 | 2026-09-19T20:45:00+08:00 | PLAN-240 | perf/archival-failure-semantics | 本条记录所在提交 |
 | UPDATE-20260919-016 | 2026-09-19T20:10:00+08:00 | PLAN-240 | perf/observer-diagnostics | 本条记录所在提交 |
@@ -74,6 +75,25 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260919-019
+
+时间：2026-09-19T21:50:00+08:00
+
+摘要：集成核对发现 docs/generated API 索引在若干 PR 后已陈旧；补齐索引并记录该逐 PR 验证遗漏。
+
+### 变更
+
+- 在 18 个提交的合成状态上重跑 api:index:check，发现 materials.json / materials.md / materials-context.json 陈旧
+- 根因：UPDATE-20260919-006（版本快照缓存）、011（延迟遥测）、013（Skill 记忆化）、016（观察诊断）、017（归档失败语义）、018（轮询谓词）向已导出的模块新增了公开符号，但未重跑 api:index
+- 重新生成 docs/generated/ 索引，api:index:check 恢复通过
+- 记录流程缺陷：这些 PR 的逐项验证只跑了 check:changed-tests，未在每次改动公开面后重跑 api:index:check
+
+### 验证
+
+- [x] npm run api:index 后 api:index:check passed
+- [x] 合成状态上 check:components / check:change-contracts / check:changed-tests / check:project-reports 全部 passed
+- [x] 合成状态上 11 个新增/相关测试文件 85/85 passed
 
 ## UPDATE-20260919-018
 

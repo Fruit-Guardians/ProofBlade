@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T21:20:00+08:00",
+  "updatedAt": "2026-09-19T21:50:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -304,6 +304,27 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260919-019",
+      "occurredAt": "2026-09-19T21:50:00+08:00",
+      "summary": "集成核对发现 docs/generated API 索引在若干 PR 后已陈旧；补齐索引并记录该逐 PR 验证遗漏。",
+      "branch": "perf/plan-240-integration",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "在 18 个提交的合成状态上重跑 api:index:check，发现 materials.json / materials.md / materials-context.json 陈旧",
+        "根因：UPDATE-20260919-006（版本快照缓存）、011（延迟遥测）、013（Skill 记忆化）、016（观察诊断）、017（归档失败语义）、018（轮询谓词）向已导出的模块新增了公开符号，但未重跑 api:index",
+        "重新生成 docs/generated/ 索引，api:index:check 恢复通过",
+        "记录流程缺陷：这些 PR 的逐项验证只跑了 check:changed-tests，未在每次改动公开面后重跑 api:index:check"
+      ],
+      "validation": [
+        "npm run api:index 后 api:index:check passed",
+        "合成状态上 check:components / check:change-contracts / check:changed-tests / check:project-reports 全部 passed",
+        "合成状态上 11 个新增/相关测试文件 85/85 passed"
+      ]
+    },
     {
       "id": "UPDATE-20260919-018",
       "occurredAt": "2026-09-19T21:20:00+08:00",
