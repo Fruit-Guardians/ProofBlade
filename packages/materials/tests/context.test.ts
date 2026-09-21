@@ -84,6 +84,67 @@ test("context projection excludes facts and evidence from stale fixture generati
   assert.deepEqual(compiled.manifest.factIds, ["F-CURRENT"]);
 });
 
+test("context control view carries the current-generation Pwn workflow only", () => {
+  const pwnTask: TaskContract = { ...task, task_id: "CTX-PWN", target_kind: "pwn", target: "LOCAL:chall" };
+  const snapshot = createInitialSnapshot("CTX-PWN", pwnTask);
+  snapshot.status = "RUNNING";
+  snapshot.phase = "target_model";
+  snapshot.domainPhase = "TARGET_MODEL";
+  snapshot.generation = 1;
+  snapshot.domainRecords["PWN-OLD-PRIMITIVE"] = {
+    id: "PWN-OLD-PRIMITIVE",
+    runId: snapshot.runId,
+    generation: 0,
+    kind: "pwn_primitive",
+    summary: "stale-route-marker",
+    artifactIds: [],
+    evidenceIds: [],
+    primitive: "stale ret2win route",
+    confidence: 0.9,
+    preconditionRecordIds: [],
+    createdSeq: 1,
+  };
+  snapshot.domainRecords["PWN-CURRENT-PROFILE"] = {
+    id: "PWN-CURRENT-PROFILE",
+    runId: snapshot.runId,
+    generation: 1,
+    kind: "pwn_binary_profile",
+    summary: "current ELF profile",
+    artifactIds: [],
+    evidenceIds: [],
+    format: "ELF",
+    architecture: "x86-64",
+    bits: 64,
+    protections: ["NX", "No canary", "No PIE"],
+    createdSeq: 2,
+  };
+  snapshot.domainRecords["PWN-CURRENT-PRIMITIVE"] = {
+    id: "PWN-CURRENT-PRIMITIVE",
+    runId: snapshot.runId,
+    generation: 1,
+    kind: "pwn_primitive",
+    summary: "current direct control hypothesis",
+    artifactIds: [],
+    evidenceIds: [],
+    primitive: "stack buffer overflow with direct ret2win control",
+    confidence: 0.8,
+    preconditionRecordIds: [],
+    createdSeq: 3,
+  };
+
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "executor", phase: snapshot.phase, task: pwnTask, snapshot });
+  const rendered = compiled.messages.map((message) => message.content).join("\n");
+  assert.match(rendered, /pwn_workflow/);
+  assert.match(rendered, /"generation":1/);
+  assert.match(rendered, /"route":"direct-ret2win"/);
+  assert.match(rendered, /current_artifact_ids/);
+  assert.match(rendered, /current_evidence_ids/);
+  assert.match(rendered, /PWN-CURRENT-PRIMITIVE/);
+  assert.doesNotMatch(rendered, /stale-route-marker|PWN-OLD-PRIMITIVE/);
+  assert.ok(compiled.manifest.sourceIds?.includes("PWN-CURRENT-PRIMITIVE"));
+  assert.equal(compiled.manifest.sourceIds?.includes("PWN-OLD-PRIMITIVE"), false);
+});
+
 test("context control view exposes bounded recovery and work constraints", () => {
   const snapshot = createInitialSnapshot("CTX-001", task);
   snapshot.status = "RUNNING";

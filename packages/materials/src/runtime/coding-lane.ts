@@ -83,6 +83,8 @@ If the same tool call keeps looking wrong or incomplete, do not re-issue it a th
 
 For a multi-step security investigation, keep the displayed phase live: call \`update_phase\` before the first investigative tool to enter reconnaissance, then before a real change to target modeling, hypothesis selection, experiment, or clean reproduction. Skip phases that do not fit the task instead of calling it mechanically. Phase tracking guides context and budgets but never restricts which prepared tool you may use. Do not call it for ordinary conversation or merely to narrate work after it happened.
 
+For Pwn tasks, call the read-only \`pwn_workflow\` view before the first Pwn action and after a crash, leak, or failed reproduction. Follow its current-generation route, phase transition, blockers, and next action. A direct ret2win path may proceed from a validated control offset; a leak/base/ROP path must bind each leak and base to current-generation evidence. Never reuse a record from before a fixture reset, and do not call \`pwn_reproduce\` again after a failed attempt until a new material observation is recorded.
+
 Use the capability proxy as an optional analysis instrument, not a mandatory workflow. Search it when stable binary or firmware structure would help, describe only the chosen operation to load its schema, and invoke it with workspace-relative paths. Keep planning autonomous; do not call capabilities mechanically when read or bash is more appropriate.`;
 
 export class PiCodingLane implements AgentLanePort {
@@ -403,6 +405,7 @@ export class PiCodingLane implements AgentLanePort {
         pwnTrustedReproducer,
         pwnBroker,
         pwnRuntimeRequired,
+        evidenceGraph,
       )
       : undefined;
     for (const session of recoveredPwnSessions) pwnTools?.adopt(session);
