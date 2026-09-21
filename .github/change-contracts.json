@@ -17,6 +17,10 @@
           "patterns": ["ControlEventBatcher", "persistProjection", "snapshot", "resolve"]
         },
         {
+          "path": "packages/materials/src/runtime/coding-lane.ts",
+          "patterns": ["observerDiagnostics", "observingDiagnostics", "instrumentToolContext"]
+        },
+        {
           "path": "packages/materials/src/skills/registry.ts",
           "patterns": ["skillTreeRevision", "skillRegistryCache", "read"]
         }

@@ -20,6 +20,7 @@ import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
 import { attachPiObservability, ControlEventBatcher, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import { ObserverDiagnostics } from "../observability/observer-diagnostics.js";
 import type { ModelContextItem } from "../context/model-context-frame.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -114,6 +115,12 @@ export class PiCodingLane implements AgentLanePort {
     private readonly closeShellJobs: () => Promise<void>,
     /** Explicit session/flush equivalent for queued Pi telemetry. */
     private readonly flushObservability: () => Promise<void>,
+    /**
+     * Observation-failure sink shared with the tool context. Created by `create()`
+     * before the context is built, because the context needs the same instance
+     * this lane exposes through `observerDiagnostics()`.
+     */
+    private readonly observingDiagnostics: ObserverDiagnostics,
     /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
     private readonly pwnRegistry?: SessionRegistry,
     /** Separate owner-scoped registry for trusted clean-process Pwn reproduction. */
@@ -151,6 +158,14 @@ export class PiCodingLane implements AgentLanePort {
     browserVerifierFactory?: BrowserVerifierFactory;
     /** Durable ledger for Pwn/Web/Browser external session ownership. */
     externalResources?: ExternalResourceRegistry;
+    /**
+     * Test-only: observe the tool context this lane will hand to its harness.
+     *
+     * Exists so a test can drive a real tool failure through a real lane, which
+     * is the only way to prove the lane's observation-diagnostics sink is wired
+     * into the tools rather than merely present. Production never passes it.
+     */
+    instrumentToolContext?: (context: CodingResourceContext) => void;
     /** Broker clients for sessions that must outlive this process. */
     sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[];
     /** A caller-owned preflight result for these exact broker clients. */
@@ -508,6 +523,13 @@ export class PiCodingLane implements AgentLanePort {
     const externalSubmit = configuredExternalSubmit && externalSubmissionTargets.length > 0
       ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
+    // Created here rather than as a field initialiser: the tool context below
+    // needs this exact instance, and `create()` builds the context before the
+    // lane object exists. The diagnostics exist so "no observations" and "all
+    // observations failed" are distinguishable; the context's field is optional,
+    // so without this every `observerDiagnostics?.record(...)` was a no-op in
+    // production and a failing observation path left no trace.
+    const observingDiagnostics = new ObserverDiagnostics();
     const externalSubmissionEnabled = Boolean(externalSubmit);
     const phaseCoordinator = new RunCoordinator(options.controlStore);
     const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...activeMcpTools];
@@ -552,6 +574,7 @@ export class PiCodingLane implements AgentLanePort {
       evidenceCurationGate,
       runtime,
       experimentGate,
+      observerDiagnostics: observingDiagnostics,
       ...(webReproducer || browserReproducer ? {
         webReproduce: async (recipe: WebExploitRecipe, signal?: AbortSignal) => {
           const transport = recipe.transport ?? webTransport;
@@ -575,6 +598,13 @@ export class PiCodingLane implements AgentLanePort {
       completedReads: new Map(),
       imagesSeen: new Map<string, number>(),
     };
+    // Test-only seam. The tool context is built here, inside `create()`, and the
+    // harness captures it, so without a hook there is no way to drive a real
+    // tool failure through a real lane -- which is why the observation-diagnostics
+    // wiring could be missing entirely while every existing test still passed
+    // (they build a context literal and inject their own sink). Production never
+    // passes this.
+    options.instrumentToolContext?.(toolContext);
     const stableSystemPrompt = codingSystemPrompt(
       resources,
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
@@ -878,6 +908,7 @@ export class PiCodingLane implements AgentLanePort {
         await telemetry.flush();
         await options.controlStore.flushProjection(options.runId).catch(() => undefined);
       },
+      observingDiagnostics,
       pwnRegistry,
       pwnVerifierRegistry,
       webSession,
@@ -970,6 +1001,17 @@ export class PiCodingLane implements AgentLanePort {
 
   public async isIdle(): Promise<boolean> {
     return !this.busy;
+  }
+
+  /**
+   * Observation failures recorded by this lane's tools.
+   *
+   * Reading this is how a caller distinguishes "nothing went wrong" (total 0)
+   * from "the observation path failed every time" (total > 0 with samples),
+   * which the tool results themselves cannot express.
+   */
+  public observerDiagnostics(): ObserverDiagnostics {
+    return this.observingDiagnostics;
   }
 
   public async close(): Promise<void> {
