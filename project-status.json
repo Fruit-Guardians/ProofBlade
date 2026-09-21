@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-21T11:00:00+08:00",
+  "updatedAt": "2026-09-21T13:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -293,8 +293,8 @@
       ],
       "acceptance": [
         "运行时不再出现源码与 dist 的 API 错配，且错配在启动时立即失败",
-        "普通工具返回前没有同步 ControlStore commit、fsync 或 projection rewrite",
-        "重要工具结果的派生记录在一个批量事务中完成",
+        "小型成功 read/glob/grep/bash 的同步 ControlStore commit <= 1（原目标「零同步提交」经实测不可达：Artifact 是 verifier 的引用目标，必须先 durable，见拆分文档 §2.4）",
+        "重要工具结果的派生记录在一个批量事务中完成（`dispatchTransaction` 按批内折叠后的快照逐条校验，合并可行；实测见 packages/materials/tests/dispatch-transaction-batch.test.ts）",
         "性能基线已实测填入，目标阈值据基线评审",
         "每个改动源文件都有对应测试文件"
       ],
@@ -2092,6 +2092,28 @@
         "因此该改动是推理所得而非门禁所得，测试注释已写明这一点；断言只覆盖可观测结果（同长度改写必须推动 revision 并触发重建）",
         "111 个断言通过：version-cache / lane-observer-diagnostics / observer-diagnostics / archival-failure-semantics / skill-registry-cache / projection-read-bound / barrier-projection / projection-hint-currency / control-store / debug-data",
         "check:components / check:change-contracts / check:project-reports / api:index:check / check:changed-tests 全部通过"
+      ]
+    },
+    {
+      "id": "UPDATE-20260921-003",
+      "occurredAt": "2026-09-21T13:00:00+08:00",
+      "summary": "重开表项 T2：原「不可行」判定被实测推翻。dispatchTransaction 逐条按批内折叠后的快照校验，且批内引用表已并入本批次将创建的 id，因此「注册 artifact 并在同一批次注解/引用它」是既有能力。",
+      "branch": "fix/review-blockers",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "新增 packages/materials/tests/dispatch-transaction-batch.test.ts 三条用例定案：一个事务内 artifact + artifact_annotation + observation + evidence 四条命令全部落盘且 provenance 正确解析同批 artifact；引用可以出现在创建之前（顺序无关）；批内谁都没创建的 id 仍被 artifact_annotation 原子拒绝并回滚本批创建",
+        "推翻 PLAN-240 表项 T2 与 §5.6.2 的「批前快照校验」前提：control-store.ts 的 #commitCommands 是 let after = before 后逐条 validateCommand(after, ...) 再 reduce，校验对象是折叠后的 after，不是批前快照",
+        "改写拆分文档 §2.5 / §2.6：合并路径不需要改事务模型，因此不再存在「只能走延后」的论证；两条路都成立，取舍改为工程权衡",
+        "顺带记录一处既有缺口：observation.source.artifactId 完全不校验（既不查 snapshot.artifacts 也不查批内引用表），evidence 在无 effectId 时也提前返回，因此可写入指向不存在 artifact 的 observation。该缺口与 T2 可行性无关，未在本轮修复",
+        "修正 PLAN-240 的验收条件：原「普通工具返回前没有同步 ControlStore commit、fsync 或 projection rewrite」与计划文档已披露的「<= 1 次同步提交」矛盾，且「零同步提交」经实测不可达（Artifact 是 verifier 的引用目标，必须先 durable）"
+      ],
+      "validation": [
+        "3 条用例全部通过；判定的证据是事务真的提交了四条命令，不是代码阅读",
+        "期间两次把断言写错并修正：artifactId 的 evidence 用 confidence 1 会先被 verifier 权限拒绝、annotation 用 annotatedBy harness 同理——两处都不是批处理限制，已改为与被测定案无关的取值",
+        "check:changed-tests 通过（dispatch-transaction-batch.test.ts 已登记进 control-and-evidence 规则）"
       ]
     }
   ],

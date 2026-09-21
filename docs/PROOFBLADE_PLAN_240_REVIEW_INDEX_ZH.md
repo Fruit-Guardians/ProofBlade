@@ -38,7 +38,8 @@
 | RunDetail 缓存失效 | —（既有） | `debug-data.test.ts` | ✅ M11 |
 | 读取路径计数 + 归因更正 | #244 | `read-path-parse-budget.test.ts` | 部分 |
 | **读取路径降为 O(增量)** | #244 | `projection-read-bound.test.ts`（5 条守恒断言） | 未逐条变异 |
-| T2 / D0 / D2 / G | 无 | 经实测判定不可行或不必要：T2 → #233；G → #235 | — |
+| T2 | `dispatch-transaction-batch.test.ts`（3 条） | **实测可行，已重开**（原判定被推翻，见拆分文档 §2.5） |
+| D0 / D2 / G | 无 | 经实测判定不必要：G → #235；D0/D2 → 会引入并行抽象层 |
 
 ### 2.1 读取路径降为 O(增量)：已实施（用户授权）
 

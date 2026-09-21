@@ -63,37 +63,52 @@ CTRL.dispatchTransaction DeterministicObserver.observe    (observer.ts:78)
 
 **「零同步提交」在当前架构下不可达**：只要结果需要被后续 Evidence 引用，artifact 注册就必须在模型继续之前 durable。父计划 §5.6.3 的措辞应据此修正为「**普通结果最多一次同步提交**」。
 
-### 2.5 表项 T2 不可行（经代码核实）
+### 2.5 表项 T2 复核：**原「不可行」判定不成立，T2 已重开**
 
-父计划表项 T2 要求「将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit」。**核实结论：在当前事务模型下不可行**，理由不是成本而是顺序：
+父计划表项 T2 要求「将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit」。本节曾判定**不可行**，理由是「`prepare(before)` 用批次前快照校验整批，故不能在同一批次内注解或引用本批次刚注册的 artifact」。**该理由与代码不符**，已被 `packages/materials/tests/dispatch-transaction-batch.test.ts` 实测推翻：
 
 ```text
 ControlStore.dispatchTransaction(runId, prepare, options)
-  -> const transaction = prepare(before);          // before = 批次之前的快照
+  -> const transaction = prepare(before);          // before 只用于生成命令与 project
   -> #commitCommands(runId, before, transaction.commands, ...)
+       let after = before;
+       for (const command of commands) {
+         validateCommand(after, command, references, authority);   // ← 校验的是批内折叠后的 after
+         after = reduce(after, event);
+       }
 ```
 
-`prepare` 拿到的是**批次之前**的快照，整批命令都对它校验。因此同一批次内：
+批内引用表 `buildBatchReferences(before, commands)` 还会把**本批次将要创建的 id** 预先并入 `references`（artifact / evidence / completion / domain record）。于是：
 
-- 对「本批次刚注册的 artifact」发 `artifact_annotation` 会被校验拒绝；
-- 引用「本批次刚创建的 observation」的 `evidence` 会被 `validateEvidence` 拒绝——它对 artifact 用的是 `snapshot.artifacts[artifactId]`（第 1573 行）而非同批次引用表，而 `artifact_annotation` / `supports` 走的是允许同批次的 `references`。
+| 批内命令 | 前向引用（先引用、后创建） | 依据 |
+|---|---|---|
+| `artifact_annotation` | **可**（同批 `artifact` 在前即可） | `validateCommand` 查 `after.artifacts`，`after` 已折叠 |
+| `observation` | **可**（顺序无关） | 只查 `references`，其中已有同批 artifact id |
+| `evidence`（无 effect） | **可**（顺序无关） | `validateEvidence` 在 `!effect` 时提前返回，不解析 artifact |
+| `domain_record` | **可** | `assertKnownReferences` 查 `references` |
 
-即 **artifact 注册必须先于派生观察提交**，这是被强制的不变量，不是实现疏漏。要突破它需要改事务模型（例如让校验按批内顺序增量应用），那属于语义变更，不是性能优化。
+实测结论（`dispatch-transaction-batch.test.ts`，3 条用例）：
 
-**实测复核**：一次 `read` 的公共写入口调用数为 3，但其中 `dispatch` 会内部委托 `dispatchBatch`，因此**逻辑提交为 2**（artifact 注册、派生观察各一）。这与 §2.1 的 4 条事件吻合：`observer.observe` 已把 annotation、observation、evidence 放在同一批次里。
+1. 一个事务里 `artifact` + `artifact_annotation` + `observation` + `evidence` 四条命令全部落盘，`evidence.provenance.artifactIds` 正确解析到同批 artifact；
+2. 引用可以出现在创建**之前**，同样成立（顺序无关）；
+3. 批内谁都没创建的 id，只有 `artifact_annotation` 会拒绝（`Unknown artifact`），且整批原子回滚。
 
-**因此 T1/T2 的合并空间已被穷尽**：不能在 2 个提交以下完成一次「归档 + 派生观察」。剩余的 25ms 中约 24ms 是两次提交各自的固有成本，只能靠减少提交**次数以外的**手段解决（例如降低 `fsync` 频率——父计划 §5.6.6 已明确反对直接删除屏障）。
+**因此 §2.6 的「合并 vs 延后」结论需要改写**：合并**不需要**改事务模型，是现有事务模型的既有能力；原判断把它当成了语义变更。
 
-### 2.6 「合并」与「延后」是两条不同的路，只有后者可行
+**一处应当补的缺口**（本复核顺带记录，不是 T2 的阻碍）：`observation.source.artifactId` 目前**完全不校验**——既不查 `snapshot.artifacts` 也不查 `references`，因此可以写入指向不存在 artifact 的 observation。`evidence` 在无 `effectId` 时同样在解析 artifact 之前返回。这是既有行为，与本表项的可行性无关。
 
-§2.5 否掉的是**合并**（把两个提交压成一个，两者仍都在工具返回前）。§3 提议的是**延后**（把派生观察移到回合边界，工具返回前只剩一个提交）。两者不可混淆：
+**仍成立的部分**：一次 `read` 的公共写入口调用数为 3，其中 `dispatch` 内部委托 `dispatchBatch`，因此**逻辑提交为 2**（artifact 注册、派生观察各一），与 §2.1 的 4 条事件吻合。原 §2.5 关于「artifact 注册必须先于派生观察提交」的结论**是错的**——两者本就可以在同一个提交里。
+
+### 2.6 「合并」与「延后」是两条不同的路，后者**不是唯一**可行的
+
+§2.5 曾否掉**合并**（把两个提交压成一个，两者仍都在工具返回前），并由此论证只能走**延后**。既然合并可行，两条路都成立，取舍改为工程权衡：
 
 | 方案 | 机制 | 工具返回前的提交数 | 可行性 |
 |---|---|---:|---|
-| 合并（表项 T2） | 一个批次里同时注册 artifact 并派生观察 | 1 | **不可行**，被 §2.5 的批前校验强制阻断 |
+| 合并（表项 T2） | 一个批次里同时注册 artifact 并派生观察 | 1 | **可行**，事务模型无需改动（§2.5 复核） |
 | 延后（§3，表项 T1） | artifact 同步提交；派生观察排队到回合边界 | 1 | 可行，但需处理 §3.3 的三处语义变化 |
 
-两者最终都能把工具返回前压到 **1 个提交**，但路径不同：合并要求改事务模型（语义变更），延后只需引入队列与屏障（既有模式，`ControlEventBatcher` 已是同构先例）。**因此应走延后，并据此把表项 T2 关闭或改述**。
+两者最终都能把工具返回前压到 **1 个提交**。合并的代价是**语义面更窄**：它只减少同一工具调用内部的提交次数，不改变观察发生在工具返回前这一事实；延后则会把观察推迟到回合边界，需额外处理崩溃窗口与投影滞后（§3.3）。**取舍交由实施者按风险选择，但不能再以「合并不可行」为前提。**
 
 ## 3. 设计提案：延后派生观察
 
