@@ -349,7 +349,11 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   }, [detail.snapshot.runId, workspace]);
 
   const savePreferences = async (patch: Partial<ConversationPreferences>) => {
-    const next = await updateConversationPreferences(detail.snapshot.runId, { ...(preferences ?? {}), ...patch });
+    // Send the edit, not the whole resolved preference object. `preferences`
+    // holds the capability lists already resolved against the workspace catalog;
+    // echoing them back would persist them server-side and freeze this
+    // conversation's tool/skill/MCP lists at today's values.
+    const next = await updateConversationPreferences(detail.snapshot.runId, patch);
     setPreferences(next);
     if (workspace) onWorkspaceChange({ ...workspace, conversations: { ...workspace.conversations, [detail.snapshot.runId]: next } });
   };

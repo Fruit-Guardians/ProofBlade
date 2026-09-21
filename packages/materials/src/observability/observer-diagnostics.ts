@@ -14,11 +14,13 @@
  * — the tool result is protected here, and visibility is the caller's choice.
  */
 
+import { redactSecrets } from "../domain/utils.js";
+
 /** One observed failure on the observation path. */
 export interface ObserverFailureSample {
   /** Which observation step failed. */
-  readonly stage: "artifact-observation" | "artifact-annotation";
-  /** Error message, bounded and already redacted by the caller when required. */
+  readonly stage: "artifact-observation" | "artifact-annotation" | "telemetry-flush";
+  /** Error message, truncated and redacted by `record()`. */
   readonly message: string;
   /** The run the failure belongs to. */
   readonly runId: string;
@@ -67,7 +69,12 @@ export class ObserverDiagnostics {
     this.#sequence += 1;
     let message: string;
     try {
-      const raw = error instanceof Error ? error.message : String(error);
+      // Redaction happens here, not at the call site: this is called from catch
+      // blocks all over the observation path, and none of them redact. Error
+      // messages on this path carry artifact paths, command fragments and
+      // provider URLs, so whatever a future consumer does with a sample, the
+      // text it holds has already been through the same filter as an Artifact.
+      const raw = redactSecrets(error instanceof Error ? error.message : String(error));
       message = raw.length > MAX_MESSAGE_CHARS ? `${raw.slice(0, MAX_MESSAGE_CHARS)}…` : raw;
     } catch {
       message = "unprintable observation failure";

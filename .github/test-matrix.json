@@ -69,9 +69,10 @@
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
-        "packages/materials/tests/lane-observer-diagnostics.test.ts"
+        "packages/materials/tests/lane-observer-diagnostics.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/context.test.ts packages/materials/tests/context-recovery.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/verification-recovery.test.ts packages/materials/tests/binding-transaction.test.ts packages/materials/tests/external-resource-registry.test.ts packages/materials/tests/session-resource-adapter.test.ts packages/materials/tests/pwn-session-runtime-host.test.ts packages/materials/tests/pwn-session-supervisor.test.ts packages/materials/tests/browser-resource-adapter.test.ts packages/materials/tests/runtime-preflight.test.ts packages/materials/tests/session-runtime-combined-host.test.ts packages/materials/tests/observability.test.ts packages/materials/tests/tool-timing.test.ts packages/materials/tests/version-cache.test.ts packages/materials/tests/telemetry-lazy-payload.test.ts packages/materials/tests/durability.test.ts packages/materials/tests/provider-pi-http-smoke.test.ts packages/materials/tests/lane-observer-diagnostics.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/context.test.ts packages/materials/tests/context-recovery.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/verification-recovery.test.ts packages/materials/tests/binding-transaction.test.ts packages/materials/tests/external-resource-registry.test.ts packages/materials/tests/session-resource-adapter.test.ts packages/materials/tests/pwn-session-runtime-host.test.ts packages/materials/tests/pwn-session-supervisor.test.ts packages/materials/tests/browser-resource-adapter.test.ts packages/materials/tests/runtime-preflight.test.ts packages/materials/tests/session-runtime-combined-host.test.ts packages/materials/tests/observability.test.ts packages/materials/tests/tool-timing.test.ts packages/materials/tests/version-cache.test.ts packages/materials/tests/telemetry-lazy-payload.test.ts packages/materials/tests/durability.test.ts packages/materials/tests/provider-pi-http-smoke.test.ts packages/materials/tests/lane-observer-diagnostics.test.ts packages/materials/tests/archival-failure-semantics.test.ts"
     },
     {
       "id": "agent-orchestration",
@@ -131,10 +132,11 @@
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
+        "packages/materials/tests/dispatch-transaction-batch.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/control-store.test.ts packages/materials/tests/control-store-concurrency.test.ts packages/materials/tests/competition-convergence.test.ts packages/materials/tests/handoff.test.ts packages/materials/tests/evidence-curation-gate.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/domain-records.test.ts packages/materials/tests/pwn-layer.test.ts packages/materials/tests/read-path-parse-budget.test.ts packages/materials/tests/projection-read-bound.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/control-store.test.ts packages/materials/tests/control-store-concurrency.test.ts packages/materials/tests/competition-convergence.test.ts packages/materials/tests/handoff.test.ts packages/materials/tests/evidence-curation-gate.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/domain-records.test.ts packages/materials/tests/pwn-layer.test.ts packages/materials/tests/dispatch-transaction-batch.test.ts packages/materials/tests/read-path-parse-budget.test.ts packages/materials/tests/projection-read-bound.test.ts"
     },
     {
       "id": "evaluation",
@@ -193,8 +195,11 @@
     {
       "id": "skill-registry",
       "sourceGlobs": ["packages/materials/src/skills/**"],
-      "testGlobs": ["packages/materials/tests/skill-registry-cache.test.ts"],
-      "command": "node --import tsx --test packages/materials/tests/skill-registry-cache.test.ts"
+      "testGlobs": [
+        "packages/materials/tests/skill-registry-cache.test.ts",
+        "packages/materials/tests/skills.test.ts"
+      ],
+      "command": "node --import tsx --test packages/materials/tests/skill-registry-cache.test.ts packages/materials/tests/skills.test.ts"
     },
     {
       "id": "services-composition",
@@ -242,9 +247,16 @@
         "packages/materials/tests/app-server.test.ts",
         "apps/gui/tests/competition-settings.test.ts",
         "apps/gui/tests/debug-data.test.ts",
-        "apps/gui/tests/control-view.test.ts"
+        "apps/gui/tests/control-view.test.ts",
+        "apps/gui/tests/workspace-settings.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/app-server.test.ts apps/gui/tests/competition-settings.test.ts apps/gui/tests/debug-data.test.ts apps/gui/tests/control-view.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/app-server.test.ts apps/gui/tests/competition-settings.test.ts apps/gui/tests/debug-data.test.ts apps/gui/tests/control-view.test.ts apps/gui/tests/workspace-settings.test.ts"
+    },
+    {
+      "id": "gui-conversation-preferences",
+      "sourceGlobs": ["apps/gui/src/conversation-preferences.ts"],
+      "testGlobs": ["apps/gui/tests/conversation-preferences.test.ts"],
+      "command": "node --import tsx --test apps/gui/tests/conversation-preferences.test.ts"
     },
     {
       "id": "cli-entrypoint",

@@ -38,8 +38,6 @@ export interface PiObservabilityOptions {
     parentEpochId?: string;
   };
   scheduling?: ProviderSchedulingTelemetry;
-  /** Internal write-behind coordinator shared with provider scheduling hooks. */
-  telemetry?: ControlEventBatcher;
 }
 
 type TelemetryEvent = Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">;
@@ -51,7 +49,12 @@ type TelemetryEvent = Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "
  * result merged into `payload`.
  */
 type QueuedTelemetryEvent = TelemetryEvent & { resolve?: () => Promise<Record<string, unknown>> };
-const telemetryByOptions = new WeakMap<object, ControlEventBatcher>();
+/**
+ * The batcher an attachment created for itself, so `append` can reuse it once
+ * `options.scheduling` is absent. Only ever written by the attachment that owns
+ * the key, so it can never smuggle in a second queue over the same event log.
+ */
+const defaultBatcherByOptions = new WeakMap<object, ControlEventBatcher>();
 
 /**
  * Bounded write-behind for low-value observability events.
@@ -102,10 +105,24 @@ export class ControlEventBatcher {
     this.schedule();
   }
 
-  /** Wait until all currently queued telemetry has reached the event log. */
+  /**
+   * Wait until all currently queued telemetry has reached the event log.
+   *
+   * Best-effort, not a strict barrier: a batch that fails to append is put back
+   * at the head of the queue and retried on a 1s timer, and this resolves once
+   * the drain loop returns even if that retry is still outstanding. Callers that
+   * need to know whether anything is still owed must check `pending()` — a
+   * non-zero count after a flush means the event log is behind, not that the
+   * flush is still running.
+   */
   public async flush(): Promise<void> {
     if (!this.flushPromise) this.flushPromise = this.flushQueued();
     await this.flushPromise;
+  }
+
+  /** Events queued but not yet appended. */
+  public pending(): number {
+    return this.queue.length;
   }
 
   private schedule(delayMs = 10): void {
@@ -412,8 +429,12 @@ interface PendingTool {
 const toolPolicies = new Map(solverToolContractSnapshot().map((contract) => [String(contract.name), contract]));
 
 export function attachPiObservability<TContext extends object | undefined>(harness: AgentHarness<TContext>, options: PiObservabilityOptions): () => void {
-  const telemetry = options.telemetry ?? options.scheduling?.batcher ?? new ControlEventBatcher(options.controlStore, options.runId, options.lane);
-  telemetryByOptions.set(options, telemetry);
+  // Exactly one batcher per attachment: `scheduling.batcher` when the caller
+  // brings provider scheduling, otherwise a private one. A caller-supplied
+  // second batcher used to win here and orphan the scheduling one, which left
+  // two flush barriers racing over one event log.
+  const telemetry = options.scheduling?.batcher ?? new ControlEventBatcher(options.controlStore, options.runId, options.lane);
+  defaultBatcherByOptions.set(options, telemetry);
   const providers: PendingProvider[] = [];
   const tools = new Map<string, PendingTool>();
   const unsubscribeBefore = harness.on("before_provider_request", async (event) => {
@@ -604,7 +625,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     }
   });
   return () => {
-    telemetryByOptions.delete(options);
+    defaultBatcherByOptions.delete(options);
     void telemetry.flush();
     unsubscribeEvents();
     unsubscribePayload?.();
@@ -614,7 +635,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
 }
 
 function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "model_context_frame_recorded" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>, resolve?: () => Promise<Record<string, unknown>>): Promise<void> {
-  const telemetry = options.telemetry ?? options.scheduling?.batcher ?? telemetryByOptions.get(options);
+  const telemetry = options.scheduling?.batcher ?? defaultBatcherByOptions.get(options);
   if (telemetry) {
     telemetry.append(type, actor, payload, resolve);
     return Promise.resolve();

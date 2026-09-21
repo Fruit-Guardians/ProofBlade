@@ -23,13 +23,39 @@ export interface ArtifactTextRange {
   truncated: boolean;
 }
 
+/**
+ * A stored Artifact plus the exact text that was written for it.
+ *
+ * `ArtifactRef` cannot answer "what bytes are on disk": `stageText` redacts
+ * before persisting, so the caller's input string is not what the Artifact
+ * contains. Callers that want to analyse the stored content — instead of
+ * reading the file back to get it — must take `storedText` from a write result
+ * and verify it against `artifact.sha256`.
+ */
+export interface ArtifactWrite {
+  artifact: ArtifactRef;
+  /** The exact text written to disk, i.e. the post-redaction form of the input. */
+  storedText: string;
+}
+
 export class ArtifactStore {
   public constructor(private readonly runsRoot: string, private readonly controlStore: ControlStore) {}
 
   public async putText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
-    const artifact = await this.stageText(runId, content, meta);
-    await this.controlStore.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
-    return (await this.controlStore.snapshot(runId)).artifacts[artifact.id] ?? artifact;
+    return (await this.putTextWithContent(runId, content, meta)).artifact;
+  }
+
+  /**
+   * `putText` for callers that need the stored text as well as the reference.
+   *
+   * The returned `storedText` is the redacted text that was persisted, so a
+   * caller can hash it against `artifact.sha256` and skip a read-back without
+   * silently inspecting pre-redaction bytes.
+   */
+  public async putTextWithContent(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactWrite> {
+    const write = await this.stageTextWithContent(runId, content, meta);
+    await this.controlStore.dispatch(runId, { type: "artifact", generation: write.artifact.generation, artifact: write.artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
+    return { artifact: (await this.controlStore.snapshot(runId)).artifacts[write.artifact.id] ?? write.artifact, storedText: write.storedText };
   }
 
   /**
@@ -37,6 +63,11 @@ export class ArtifactStore {
    * capability-gated step; an unregistered file is never Evidence provenance.
    */
   public async stageText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
+    return (await this.stageTextWithContent(runId, content, meta)).artifact;
+  }
+
+  /** `stageText` for callers that also need the redacted text that was written. */
+  public async stageTextWithContent(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactWrite> {
     const snapshot = await this.controlStore.snapshot(runId);
     const generation = snapshot.generation;
     const redacted = redactSecrets(content);
@@ -61,7 +92,7 @@ export class ArtifactStore {
       truncated: meta.truncated,
       semantic: meta.semantic ? { ...meta.semantic, updatedSeq: 0 } : undefined,
     };
-    return artifact;
+    return { artifact, storedText: redacted };
   }
 
   public async readText(runId: string, artifact: ArtifactRef): Promise<string> {

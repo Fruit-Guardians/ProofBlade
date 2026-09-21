@@ -19,7 +19,7 @@ import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
-import { attachPiObservability, ControlEventBatcher, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { ObserverDiagnostics } from "../observability/observer-diagnostics.js";
 import type { ModelContextItem } from "../context/model-context-frame.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
@@ -223,10 +223,11 @@ export class PiCodingLane implements AgentLanePort {
       });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "main", controlStore: options.controlStore });
-    // Bounded write-behind for Pi hook telemetry. Without it every hook appends
+    // Pi hook telemetry rides `scheduling.batcher`: a bounded write-behind queue
+    // shared with the provider-scheduling hooks. Without it every hook appends
     // synchronously on the tool-result path, which is a lock + fsync the model
     // waits on for events it never reads. turn/close flush it as the barrier.
-    const telemetry = new ControlEventBatcher(options.controlStore, options.runId, "main");
+    // A second batcher here would take priority over this one and orphan it.
     const { models, model, closeTransport } = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     // skills/ and .mcp.json live in the ProofBlade install root, NOT the challenge
     // workspace. runDir is <installRoot>/runs/<runId>, so dirname(dirname(runDir))
@@ -871,7 +872,6 @@ export class PiCodingLane implements AgentLanePort {
         };
       },
       scheduling,
-      telemetry,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
     return new PiCodingLane(
@@ -905,7 +905,12 @@ export class PiCodingLane implements AgentLanePort {
       async () => await stopAllShellJobs(toolContext),
       async () => {
         await scheduling.flush();
-        await telemetry.flush();
+        // Flushing is best-effort: a failed telemetry append goes back on the
+        // queue for a timer retry, so the lane can close with events still owed.
+        // Record it rather than letting the run look complete with a truncated
+        // event log — the plan requires this closure and nothing reported it.
+        const owed = scheduling.batcher.pending();
+        if (owed > 0) observingDiagnostics.record("telemetry-flush", options.runId, new Error(`${owed} telemetry event(s) still queued after the lane close flush`));
         await options.controlStore.flushProjection(options.runId).catch(() => undefined);
       },
       observingDiagnostics,

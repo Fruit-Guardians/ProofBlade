@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import { sha256 } from "../src/domain/utils.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { ExperimentGate } from "../src/competition/experiment-gate.js";
 import type { ProofBladeConfig } from "../src/config.js";
@@ -49,6 +50,13 @@ interface Scenario {
   readonly root: string;
   readonly result: { isError?: boolean; content: Array<{ type?: string; text?: string }>; details?: unknown };
   readonly diagnostics: ObserverDiagnostics;
+  /**
+   * The bytes the Artifact holds, read back from disk after the tool ran.
+   *
+   * This is the ground truth the in-memory observer input has to match; it is
+   * empty when archival failed.
+   */
+  readonly storedText: string;
 }
 
 /** Drive one read through a real Run, optionally with artifact storage down. */
@@ -57,7 +65,9 @@ async function readOnce(runId: string, content: string, breakArchival: boolean):
   const services = createServices(root, config);
   await services.control.createRun(runId, { ...demoTask(runId, root, config), mode: "coding_assistant", target_kind: "unknown", verification: { kind: "reproduction", required_reproductions: 0 } });
   if (breakArchival) {
-    services.artifacts.putText = (async () => { throw new Error("artifact storage unavailable"); }) as typeof services.artifacts.putText;
+    // The read path writes through `putTextWithContent`; that is the call that
+    // must fail for "artifact storage unavailable" to reach the fallback.
+    services.artifacts.putTextWithContent = (async () => { throw new Error("artifact storage unavailable"); }) as typeof services.artifacts.putTextWithContent;
   }
   const diagnostics = new ObserverDiagnostics();
   const runtime = new ProofBladeToolRuntime(
@@ -104,8 +114,21 @@ async function readOnce(runId: string, content: string, breakArchival: boolean):
   const read = createCodingTools().find((tool) => tool.name === "read");
   assert.ok(read, "the read tool must exist");
   const result = await read.execute("read-1", { path: target }, new AbortController().signal, undefined, context) as Scenario["result"];
+  const artifactId = (result.details as { artifactId?: string } | undefined)?.artifactId;
+  const storedText = artifactId && artifactId.length > 0
+    ? await readStorageText(services.runsRoot, runId, artifactId)
+    : "";
   await rm(root, { recursive: true, force: true });
-  return { root, result, diagnostics };
+  return { root, result, diagnostics, storedText };
+}
+
+/** Read back exactly what the Artifact holds, without going through ArtifactStore. */
+async function readStorageText(runsRoot: string, runId: string, artifactId: string): Promise<string> {
+  const directory = join(runsRoot, runId, "artifacts");
+  const entries = await readdir(directory);
+  const match = entries.find((entry) => entry.startsWith(`${artifactId}-`));
+  assert.ok(match, `no stored file for artifact ${artifactId} in ${directory}`);
+  return await readFile(join(directory, match), "utf8");
 }
 
 test("[contract:archival-failure-keeps-read-successful] a failed archival returns the content inline instead of failing the read", async () => {
@@ -144,5 +167,25 @@ test("the inline fallback stays bounded because the read itself is capped", asyn
   assert.ok(
     Buffer.byteLength(text) <= 256 * 1024 + 512,
     `inline fallback should stay within the read cap, got ${Buffer.byteLength(text)} bytes`,
+  );
+});
+
+test("the observer classifies the stored text, not the pre-redaction original", async () => {
+  // The read path hands `observeCodingArtifact` the text the Artifact holds
+  // instead of reading the file back. `stageText` redacts before persisting, so
+  // that value is the redacted form: passing the caller's original would make
+  // the observer classify bytes the Artifact does not contain — and, because the
+  // observer only reports signature *kinds*, silently so.
+  const secret = "token=flag{not-a-real-secret}\n";
+  const { result, storedText } = await readOnce("D2-REDACT-1", secret, false);
+
+  const details = result.details as { artifactHash?: string } | undefined;
+  assert.ok(details?.artifactHash, "the read must still produce a citable artifact");
+  assert.match(storedText, /token=\[REDACTED\]/, "the archived text must be the redacted form");
+  assert.doesNotMatch(storedText, /flag\{not-a-real-secret\}/, "the secret must not be stored verbatim");
+  assert.equal(
+    sha256(storedText),
+    details.artifactHash,
+    "the text the observer sees must be the text the artifact hash covers",
   );
 });

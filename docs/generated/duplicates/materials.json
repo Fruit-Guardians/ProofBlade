@@ -216,7 +216,7 @@
           "kind": "method",
           "signature": "(): readonly ObserverFailureSample[]",
           "module": "src/observability/observer-diagnostics.ts",
-          "line": 85,
+          "line": 92,
           "summary": "Retained samples, oldest first."
         },
         {
@@ -420,7 +420,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 994,
+          "line": 999,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -449,7 +449,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 998,
+          "line": 1003,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {

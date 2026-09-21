@@ -75,6 +75,25 @@ test("the diagnostics rejects a limit that cannot retain a sample", () => {
   assert.equal(DEFAULT_OBSERVER_FAILURE_LIMIT >= 1, true);
 });
 
+test("a recorded message is redacted before it is retained", () => {
+  // No call site redacts: `record` is called from catch blocks all over the
+  // observation path, and the messages they carry hold artifact paths, command
+  // fragments and provider URLs. The sample must therefore be safe on its own,
+  // for whatever consumer is added next.
+  const diagnostics = new ObserverDiagnostics();
+  diagnostics.record("artifact-observation", "RUN-1", new Error("control store rejected api_key=sk-live-abc123 for /runs/RUN-1"));
+  diagnostics.record("artifact-annotation", "RUN-1", new Error("Authorization: Bearer eyJhbGci.payload.sig\n"));
+
+  const messages = diagnostics.failures().map((sample) => sample.message);
+  assert.equal(messages.length, 2);
+  assert.match(messages[0] ?? "", /api_key=\[REDACTED\]/);
+  assert.doesNotMatch(messages[0] ?? "", /sk-live-abc123/);
+  assert.match(messages[1] ?? "", /Bearer \[REDACTED\]/);
+  assert.doesNotMatch(messages[1] ?? "", /eyJhbGci\.payload\.sig/);
+  // Redaction must not cost the operator the rest of the message.
+  assert.match(messages[0] ?? "", /control store rejected/);
+});
+
 test("[contract:observer-failure-is-diagnostic-only] a throwing observer does not change the tool result", async () => {
   // D3's first half. The observation is best-effort, so a failure must leave the
   // model-visible content and the error flag exactly as they were.

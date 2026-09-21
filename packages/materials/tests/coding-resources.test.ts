@@ -104,7 +104,7 @@ test("update_phase changes the durable phase before later investigation actions"
     assert.deepEqual(phaseEvent?.payload, { domainPhase: "EXPERIMENT", reason: "The packet layout is known; execute the bounded decoder." });
   } finally {
     await services.sandbox.close();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -128,7 +128,7 @@ test("ordinary read follows bounded continuation pages into one complete model r
     assert.doesNotMatch(text, /Use offset=\d+ to continue/);
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -201,7 +201,7 @@ test("generic result proposals accept ordinary text without CTF formatting", asy
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[completion.artifactId]!), "ordinary report result");
   } finally {
     await runtime.close();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -253,7 +253,7 @@ test("verify_result accepts a durable result Artifact with a hash-bound verifier
     const conflictingText = await verifier.project("Verify the report Artifact", "最终结果：a different text result");
     assert.equal(conflictingText.status, "unverified", "a stated text result must not inherit a different Artifact verification");
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -459,7 +459,7 @@ test("evidence_record has an exact write contract and legacy record calls are no
     );
   } finally {
     await services.sandbox.close();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -512,7 +512,7 @@ test("real AgentHarness projects evidence_record schema failures into structured
     assert.match(result.content[0]?.text ?? "", /^\[ProofBlade evidence error\] \{/);
   } finally {
     await env.cleanup();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -633,7 +633,7 @@ test("[contract:evidence-inspect-forest-max-chars] generic result verification r
     assert.equal(continuous.terminate, undefined, "continuous recovery keeps result verification in the same lane");
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -697,7 +697,7 @@ test("coding bash is blocked after the durable evidence curation threshold", asy
     assert.match(text, /evidence curation required/);
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -848,7 +848,7 @@ test("[contract:coding-capability-proxy] coding capability proxy discovers lazil
     }, context), /fixture|relative path/);
   } finally {
     await runtime.close();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -875,7 +875,7 @@ test("coding bash archives raw output before returning RTK-compressed content", 
       return { ok: true as const, value: { stdout: "6 tests passed\n", stderr: "", exitCode: 0 } };
     },
   };
-  const raw = "PASS verbose diagnostic\n".repeat(200);
+  const raw = "PASS verbose diagnostic\ntoken=flag{bash-archived-secret}\n".repeat(200);
   const port: OutputRewritePort = {
     async prepare(input) {
       return {
@@ -915,9 +915,23 @@ test("coding bash archives raw output before returning RTK-compressed content", 
     assert.match(result.content.map((item) => item.text ?? "").join("\n"), new RegExp(`artifact=pb://run/${runId}/artifact/${artifactId}/content`));
     const snapshot = await services.control.snapshot(runId);
     assert.ok(snapshot.artifacts[artifactId]);
-    assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!), raw);
+    // The archived bytes are the redacted form: `stageText` redacts before it
+    // writes, and the observer now receives that same stored text rather than a
+    // read-back of the file or the caller's pre-redaction original.
+    const archived = await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!);
+    assert.match(archived, /token=\[REDACTED\]/);
+    assert.doesNotMatch(archived, /bash-archived-secret/);
+    assert.equal(
+      rewrite.artifactHash,
+      sha256(archived),
+      "the observer input must be covered by the hash the artifact records",
+    );
+    // `details` is persisted with the session and rendered in the debug view, so
+    // the full raw output must not be reachable from it under any key.
+    assert.equal(rewrite.archivedText, undefined);
+    assert.doesNotMatch(JSON.stringify(result.details), /bash-archived-secret/);
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -990,7 +1004,7 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     assert.equal(artifact.semantic?.role, "supporting");
   } finally {
     await runtime.close();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -1074,7 +1088,7 @@ test("shell_background returns immediately and shell_job polls then stops the re
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 });
@@ -1132,7 +1146,7 @@ test("shell_job stop reaps descendants when setsid is unavailable", async (t) =>
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 });
@@ -1195,7 +1209,7 @@ test("shell_job stop reaps a descendant after the fallback user command exits", 
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 });
@@ -1264,7 +1278,7 @@ test("fallback supervisor survives user trap, PATH changes, and exec", async (t)
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 });
@@ -1311,7 +1325,7 @@ test("shell_job stop accepts a schema 1 process-group record during upgrade", as
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 });
@@ -1601,9 +1615,12 @@ test("bash anchors an artifact only when output was actually withheld", async (t
         },
       } as unknown as OutputRewritePort,
       artifactStore: {
-        async putText(_runId: string, text: string) {
+        async putTextWithContent(_runId: string, text: string) {
           archived.push(text);
-          return { id: `A-${archived.length}`, sha256: "deadbeef" };
+          // The observer verifies the content it is handed against the hash the
+          // artifact carries, so this stub must report the real hash of `text`
+          // rather than a placeholder.
+          return { artifact: { id: `A-${archived.length}`, sha256: sha256(text) }, storedText: text };
         },
       },
       runId: "RUN-anchor",
@@ -1628,7 +1645,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 });
@@ -1653,9 +1670,9 @@ test("failed bash returns structured error feedback and records the real experim
       },
     } as unknown as OutputRewritePort,
     artifactStore: {
-      async putText(_runId: string, text: string) {
+      async putTextWithContent(_runId: string, text: string) {
         archived.push(text);
-        return { id: `A-${archived.length}`, sha256: "deadbeef" };
+        return { artifact: { id: `A-${archived.length}`, sha256: sha256(text) }, storedText: text };
       },
     },
     runId: "RUN-bash-failure",
@@ -1708,7 +1725,7 @@ test("source scope trusts only catalog-declared external executable paths", asyn
           return { rawOutput: visible, rawBytes: Buffer.byteLength(visible), visibleBytes: Buffer.byteLength(visible), rawTruncated: false, rawCapture: "full" };
         },
       },
-      artifactStore: { async putText() { return { id: "A-source-scope", sha256: "scope" }; } },
+      artifactStore: { async putTextWithContent(_runId: string, text: string) { return { artifact: { id: "A-source-scope", sha256: sha256(text) }, storedText: text }; } },
       runId: "RUN-source-scope",
     },
     runtime: { runId: "RUN-source-scope" },

@@ -11,6 +11,7 @@ import { WorkspaceSettingsStore } from "./workspace-settings.js";
 import { listDirectories, requireDirectory } from "./directory-browser.js";
 import { closeGuiResources } from "./shutdown.js";
 import { AblationService } from "./ablation-service.js";
+import { conversationPreferencesInput, stringArray } from "./conversation-preferences.js";
 import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -209,8 +210,17 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       const body = await readBody(request);
       const patch = conversationPreferencesInput(body, workspaceSettings.preferences(parts[2], defaults));
       if (patch.workspacePath !== undefined) patch.workspacePath = await requireDirectory(patch.workspacePath);
-      const next = normalizedPreferences({ ...workspaceSettings.preferences(parts[2], defaults), ...patch }, capabilities);
-      return sendJson(response, 200, await workspaceSettings.saveConversation(parts[2], next, defaults));
+      if (Object.keys(patch).length === 0) return sendJson(response, 200, normalizedPreferences(workspaceSettings.preferences(parts[2], defaults), capabilities));
+      // Persist only what this request actually edited. Writing the resolved
+      // capabilities back here is what made the create-time fix useless: the
+      // first preference save froze `enabledTools`/`enabledSkills`/
+      // `enabledMcpServers` at their current values, so a Skill, MCP server or
+      // tool added to the workspace afterwards stayed permanently invisible to
+      // this conversation. A list is stored only once this request edits it, and
+      // `normalizedPreferences` (below, and on the read path) still resolves
+      // whatever is absent against the current catalog.
+      await workspaceSettings.saveConversation(parts[2], patch);
+      return sendJson(response, 200, normalizedPreferences(workspaceSettings.preferences(parts[2], defaults), capabilities));
     }
   }
   if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts.length === 3) {
@@ -539,25 +549,6 @@ function normalizedPreferences(input: ConversationPreferences, capabilities: Wor
   };
 }
 
-function conversationPreferencesInput(body: Record<string, unknown>, current: ConversationPreferences): Partial<ConversationPreferences> {
-  return {
-    ...current,
-    ...(body.folderId === null ? { folderId: undefined } : typeof body.folderId === "string" ? { folderId: body.folderId } : {}),
-    ...(typeof body.workspacePath === "string" ? { workspacePath: body.workspacePath } : {}),
-    ...(typeof body.profileId === "string" ? { profileId: body.profileId } : {}),
-    ...(typeof body.model === "string" ? { model: body.model } : {}),
-    ...(typeof body.thinkingLevel === "string" ? { thinkingLevel: body.thinkingLevel as ProviderThinkingLevel } : {}),
-    ...(typeof body.contextCompactionThreshold === "number" ? { contextCompactionThreshold: body.contextCompactionThreshold } : {}),
-    ...(Array.isArray(body.enabledTools) ? { enabledTools: stringArray(body.enabledTools) } : {}),
-    ...(Array.isArray(body.enabledSkills) ? { enabledSkills: stringArray(body.enabledSkills) } : {}),
-    ...(Array.isArray(body.enabledMcpServers) ? { enabledMcpServers: stringArray(body.enabledMcpServers) } : {}),
-    ...(typeof body.projectPrompt === "string" ? { projectPrompt: body.projectPrompt } : {}),
-  };
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
 
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name);
