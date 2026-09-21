@@ -471,14 +471,23 @@ export class JsonlControlStore {
       // establishes currency.
       if (projectionStat.mtimeMs < eventsStat.mtimeMs) return undefined;
       const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
-      // Establish currency from content, not from time. The seal proves a
-      // projection is authentic and internally consistent, not that it covers
-      // the whole log: a projection sealed at lastSeq 1 stays perfectly valid
-      // after 10,000 more events. Comparing the projection's lastSeq with the
-      // log's last event closes that gap for the cost of one bounded tail read,
-      // independent of timestamp granularity.
+      // Establish currency from content, not from time, and fail closed.
+      //
+      // The seal proves a projection is authentic and internally consistent, not
+      // that it covers the whole log: a projection sealed at lastSeq 1 stays
+      // perfectly valid after 10,000 more events. Comparing the projection's
+      // lastSeq with the log's last event closes that gap for the cost of one
+      // bounded tail read, independent of timestamp granularity.
+      //
+      // That comparison must fail closed. `lastEventSeq()` returns undefined
+      // whenever the tail cannot be read -- an unreadable or torn trailing
+      // region, or a log whose records all fail to parse -- and an earlier
+      // version treated undefined as "cannot disprove currency" and returned the
+      // projection anyway. A reader could then be handed a projection that is
+      // behind the log. Unknown currency is not currency: reject.
       const streamLastSeq = await this.lastEventSeq(runId);
-      if (streamLastSeq !== undefined && streamLastSeq !== stored.lastSeq) return undefined;
+      if (streamLastSeq === undefined) return undefined;
+      if (streamLastSeq !== stored.lastSeq) return undefined;
       const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
       const snapshot = snapshotFields as RunSnapshot;
       // Recompute the projection content hash before trusting any stored hash.

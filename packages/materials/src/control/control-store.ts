@@ -726,50 +726,35 @@ export class ControlStore {
       return cached.snapshot;
     }
 
-    // Read bound: only parse the event stream when the durable projection cannot
-    // answer on its own.
+    // Why the authoritative path does not take the `loadProjectionHint()`
+    // shortcut, even though a current projection would let it skip parsing the
+    // stream (1,877ms -> ~5ms at 10,001 events):
     //
-    // `loadProjectionHint` returns a projection only when it authenticates
-    // against the authority secret AND `lastEventSeq()` (a bounded tail read)
-    // confirms the projection's `lastSeq` equals the log's last seq, i.e. the
-    // projection already covers every committed event. In that state it is the
-    // complete state, so re-deriving it by parsing the whole stream yields the
-    // same value at O(history) cost -- measured at 1,877ms for 10,001 events,
-    // of which `loadProjection()` itself is only 49ms.
+    // The hint establishes currency from the log's byte size plus its trailing
+    // seq, and authenticates the projection against the authority secret. What
+    // it cannot do is prove the *historical* bytes are the ones the seal's
+    // prefix hash was computed over. Rewriting an event in place while keeping
+    // the file length and the trailing seq leaves all of those checks passing,
+    // so the shortcut returned the state as of the seal while `replay()` folded
+    // the rewritten events -- the two paths disagreed about the same Run.
     //
-    // What this gives up: recomputing the event-prefix hash from the parsed
-    // events. That check only fires for the current-projection case (a stale
-    // projection is folded and extended below), and shelling out to `replay()`
-    // on failure folds the same on-disk events with no validation at all, so it
-    // never determined which state a reader sees -- see
-    // docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md section 6.5. The
-    // guarantee that matters is preserved: a projection failing its seal is
-    // discarded here and never overrides the event log, and the authoritatively
-    // verified path below still runs whenever the projection is behind.
+    // Verifying that cheaply is impossible with the current seal: the hash is
+    // over the canonical JSON of the parsed events, so it cannot be recomputed
+    // from raw file bytes, and hashing the prefix still requires parsing it.
+    // The seal records the log's byte size to make the *adjacent* guarantees
+    // checkable (see loadProjection / loadProjectionHint), but a size cannot
+    // witness content. Until the seal can prove the prefix, the read path stays
+    // authoritative and pays O(history). Regression test:
+    // packages/materials/tests/projection-read-bound.test.ts, "snapshot and
+    // replay agree after a historical event is rewritten in place".
+    const events = await this.eventStore.events(runId);
+    const streamLastSeq = events.at(-1)?.seq ?? 0;
     let snapshot: RunSnapshot | undefined;
-    // Authenticate with the same authority the rest of this store uses. The
-    // hint's own default resolves the same shared secret in the normal
-    // configuration, but a store constructed with an explicit secret must not
-    // silently lose this path -- and it must not accept a projection sealed by
-    // a different authority either.
-    const fastPath = await this.eventStore.loadProjectionHint(runId, this.#authoritySecret).catch(() => undefined);
-    if (fastPath && fastPath.runId === runId && fastPath.projectionHash === projectionHash(fastPath)) {
-      snapshot = fastPath;
-    }
-
-    // Lazily materialised: on the fast path the stream is never parsed, so an
-    // eagerly awaited `events()` would pay the whole O(history) cost to answer a
-    // question the projection already answered.
-    let loaded: Promise<HarnessEvent[]> | undefined;
-    const loadEvents = () => (loaded ??= this.eventStore.events(runId));
-
     // A cache revision mismatch means another process (or an operator) changed
     // durable state. Do not assume that change was append-only.
     const durableStateChanged = cached !== undefined;
     if (durableStateChanged) this.snapshotCache.delete(runId);
-    if (snapshot === undefined && !durableStateChanged) {
-      const events = await loadEvents();
-      const streamLastSeq = events.at(-1)?.seq ?? 0;
+    if (!durableStateChanged && snapshot === undefined) {
       const persisted = await this.eventStore.loadProjection(runId, {
         events,
         authoritySecret: this.#authoritySecret,
