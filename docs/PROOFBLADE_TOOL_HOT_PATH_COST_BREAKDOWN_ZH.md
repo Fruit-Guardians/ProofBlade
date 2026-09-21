@@ -1,10 +1,12 @@
 # 工具热路径成本分解与 T1 write-behind 队列设计（PLAN-240 表项 T1）
 
-> 文档版本：1.0.0
-> 编写日期：2026-09-19
-> 文档性质：**成本分解实测 + 设计提案，尚未实施**
+> 文档版本：1.1.0
+> 编写日期：2026-09-19（2026-09-21 复核修订：§2.2 的 12ms 改为推导值标注、§2.5/§2.6 重开 T2、§2.6 的「只有延后可行」撤销）
+> 文档性质：**成本分解实测 + 设计提案，部分已实施**（§2.5 的 T2 复核已由 `packages/materials/tests/dispatch-transaction-batch.test.ts` 实证）
 > 父文档：`docs/PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md` §5.6.3、表项 T1
 > ProofBlade 基线：`156ec17`
+>
+> **数字口径**：本文所有毫秒值来自**单机**测量（Windows / i9-14900HX / Node 22），除明确标注「n≥20」者外，`p95` 在 n=8 时**就是最大值**（nearest-rank）。凡未经入库 harness 产生的数字都标了来源；`scripts/tool-hot-path-real-run-baseline.ts` 与 `scripts/tool-hot-path-long-run-baseline.ts` 是仅有的两个可复现入口。
 
 ## 1. 为什么要单独成文
 
@@ -39,7 +41,13 @@ CTRL.dispatchTransaction DeterministicObserver.observe    (observer.ts:78)
 
 ### 2.2 25ms 花在哪
 
-单次 `read`：4 条事件 / 2 个提交 / 约 25ms p50（PR #230 实测）。即**每个提交约 12ms**，其内容为：run 锁获取 → 事件追加 + `fsync` → 快照折叠。
+单次 `read`：4 条事件 / 2 个提交 / 约 25ms p50（PR #230 实测，n=8）。
+
+**「每个提交约 12ms」是 25 ÷ 2 的推导值，不是测量值。**本节的插桩识别的是提交**点**（哪几个位置各提交一次），没有任何一处测量了单次提交的耗时。把它写成「实测事实」是错的，写成「由此推出的量级」才对，置信度也随之降低：它假设两次提交成本相同，而第一次（artifact 注册）与第二次（派生观察）折叠的快照大小并不必然一样。要得到真实数字需要分别给两个 dispatch 点插桩计时，那还没有做。
+
+单个提交的内容是：run 锁获取 → 事件追加 + `fsync` → 快照折叠。
+
+另需注意「25ms」这一列的口径：它是 PR #230 脚本里 `command` 列的值，即**工具体本身**的耗时，其中包含它触发的 durable 提交；`framework − command` 只有 1.4–4ms。因此 25ms 不是「附加在命令之外的链路开销」，而是「命令内部含它自己的提交」。§7.2 的收益数字据此重新推导。
 
 ### 2.3 T3 到底省了多少
 
@@ -50,16 +58,18 @@ CTRL.dispatchTransaction DeterministicObserver.observe    (observer.ts:78)
 | 延后投影（T3 之后的现状） | 46.8ms | 9.4ms |
 | 强制投影（T3 之前的行为） | 68.1ms | 13.6ms |
 
-**结论：投影重写每次约 4.3ms，约占单次提交成本的三分之一。**这是对 PR #228 独立、可复现的收益量化——不再是「改了代码」，而是「省了 4.3ms/次」。
+**结论：投影重写每次约 4.3ms（68.1 − 46.8 = 21.3ms ÷ 5），约占单次提交成本的三分之一。**这是对 PR #228 的收益量化——但口径必须说清：单进程、5 次、无重复、无 warm-up 的 A/B，且它是拿 `ExperimentGate` 的数字去比一个**推导出来**的读取路径数字（§2.2 的 12ms）。它是「省了 4.3ms/次」的证据，不是「投影重写占提交成本三分之一」这一普遍结论的证据。
 
 ### 2.4 因此剩余成本的结构
 
 | 组成 | 每次 | 可否移除 |
 |---|---:|---|
-| run 锁 + event append + `fsync`（提交 1：artifact） | 约 12ms | 否——artifact 是 Evidence 提升的引用对象 |
-| run 锁 + event append + `fsync`（提交 2：observation） | 约 12ms | **否——见 §2.5** |
+| run 锁 + event append + `fsync`（提交 1：artifact） | 约 12ms（**推导值，25÷2**） | 否——artifact 是 Evidence 提升的引用对象 |
+| run 锁 + event append + `fsync`（提交 2：observation） | 约 12ms（**推导值，25÷2**） | 否，但可并入提交 1——见 §2.5 复核 |
 | 投影重写 | 0（已由 T3 移除） | 已解决 |
 | Artifact 回读 | 0（已由 PR #229 移除） | 已解决 |
+
+上表两行的 12ms 都是**同一个推导值**，不是两次独立测量：它的作用是给出量级，不是给出精度。真实数字需要分别插桩两个 dispatch 点。
 
 **「零同步提交」在当前架构下不可达**：只要结果需要被后续 Evidence 引用，artifact 注册就必须在模型继续之前 durable。父计划 §5.6.3 的措辞应据此修正为「**普通结果最多一次同步提交**」。
 
@@ -114,7 +124,7 @@ ControlStore.dispatchTransaction(runId, prepare, options)
 
 ### 3.1 目标
 
-把提交 1 保留，把提交 2（annotation + observation + evidence）推迟到回合边界，使普通 `read`/`glob`/`grep`/短 `bash` 从 2 次同步提交降到 1 次，理论收益约 12ms/次（25ms → 约 13ms）。
+把提交 1 保留，把提交 2（annotation + observation + evidence）推迟到回合边界，使普通 `read`/`glob`/`grep`/短 `bash` 从 2 次同步提交降到 1 次。**收益的量化口径**：少一次提交，按 §2.2 的**推导值**约 12ms/次——该数字是 25÷2 推出来的，不是两次独立测量，所以这里只应读作量级（25ms → 十几毫秒），不是精确到毫秒的承诺。要把它变成实测数字，需要分别给两个 dispatch 点插桩计时。
 
 ### 3.2 为什么不能直接把这些事件丢进 `ControlEventBatcher`
 

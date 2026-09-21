@@ -4,7 +4,7 @@
 
 > **修订说明（评审修订 2）**
 >
-> 1. **§7.2 恢复中心论断为已确认事实**。「几毫秒的命令被外围链路放大到秒级」经使用者在真实环境实测确认，不再是待验证推断；§2.6 的热路径分析与 T1/T2 优先级因此成立，不因基线未填而重排。基线的用途改为「量化放大倍数、定位主要成本来源、作为改进对比基准」。
+> 1. **§7.2 的中心论断是「用户报告的可观察现象」，不是本仓库的实测结论**。「几毫秒的命令被外围链路放大到秒级」来自使用者在真实环境的口头反馈（症状：长对话下每次操作都要等数秒；日期见本节修订记录），**没有**附日志、机器信息或复现步骤。它足以作为优先级的输入，不足以作为「已确认事实」。承担优先级论证的是 T0 基线（PR #230 / #240），它把问题定位到**读取路径**而不是热路径：热路径实测 25–37ms 平坦，秒级出现在读取与投影重建上。基线的用途仍是量化放大倍数、定位主要成本来源、作为改进对比基准。
 > 2. **§7.2.1 记录 PR 2 已交付的局部基线**，并明确它不能替代真实 Run 基线（无 ControlStore，落盘与 `fsync` 是被计数而非被执行）。
 > 3. **U1 迁移方案定为选项 B（先可选、后转必填）**，见 `docs/PROOFBLADE_BASH_DESCRIPTION_CONTRACT_ZH.md` v1.1.0。
 
@@ -338,7 +338,7 @@ DSH 的 `bash`/`pwsh` 除工具定义说明外，还要求每次调用提供短�
 |---|---:|---|---|---|---|
 | A | P0 | 修复 GUI 与 workspace package 的构建一致性 | `package.json`、`apps/gui/package.json`、启动测试 | 消除 `loadProjectionHint` 运行时报错 | 启动前验证该方法存在；GUI HTTP 200；源码变化后不会加载旧 `dist` |
 | T0 | P0 | 增加工具分阶段计时，不经 ControlStore 持久化计时本身 | `coding-resources.ts`、Pi observability、benchmark | 精确区分命令耗时和框架开销 | 输出 execute/rewrite/artifact/control/observe/experiment/subscriber/total 时间 |
-| T1 | P0 | 普通结果的派生观察延后到回合边界（最多一次同步提交） | `coding-resources.ts`、`tools/runtime.ts`、`knowledge/observer.ts` | 毫秒命令不再等待第二多轮锁和 fsync；收益约 12ms/次 | 小型成功 read/glob/grep/bash 的同步 ControlStore commit <= 1（实测现状为 2）；见 §5.6.3 与拆分文档 |
+| T1 | P0 | 普通结果的派生观察延后到回合边界（最多一次同步提交） | `coding-resources.ts`、`tools/runtime.ts`、`knowledge/observer.ts` | 毫秒命令不再等待第二多轮锁和 fsync；收益按 §7.2.2 的量级口径为约 12ms/次（**推导值 25÷2，非实测**） | 小型成功 read/glob/grep/bash 的同步 ControlStore commit <= 1（实测现状为 2）；见 §5.6.3 与拆分文档 |
 | T2 | P0 | 将 Artifact、annotation、Observation、Evidence、Experiment 合并为单次 ToolResultCommit（**已重开：原「不可行」判定被实测推翻**） | `control-store.ts` 的 `dispatchTransaction` 调用点、`coding-resources.ts` | 一次工具调用只保留 1 个提交，且不需要引入延后队列与其屏障 | 小型成功 read/glob/grep/bash 的同步 ControlStore commit = 1；同一事务内 `artifact` + `artifact_annotation` + `observation` + `evidence` 全部落盘（实测见 §2.5 复核） | 见 `docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md` §2.5；判定依据 `packages/materials/tests/dispatch-transaction-batch.test.ts` |
 | T3 | P0 | ExperimentGate 只对声明需要的安全实验启用，普通 coding chat 使用内存去重 | `experiment-gate.ts`、`coding-lane.ts` | 删除每次普通 bash 的投影重写 | 普通对话 bash 不产生同步 experiment projection |
 | T4 | P1 | 去除工具结果重复 hash、Artifact 回读和 telemetry snapshot | `coding-resources.ts`、`runtime.ts`、`pi-events.ts` | 降低 CPU、磁盘和 subscriber barrier | 同一输出只计算一次内容 hash；observer 直接接收已知内容；telemetry 不读 snapshot |
@@ -621,9 +621,9 @@ interface ToolResultCommit {
 
 #### 5.6.3 普通结果最多一次同步提交
 
-> **评审修订 3（实测修正）**：本节原写「零同步提交」。真实 Run 基线（PR #230）与成本分解（`docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md`）表明该目标在当前架构下**不可达**：一次 `read` 有 2 个逻辑提交（artifact 注册、派生观察），每次约 12ms；artifact 是后续 Evidence/verifier 的引用对象，不能在模型继续前不落盘。
+> **评审修订 3（实测修正）**：本节原写「零同步提交」。真实 Run 基线（PR #230）与成本分解（`docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md`）表明该目标在当前架构下**不可达**：一次 `read` 有 2 个逻辑提交（artifact 注册、派生观察）；artifact 是后续 Evidence/verifier 的引用对象，不能在模型继续前不落盘。
 >
-> 因此目标修正为**「普通结果最多一次同步提交」**，理论收益从 25ms 降到约 13ms。完整分解与队列设计见拆分文档，本节只保留结论。
+> 因此目标修正为**「普通结果最多一次同步提交」**。收益的量级口径是「少一次提交」，按拆分文档 §2.2 **推导值**（25÷2）约 12ms/次——该数字不是两次独立测量，不可当作精确承诺。完整分解与队列设计见拆分文档，本节只保留结论。
 
 满足以下全部条件时进入快速路径：
 
@@ -795,7 +795,7 @@ Tool execute
 
 > **评审修订说明**：本节原文在全文**没有任何实测数据**的前提下直接给出毫秒阈值。在基线未知时无法判断阈值是否合理——真实 p50 可能是 80 ms（则 100 ms 目标毫无意义），也可能是 8 秒（则 100 ms 目标不现实）。因此本节拆为**基线段**与**目标段**：先由 T0 填基线，再据基线定阈值。
 >
-> **关于中心论断「几毫秒的命令被外围链路放大到秒级」**：该现象已由**使用者在真实环境实测确认**，不是机制推演。因此 §2.6 的热路径分析与 T1/T2 的优先级**成立**，不需要因基线未填而重新排序。基线的用途是量化放大倍数、定位主要成本来源，并作为改进后的对比基准——而非判断问题是否存在。
+> **关于中心论断「几毫秒的命令被外围链路放大到秒级」**：这是**用户报告的可观察现象**，不是本仓库的实测结论——它没有附日志、机器信息或复现步骤，因此不能承担「已确认事实」这个口径。§2.6 的热路径分析与 T1/T2 的优先级**仍然成立**，但依据是 T0 基线而不是这句话：热路径实测 25–37ms 平坦，秒级出现在读取与投影重建路径上。基线的用途是量化放大倍数、定位主要成本来源，并作为改进后的对比基准——而非判断问题是否存在。
 >
 > 注意 PR 2 交付的 provider-free 基线**不能**替代真实 Run 基线：它没有 ControlStore，Artifact 落盘、文件锁、`fsync` 与 projection 重写是被计数而非被执行。真实 Run 基线仍须补齐。
 
@@ -803,35 +803,43 @@ Tool execute
 
 测试条件：本机 release-like 构建，至少 100 个历史 Run，一个 10,000 条事件的长对话。
 
-**已完成的局部基线（PR 2，provider-free）**：命令执行本身为亚毫秒到毫秒级，`scheduled → executionStart` 框架调度开销可忽略。
+**已完成的局部基线（PR 2，provider-free）**：命令执行本身为亚毫秒到毫秒级，`scheduled → executionStart` 只是计时包装器自身的入口开销（两处埋点都在包装器内，测不到框架调度），可忽略。
 
-**已完成的真实 Run 基线（`npm run baseline:tools:real`）**：在隔离临时项目中驱动真实 ControlStore，8 次/用例：
+**已完成的真实 Run 基线（`npm run baseline:tools:real`）**：在隔离临时项目中驱动真实 ControlStore，**8 次/用例（n=8）**：
 
-| 用例 | 每次调用 durable 事件 | projection 重写 | Artifact 回读 | command p50 | framework p50 | p95 |
-|---|---:|---:|---:|---:|---:|---:|
-| read-1B | 4 | 0 | 0 | 25.1ms | 26.5ms | 34.7ms |
-| read-32KiB | 4 | 0 | 0 | 43.0ms | 44.9ms | 49.5ms |
-| bash-noop（`echo baseline`） | 5 | 0 | 0 | 532ms | 536ms | 2.9s |
+| 用例 | n | 每次调用 durable 事件 | projection 重写 | Artifact 回读 | command p50 | wrapper p50 | p95 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| read-1B | 8 | 4 | 0 | 0 | 25.1ms | 26.5ms | 34.7ms |
+| read-32KiB | 8 | 4 | 0 | 0 | 43.0ms | 44.9ms | 49.5ms |
+| bash-noop（`echo baseline`） | 8 | 5 | 0 | 0 | 532ms | 536ms | 2.9s |
+
+**先读这一条再读下面的结论**：n=8 时 nearest-rank 的 `p95` **就是最大值**（`ceil(0.95×8)−1 = 7`，最后一片），`p99` 在这个 harness 下根本不可得。所以表中 `bash-noop` 的 2.9s 是**单次观测**，不是「95 分位」。脚本已改为在每行打印 n，并在 n<20 时标注「p95 就是最大值」。
 
 三条可直接使用的结论：
 
 1. **控制链路每次调用是固定成本，约 25ms**，与载荷大小几乎无关。`read-1B` 与 `read-32KiB` 事件数完全相同（各 4 条），但延迟只从 25ms 增长到 43ms——增量来自 32KiB 的归档 I/O，**固定部分才是链路本身**。
+   **口径更正**：这 25ms 是 `command` 列（工具体本身）的耗时，其中**包含**它触发的 durable 提交；`wrapper − command` 只有 1.4–4ms。因此 25ms 不是「附加在命令之外的链路开销」，而是「命令内部含它自己的两次提交」。
 2. **`projection 重写 = 0`**：这直接验证了表项 T3（`ExperimentGate` 延后投影）在真实 Run 上生效。全量投影重写已不在工具热路径上。
-3. **`bash` 的 p95（2.9s）与 p50（532ms）严重脱节**，而 `framework − command` 仅约 4ms。也就是说这条尾巴来自命令执行/进程启动与磁盘抖动，**不是** ProofBlade 附加开销。§2.6 提到的「杀毒软件、索引服务、磁盘写入抖动」在这里得到量化。
+3. **`bash` 的最大值（2.9s）与 p50（532ms）严重脱节**，而 `wrapper − command` 仅约 4ms。也就是说这条尾巴来自命令执行/进程启动与磁盘抖动，**不是** ProofBlade 附加开销。§2.6 提到的「杀毒软件、索引服务、磁盘写入抖动」在这里得到量化。
 
-**基线尚缺的部分**：真实 Run 基线原本只用了一个 Run、一个短会话。**长 Run 部分已由 `npm run baseline:tools:longrun` 补齐**（本机实测，每点 5 次取样）：
+**基线尚缺的部分**：真实 Run 基线原本只用了一个 Run、一个短会话。**长 Run 部分已由 `npm run baseline:tools:longrun` 补齐**（本机实测，**`read`/`snapshot()` 每点 5 次取样；`replay()` 只有 1 次**）：
 
-| events | events.jsonl | projection.json | read p50 | snapshot() p50 | replay() |
+| events | events.jsonl | projection.json | read p50 (n=5) | snapshot() p50 (n=5) | replay() (n=1) |
 |---:|---:|---:|---:|---:|---:|
 | 10 | 28 KB | 4.6 KB | 28.7ms | 0.2ms | 11.0ms |
 | 1,000 | 644 KB | 12.6 KB | 35.2ms | 0.3ms | 578.6ms |
 | 5,000 | 3.1 MB | 20.7 KB | 34.4ms | 0.2ms | **4.0s** |
 | 10,000 | 6.2 MB | 28.7 KB | **36.7ms** | 0.2ms | **9.3s** |
 
+`replay()` 一列是 **n=1**：脚本自己的注释就承认只取了一次样。它不是分位数，是一条时序曲线上的单点，跨机器比较没有意义。
+
+**事件形态的限制**：这个长 Run 是 **10,000 条同构的 `tool_result_recorded`**（脚本用 `control.append` 直写），**不注册任何 artifact**。真实工具结果会注册 artifact，而 artifact 才是让投影与快照变大的部分。所以该基线测的是历史的**体量**，不是历史的**形态**；「10,000 事件的长对话」这一措辞对它偏宽松，准确说法是「10,000 条遥测事件」。表中 KB 一律按 1024 进制（KiB）换算。
+
 **两个结论，缺一不可：**
 
 1. **工具热路径不随 Run 历史退化。** `read` 在 10 条事件与 10,000 条事件下都是约 29–37ms，`snapshot()` 恒为 0.2–0.3ms。原因是 `#withWrite` 在提交后用 `committed.reduce(reduce, before)` 刷新快照缓存，所以每次读取都命中增量折叠而不是重放。**这否定了「长 Run 让每次工具调用变慢」这一猜测。**
-2. **但重放路径随历史线性增长，10,000 事件约 9.3 秒。** `replay()` 按设计折叠整条事件流，慢是应该的；它位于读取的**最后**一道回退上：`control-store.ts:743` 在 `loadProjection` 无法返回有效投影时才回退到 `eventStore.replay()`。**注意：后续实测更正了这一条的归因**——秒级读数并非由这条回退产生（见下文本节末的分解实验）。
+2. **`replay()` 随历史线性增长，10,000 事件约 9.3 秒（n=1）。** `replay()` 按设计折叠整条事件流，慢是应该的；它位于读取的**最后**一道回退上：`control-store.ts` 在 `loadProjection` 无法返回有效投影时才回退到 `eventStore.replay()`。
+   **归因更正（就地写全，因为它原先的更正只存在于一个未合并的分支上）**：秒级读数**不是**这条回退造成的。PR #244 的分解实验表明，投影陈旧时 `snapshot()` 走的是「投影 + `applyTail`」（计数器验证 `projectionHits=1, snapshotFallbacks=0`），真正的秒级来自读取路径**无条件先取回并解析整条事件流**，然后才用投影做增量折叠。因此下面第 2 条「建议新增 P0」的修法目标也随之改变：要修的是**读取路径的 O(历史) 输入**，不是回退代价。完整证据链见拆分文档 §6.3–§6.5。
 
 **这条把 §2.6 的「秒级放大」定位到一个具体机制**：不是每次工具调用都慢，而是**长 Run 上的读取路径慢**。因此：
 
@@ -840,12 +848,14 @@ Tool execute
 
 **回退代价的端到端实测**（10,000 事件，走真实 GUI 读取路径 `DebugDataService.getRun`，冷缓存 = 重启后的 GUI）：
 
-| 条件 | projection.json | getRun |
-|---|---:|---:|
-| 冷缓存，投影存在 | 4.6 KB | **211.6ms** |
-| 冷缓存，投影**被删除** | absent | **2095.8ms** |
+| 条件 | projection.json | getRun | 该投影的 lastSeq |
+|---|---:|---:|---:|
+| 冷缓存，投影存在 | 4.6 KB | **211.6ms** | **1**（见下方更正） |
+| 冷缓存，投影**被删除** | absent | **2095.8ms** | — |
 
-投影文件只有 **4.6 KB**，但它的存在与否让一次读取相差 **10 倍（0.21s → 2.1s）**。
+**更正：上表把「4.6 KB」和本页 §7.2 的「28.7 KB」当成同一个名义运行，两者并不是。**28.7 KB 是 10,000 事件长 Run 的当前投影；4.6 KB 那一份封在**很早就结束的 seq 上**（后续复测直接读到 `lastSeq = 1`），也就是 211ms 那一格根本不是「投影陈旧但仍可用」的情形，而接近「投影几乎为空」。因此「一个 4.6KB 的文件决定读取是 0.21s 还是 2.1s」这句话把**文件大小**当成了自变量——真正的自变量是**投影的时效**，而同一份 4.6KB 文件在两种时效下并不等价。
+
+**正确的三点时序**（同一路径、10,001 事件，拆分文档 §6.4 / §6.5）：投影陈旧 **1647.9ms**、回合边界屏障后 **223.3ms**、投影被删除 **1846.0ms**。真实时序档才是复现基线；上表的 211.6ms **不可复现**：探针未入库，且没有记录每组的 `lastSeq`、屏障状态与是否冷缓存。要重新得到它，按拆分文档 §6.5 的方法记录这四个字段，并把探针提交为 `scripts/`。
 
 **补充：真实时序三点已补齐，且归因被推翻**（拆分文档 §6.4）。上表缺的是"快速路径刚写完、屏障尚未补投影"这一档，而它才是使用者实际遇到的时序。10,001 事件下走同一条 GUI 冷读路径：投影陈旧 **1647.9ms**、回合边界屏障后 **223.3ms**、投影被删除 **1846.0ms**。
 
@@ -993,16 +1003,20 @@ CI 应断言次数上限，不只断言最终耗时，避免机器负载掩盖�
 每个样本必须同时报告：
 
 ```text
-command_ms
-framework_ms
+command_ms          # 工具体本身，含它触发的 durable 提交
+wrapper_ms          # 计时包装器的入口开销 + 调用方的 scheduled 埋点
 total_ms
-control_commits
+control_commits     # 同步 ControlStore 提交次数（run 锁 + 事件追加 + fsync）
 event_fsyncs
 projection_writes
 hash_bytes
 snapshot_reads
 artifact_reads
+n                   # 该行的样本数；n<20 时不得称之为 p95
+dropped             # 环形缓冲淘汰的样本数；非零即告警
 ```
+
+**两处口径必须写在报告里**：`wrapper_ms` 不是框架调度开销（两处埋点都在计时包装器内，测不到 agent loop 的 dispatch），它是包装器自身的入口成本；`n` 与 `dropped` 必须与分位数同行输出，因为 nearest-rank 下 `n=8` 的 p95 **就是最大值**，而缓冲淘汰会让分位数只描述后缀。
 
 测试失败时应直接指出是哪一个阶段超出预算，不能只输出一个总耗时。
 
