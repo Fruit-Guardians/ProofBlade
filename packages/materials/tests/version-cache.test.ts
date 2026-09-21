@@ -202,29 +202,27 @@ test("a same-size rewrite is not hidden by the revision cache", async () => {
     assert.equal(cache.buildCount(), 2, "the snapshot must be rebuilt from the new bytes");
     assert.equal(after.skills.length, before.skills.length);
 
-    // Scope, and a closed dead end. The stronger assertion -- that the rebuilt
-    // snapshot carries a NEW skill contentHash -- still fails. What was
-    // established while chasing it:
+    // Open lead, sharpened -- this is where the trail currently ends.
     //
-    //   * versionRevision() does report a new revision and the snapshot is
-    //     genuinely rebuilt (asserted above)
-    //   * ProofBladeSkillRegistry.cacheStats() showed parses=2, hits=0, so the
-    //     registry DID re-parse rather than serve its own memo, and resetCache()
-    //     does not change the outcome
-    //   * NodeExecutionEnv.readTextFile() does return the NEW bytes after this
-    //     rewrite -- checked directly, both on a reused env and a fresh one -- so
-    //     the execution environment is not caching the read
-    //   * the Pi skill loader itself holds no cache: it reads only through
-    //     env.readTextFile and returns per call
+    // Asserting that the rebuilt snapshot carries a NEW skill contentHash fails
+    // HERE, and the failure is specific to this path:
     //
-    // So the stale content is not coming from the env read, and the loader has
-    // nothing to hold it, yet the re-parse still yields the old hash. That
-    // contradiction is unresolved. Ruling out the two obvious candidates is
-    // where this stopped, and it is recorded rather than papered over with a
-    // cause that was not established. Driving loadSkills() standalone to narrow
-    // it further is blocked from here: the vendored `ignore` dependency rejects
-    // the absolute paths the loader passes it unless the call goes through
-    // ProofBlade's own portableSkillEnv wrapper.
+    //   * calling ProofBladeSkillRegistry.load(root) directly, before and after
+    //     the same rewrite, DOES return a new contentHash (60e06da2 -> e21688fe
+    //     in a standalone probe) with cacheStats() reporting parses=2, hits=0
+    //   * through this snapshot, the revision moves and the snapshot is rebuilt,
+    //     yet contentHash comes back identical
+    //
+    // So the registry is not stale on its own; something about how the snapshot
+    // reaches it is. The snapshot's `skills` entries carry only name and
+    // contentHash -- no path -- so which file it actually read could not be
+    // confirmed from here, and that is where this stopped.
+    //
+    // Two candidates were ruled out and are recorded so the next attempt need
+    // not redo them: NodeExecutionEnv.readTextFile() returns the new bytes after
+    // this rewrite (reused and fresh env alike, checked directly), and the
+    // vendored Pi skill loader holds no cache of its own -- it reads only through
+    // env.readTextFile and returns per call.
   } finally {
     await rm(root, { recursive: true, force: true });
   }

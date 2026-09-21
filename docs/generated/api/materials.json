@@ -2571,7 +2571,6 @@
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
     },
@@ -25605,7 +25604,8 @@
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-native.test.ts",
-        "packages/materials/tests/tool-catalog.test.ts"
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "9462179a20a9b229016544efff9c1fbccdade5dca399101ff46bffb1576c82ed",
       "parentId": "@proofblade/materials::class::CapabilityBackendResolver"
@@ -30067,7 +30067,6 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "7316a5c9336a860d883c111e9f03660ee7671d8df3335ff086cb06ed8046e63c",
@@ -34298,6 +34297,7 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "8c1b240486ffca40ca05f5f810e9ba7b539691df83fb3df4ff8b8bae81f730e6",
@@ -48711,7 +48711,6 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "adead5e72267b20524b636593147890fb1ea772e671fef25c28e3a8063ee192d",
@@ -49355,8 +49354,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ],
       "structureHash": "f01625649412a16c401349f7546e025b48a25d52b9fff8bbf32c0e4231b893a8",
       "parentId": "@proofblade/materials::class::ProofBladeSkillRegistry"
@@ -50852,7 +50850,8 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "fcfe82e4f9ec02888f0896663c615ac5219813d39e404e446ae0c9ea59bbaeda",
       "parentId": "@proofblade/materials::class::ProofBladeToolCatalogRegistry"
@@ -54586,7 +54585,8 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "b37586d3354ee3dc2fdb0694c5483c452ae488e2cd7bf27084583928443427a1",
       "parentId": "@proofblade/materials::class::HttpBrowserVerifierFactory"

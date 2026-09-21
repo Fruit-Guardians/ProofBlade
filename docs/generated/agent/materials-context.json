@@ -1781,7 +1781,6 @@
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
     },
@@ -16674,7 +16673,8 @@
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-native.test.ts",
-        "packages/materials/tests/tool-catalog.test.ts"
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -20178,7 +20178,6 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -23182,6 +23181,7 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -34293,7 +34293,6 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -34798,8 +34797,7 @@
       "moduleHash": "fa18069a76b0bfb3068f875d08039f9eb25e0ad0cee414b530b8fab892727941",
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ]
     },
     {
@@ -35897,7 +35895,8 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -38358,7 +38357,8 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
