@@ -139,7 +139,7 @@
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
-    "src/runtime/version.ts": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+    "src/runtime/version.ts": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
@@ -3032,7 +3032,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 13,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": []
     },
     {
@@ -3046,7 +3046,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 16,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": []
     },
     {
@@ -3060,7 +3060,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 12,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": []
     },
     {
@@ -3074,7 +3074,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 15,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": []
     },
     {
@@ -3088,7 +3088,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 14,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": []
     },
     {
@@ -6753,7 +6753,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 87,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ]
@@ -6769,7 +6769,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 25,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ]
@@ -14361,7 +14361,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 53,
-      "moduleHash": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+      "moduleHash": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
       "testRefs": []
     },
     {
@@ -17846,6 +17846,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -28752,6 +28753,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -33075,6 +33077,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/update-evaluation-gates.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
     },
@@ -35259,6 +35262,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -35684,6 +35688,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -35729,6 +35734,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -35789,6 +35795,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },

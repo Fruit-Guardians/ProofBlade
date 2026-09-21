@@ -145,8 +145,26 @@ async function versionRevision(projectRoot: string, configPath: string, revision
 }
 
 /**
- * Revision of one file: reuse the cached content digest while `mtimeMs + size`
- * are unchanged, otherwise re-hash the bytes.
+ * Revision of one file: reuse the cached content digest while the file's
+ * identity and metadata are unchanged, otherwise re-hash the bytes.
+ *
+ * The key is `path | ino | size | mtimeMs | ctimeMs`, and each part earns its
+ * place. `size + mtimeMs` alone is not enough: an in-place rewrite that keeps
+ * the byte length and then restores the timestamp -- which any writer can do
+ * with `utimes` -- reproduces the old key exactly, so the stale digest was
+ * reused and a caller could be handed a RunVersionSnapshot built from content
+ * that no longer exists.
+ *
+ * `ctimeMs` closes that: the kernel updates it on any content or metadata
+ * change and ordinary writers cannot set it, so it advances even when `mtimeMs`
+ * is put back. `ino` distinguishes a replacement file (atomic rename, a common
+ * way to publish config) from an in-place write of the same size. Both are
+ * fields of the same `stat()`, so the fast path stays a fast path.
+ *
+ * This is not a substitute for hashing. An actor who can write content and hold
+ * ctime still is out of scope, and could equally rewrite the cached digest; the
+ * goal is to make staleness from ordinary and near-miss writes impossible, not
+ * to detect a privileged adversary.
  *
  * @param file - absolute path.
  * @param revisions - cache to consult and update.
@@ -157,7 +175,7 @@ async function fileRevision(file: string, revisions: Map<string, string>, maxEnt
   try {
     const stats = await fs.stat(file);
     if (!stats.isFile()) return undefined;
-    const key = `${file}|${stats.size}|${stats.mtimeMs}`;
+    const key = `${file}|${stats.ino}|${stats.size}|${stats.mtimeMs}|${stats.ctimeMs}`;
     const cached = revisions.get(key);
     if (cached !== undefined) return cached;
     const digest = sha256(await fs.readFile(file, "utf8"));
