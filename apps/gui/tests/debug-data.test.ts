@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, sep } from "node:path";
 import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import { taskWorkspaceDir, taskWorkspaceRoot } from "../src/task-workspace.js";
 import { JsonlControlStore, projectionHash, RunEventIngress } from "@proofblade/materials";
@@ -386,8 +386,13 @@ test("an ordinary conversation never stages a workspace while an attachment task
 
     // The staging root sits beside the runs directory, never inside it: a
     // pre-existing run directory would make JsonlControlStore treat the staged
-    // task as an already-created Run.
-    assert.equal(taskWorkspaceRoot(runsRoot), join(root, ".proofblade-workspaces"));
+    // task as an already-created Run. Asserting equality with
+    // `join(root, ".proofblade-workspaces")` restated the helper's own
+    // definition, so dropping `dirname` from the helper left it green; this
+    // asserts the constraint the comment claims.
+    assert.equal(taskWorkspaceRoot(runsRoot).startsWith(`${runsRoot}${sep}`), false, "the staging root must not be inside the runs directory");
+    assert.equal(isAbsolute(taskWorkspaceRoot(runsRoot)), true, "the staging root must be absolute, not a run-relative fragment");
+    assert.equal(await exists(join(runsRoot, ".proofblade-workspaces")), false, "nothing may be staged inside the runs root");
   } finally {
     await data?.close?.().catch(() => undefined);
     await rm(root, { recursive: true, force: true });
@@ -402,6 +407,44 @@ test("deletes an idle coding conversation and rejects active deletion", async ()
     await data.createConversation({ runId, title: "待删除", workspacePath: root });
     await data.deleteConversation(runId);
     await assert.rejects(() => data.getRun(runId), /ENOENT|no such file/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("deleting a conversation also removes the staged workspace it owns", async () => {
+  // A conversation with attachments stages a copy of them beside the runs root.
+  // Deleting only `runs/<runId>` left those bytes behind with nothing pointing at
+  // them: not reachable from the GUI, not counted anywhere, not reaped.
+  //
+  // The staging is driven through `startTask`, which also starts a lane, so the
+  // service is closed first -- `deleteConversation` refuses an active
+  // conversation, and that guard is the subject of the test above.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-delete-staged-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runsRoot = join(root, config.storage.runsDir);
+    const attachment = join(root, "input.txt");
+    await writeFile(attachment, "challenge input\n", "utf8");
+    const runId = "CHAT-DELETE-STAGED";
+    await data.startTask({
+      runId,
+      objective: "verify the attachment",
+      workspacePath: root,
+      attachmentPaths: ["input.txt"],
+      verificationCommand: "echo ok",
+      mode: "auto",
+      maxTurns: 1,
+    });
+    const staged = taskWorkspaceDir(runsRoot, runId);
+    assert.equal(await exists(staged), true, "the task must have staged a workspace");
+    assert.equal(await exists(join(staged, "attachments", "input.txt")), true, "the staged copy must be there to leak");
+
+    await data.close();
+    await data.deleteConversation(runId);
+
+    assert.equal(await exists(join(runsRoot, runId)), false, "the Run directory must be gone");
+    assert.equal(await exists(staged), false, "the staged workspace must be gone with it");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

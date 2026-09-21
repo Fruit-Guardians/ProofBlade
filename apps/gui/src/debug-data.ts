@@ -39,7 +39,7 @@ import {
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
 import { assertMaterialsRuntime, type RuntimeShapeReport } from "./runtime-shape.js";
-import { stageTaskWorkspace, type TaskWorkspaceInput } from "./task-workspace.js";
+import { stageTaskWorkspace, taskWorkspaceDir, type TaskWorkspaceInput } from "./task-workspace.js";
 import type {
   ActiveRunInfo,
   AssistantTurnDebug,
@@ -497,6 +497,12 @@ export class DebugDataService {
     const snapshot = await this.services.control.snapshot(runId);
     if (runKind(snapshot.task) !== "chat") throw new Error("只能删除普通对话，Fixture Run 请保留用于复盘");
     await rm(join(this.services.runsRoot, runId), { recursive: true, force: false });
+    // A conversation with attachments owns a staged workspace beside the runs
+    // root. Deleting the Run without it leaked the staged copy of every
+    // attachment -- up to the per-task byte caps -- with nothing left pointing at
+    // it. `force: true` because a conversation that never staged has no
+    // directory here, and that is not an error.
+    await rm(taskWorkspaceDir(this.services.runsRoot, runId), { recursive: true, force: true });
     this.runListCache.delete(runId);
     this.runDetailCache.delete(runId);
   }
