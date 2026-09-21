@@ -1839,9 +1839,19 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
         // Archival is the transport for a large result, not a precondition for
         // reading a file. When it fails the model already holds the content, so
         // the read must stay successful rather than turning a completed file read
-        // into a failed solve. The failure is reported, not swallowed, and the
-        // notice tells the model the content carries no citable artifact id.
-        context.observerDiagnostics?.record("artifact-observation", pipeline.runId, error);
+        // into a failed solve.
+        //
+        // What the failure leaves behind, stated precisely so nobody has to infer
+        // it: the model gets the content plus `UNARCHIVED_READ_NOTICE`, and the
+        // tool result carries `details.archivalFailed` so the failure is visible
+        // in the session record and the debug view. What it does NOT get is a
+        // ControlStore event — deliberately. An Observation is a claim about a
+        // registered Artifact, and there is no Artifact here; recording one would
+        // mean an observation that cites nothing. The event log therefore shows
+        // the read's effect but no observation for it, and the diagnostic sink
+        // (in-memory, per lane) is the operator-facing record of why.
+        const sink = context.observerDiagnostics;
+        if (sink) sink.record("artifact-observation", pipeline.runId, error);
         if (complete && context.completedReads) context.completedReads.set(pathKey, { artifactId: "", contentHash, bytes: Buffer.byteLength(visible) });
         return {
           ...result,

@@ -140,10 +140,55 @@ test("[contract:archival-failure-keeps-read-successful] a failed archival return
   assert.match(text, /read unarchived/, "the model must be told the content carries no citable artifact id");
   assert.doesNotMatch(text, /artifact storage unavailable/, "the raw storage error must not leak into model content");
 
+  // The failure is durable on the tool result itself: this is what a session
+  // reader or the debug view sees, since the failure deliberately produces no
+  // Observation (an Observation is a claim about a registered Artifact).
+  const details = result.details as { archivalFailed?: boolean; artifactId?: string; observationId?: string } | undefined;
+  assert.equal(details?.archivalFailed, true, "the tool result must carry the failure, not just the model notice");
+  assert.equal(details?.artifactId, undefined, "there is no artifact to cite");
+  assert.equal(details?.observationId, undefined, "an observation for a failed archival would cite nothing");
+
   // And the outage is visible to an operator rather than swallowed.
   assert.equal(diagnostics.total(), 1);
   assert.equal(diagnostics.failures()[0]?.runId, "D2-FAIL-1");
   assert.match(diagnostics.failures()[0]?.message ?? "", /artifact storage unavailable/);
+});
+
+test("a dispatch failure leaves no orphan artifact file behind", async () => {
+  // `putTextWithContent` stages the file first and then registers it. If the
+  // registration fails, the file is an orphan: no event references it, so
+  // nothing can find it and no reaper knows it exists. It must be removed.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-d2-orphan-"));
+  const runId = "D2-ORPHAN-1";
+  try {
+    const services = createServices(root, config);
+    await services.control.createRun(runId, { ...demoTask(runId, root, config), mode: "coding_assistant", target_kind: "unknown", verification: { kind: "reproduction", required_reproductions: 0 } });
+
+    const realDispatch = services.control.dispatch.bind(services.control);
+    let staged = 0;
+    const realStage = services.artifacts.stageTextWithContent.bind(services.artifacts);
+    services.artifacts.stageTextWithContent = (async (...args: Parameters<typeof realStage>) => {
+      staged += 1;
+      return await realStage(...args);
+    }) as typeof services.artifacts.stageTextWithContent;
+    services.control.dispatch = (async () => { throw new Error("dispatch refused"); }) as typeof services.control.dispatch;
+
+    await assert.rejects(
+      services.artifacts.putTextWithContent(runId, "orphan candidate\n", { filename: "orphan.txt", sensitivity: "public" }),
+      /dispatch refused/,
+    );
+
+    assert.equal(staged, 1, "the file must have been staged before the failure");
+    const directory = join(root, config.storage.runsDir, runId, "artifacts");
+    const left = await readdir(directory).catch(() => [] as string[]);
+    assert.deepEqual(left, [], "a staged file with no registration must not survive the failure");
+
+    services.control.dispatch = realDispatch;
+    const events = await services.control.events(runId);
+    assert.equal(events.filter((event) => event.type === "artifact_registered").length, 0, "the run must hold no artifact event");
+  } finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
 });
 
 test("a healthy archival still reports an artifact id and no diagnostics", async () => {

@@ -75,27 +75,41 @@ export class ProofBladeSkillRegistry {
     const root = await canonicalOrResolved(projectRoot);
     const dirList = Array.isArray(skillsDirs) ? skillsDirs : [skillsDirs];
     const requestedDirs = dirList.map((dir) => (isAbsolute(dir) ? dir : resolve(root, dir)));
+    const key = cacheKey(root, dirList);
     // Parsing every skill's front matter costs ~30ms on this tree and the result
-    // only changes when a SKILL.md appears, disappears or changes, so the parse
+    // only changes when a skill file appears, disappears or changes, so the parse
     // is memoized on a cheap structural revision. Both the version snapshot and
     // every lane creation load this registry.
     const revision = await skillTreeRevision(requestedDirs);
-    const cached = skillRegistryCache.get(cacheKey(root, dirList));
-    if (cached && cached.revision === revision && cached.projectRoot === root) {
+    const cached = skillRegistryCache.get(key);
+    if (cached && cached.projectRoot === root && cached.revision === revision) {
+      // Re-insert so eviction is least-recently-*used*, not first-in: a hit is a
+      // use, and a plain FIFO evicts exactly the entries being reused.
+      skillRegistryCache.delete(key);
+      skillRegistryCache.set(key, cached);
       skillRegistryHits += 1;
       return cached.registry;
     }
-    const registry = await ProofBladeSkillRegistry.read(root, requestedDirs);
-    skillRegistryParses += 1;
-    const key = cacheKey(root, dirList);
-    skillRegistryCache.delete(key);
-    skillRegistryCache.set(key, { revision, projectRoot: root, registry });
-    while (skillRegistryCache.size > SKILL_REGISTRY_CACHE_LIMIT) {
-      const oldest = skillRegistryCache.keys().next().value;
-      if (oldest === undefined) break;
-      skillRegistryCache.delete(oldest);
-    }
-    return registry;
+    // Single-flight: concurrent loads of the same tree (the version snapshot and
+    // every lane creation at startup) must walk and parse once between them, not
+    // once each. Only the losers wait; the winner removes its own entry.
+    const inFlight = skillRegistryLoads.get(key);
+    if (inFlight) return await inFlight;
+    const load = ProofBladeSkillRegistry.read(root, requestedDirs).then((registry) => {
+      skillRegistryParses += 1;
+      skillRegistryCache.delete(key);
+      skillRegistryCache.set(key, { revision, projectRoot: root, registry });
+      while (skillRegistryCache.size > SKILL_REGISTRY_CACHE_LIMIT) {
+        const oldest = skillRegistryCache.keys().next().value;
+        if (oldest === undefined) break;
+        skillRegistryCache.delete(oldest);
+      }
+      return registry;
+    }).finally(() => {
+      skillRegistryLoads.delete(key);
+    });
+    skillRegistryLoads.set(key, load);
+    return await load;
   }
 
   /** Parse the skill roots without consulting the cache. */
@@ -216,6 +230,8 @@ export class ProofBladeSkillRegistry {
  */
 const SKILL_REGISTRY_CACHE_LIMIT = 8;
 const skillRegistryCache = new Map<string, { revision: string; projectRoot: string; registry: ProofBladeSkillRegistry }>();
+/** Loads still running, so concurrent callers share one walk and one parse. */
+const skillRegistryLoads = new Map<string, Promise<ProofBladeSkillRegistry>>();
 let skillRegistryParses = 0;
 let skillRegistryHits = 0;
 
@@ -247,13 +263,57 @@ function cacheKey(root: string, dirList: readonly string[]): string {
  * @returns a digest that changes whenever the skill set or any skill file does.
  */
 async function skillTreeRevision(roots: readonly string[]): Promise<string> {
-  const entries: string[] = [];
-  for (const root of roots) await collectSkillFiles(root, entries);
-  entries.sort();
-  return sha256(entries.join("\n"));
+  return sha256((await collectSkillFiles(roots)).join("\n"));
 }
 
-async function collectSkillFiles(directory: string, into: string[]): Promise<void> {
+/**
+ * Every file the skill loaders derive their result from.
+ *
+ * This is the single definition of "the skill input set", shared by the registry
+ * memo's revision and by the version snapshot (`runtime/version.ts`), because the
+ * two caches cover the same tree and a narrower key in either one silently
+ * serves stale content.
+ *
+ * The discovery rules mirror `loadSkills` from
+ * `@earendil-works/pi-agent-core`, which the registry calls:
+ *
+ * - every root contributes `SKILL.md` files at any depth;
+ * - the **first** root also contributes its direct `*.md` files, because
+ *   `loadSkills` is documented to treat those as skills too. The registry then
+ *   drops any skill whose owner index is > 0, which is why only the first root
+ *   gets them — but the *walker* has to collect them for the first root or a new
+ *   `skills/<name>.md` would not move the revision.
+ *
+ *   Measured caveat: on Windows the upstream loader does not actually read those
+ *   files. `NodeExecutionEnv` reports absolute backslash paths, so the loader's
+ *   own `relativeEnvPath(root, path)` fails to strip the root prefix and the
+ *   `ignore` package rejects the resulting absolute path; the read is skipped as
+ *   an empty result. Collecting them anyway keeps the revision correct on the
+ *   platforms where the loader does read them, and costs only a re-parse where it
+ *   does not. The same quirk is why `.gitignore` rules inside a skill root have
+ *   no effect on Windows.
+ * - hidden entries and `node_modules` are not descended into, matching the
+ *   loader's pruning;
+ * - directory symlinks are followed (`Dirent.isDirectory()` is false for them,
+ *   yet the loader recurses by entry kind), so they are normalized with
+ *   `stat()` rather than skipped;
+ * - `.gitignore` / `.ignore` / `.fdignore` are included wherever they appear.
+ *   This is deliberately conservative: the loader consults them to prune the
+ *   walk, and reproducing its matcher here would be a second implementation of
+ *   the `ignore` package. Including the rule files themselves means a changed
+ *   rule always moves the revision, which is the safe direction — a false
+ *   invalidation costs one re-parse, a missed one serves a stale catalog.
+ *
+ * @param roots - absolute skill root directories, in precedence order.
+ * @returns `path \0 ino \0 size \0 mtimeMs \0 ctimeMs` entries, sorted.
+ */
+export async function collectSkillFiles(roots: readonly string[]): Promise<string[]> {
+  const entries: string[] = [];
+  for (const [index, root] of roots.entries()) await walkSkillRoot(root, index === 0, entries);
+  return entries.sort();
+}
+
+async function walkSkillRoot(directory: string, isFirstRoot: boolean, into: string[]): Promise<void> {
   let listing: Dirent[];
   try {
     listing = await readdir(directory, { withFileTypes: true });
@@ -263,20 +323,38 @@ async function collectSkillFiles(directory: string, into: string[]): Promise<voi
     return;
   }
   for (const entry of listing) {
-    const path = resolve(directory, entry.name);
-    if (entry.isDirectory()) {
-      await collectSkillFiles(path, into);
+    if (isSkillInput(entry.name, isFirstRoot)) {
+      const path = resolve(directory, entry.name);
+      try {
+        const stats = await stat(path);
+        if (stats.isFile()) into.push(`${path}\u0000${stats.ino}\u0000${stats.size}\u0000${stats.mtimeMs}\u0000${stats.ctimeMs}`);
+        else if (stats.isDirectory()) await walkSkillRoot(path, isFirstRoot, into);
+      } catch {
+        // Raced with a deletion, or a broken symlink; the next load recomputes.
+      }
       continue;
     }
-    if (entry.name !== "SKILL.md") continue;
+    // Hidden entries and `node_modules` are pruned before the ignore-file test so
+    // a rule file is still collected: it is an input to the walk even though it
+    // is never descended into.
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    const path = resolve(directory, entry.name);
     try {
       const stats = await stat(path);
-      into.push(`${path}\u0000${stats.ino}\u0000${stats.size}\u0000${stats.mtimeMs}\u0000${stats.ctimeMs}`);
+      if (stats.isDirectory()) await walkSkillRoot(path, isFirstRoot, into);
     } catch {
-      // Raced with a deletion; the next load recomputes the revision.
+      continue;
     }
   }
 }
+
+function isSkillInput(name: string, isFirstRoot: boolean): boolean {
+  if (name === "SKILL.md") return true;
+  if (SKILL_IGNORE_FILES.has(name)) return true;
+  return isFirstRoot && name.endsWith(".md");
+}
+
+const SKILL_IGNORE_FILES = new Set([".gitignore", ".ignore", ".fdignore"]);
 
 async function canonicalOrResolved(path: string): Promise<string> {
   try {

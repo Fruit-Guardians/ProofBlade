@@ -6,7 +6,7 @@ import type { RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { CONTEXT_COMPILER_VERSION, PROOFBLADE_STANDING_INSTRUCTIONS } from "../context/compiler.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
-import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { ProofBladeSkillRegistry, collectSkillFiles } from "../skills/registry.js";
 import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import { solverToolContractHash } from "./solver-tools.js";
 
@@ -146,10 +146,12 @@ async function versionRevision(projectRoot: string, configPath: string, revision
 }
 
 /**
- * Every `SKILL.md` the version snapshot's skill catalog is derived from.
+ * Every file the version snapshot's skill catalog is derived from.
  *
- * This must match what `ProofBladeSkillRegistry.load()` actually reads, and the
- * first version did not: it walked only `skills/` and only one level deep, while
+ * The input set is defined once, by the registry, because the registry memo and
+ * this snapshot cache cover the same tree: a narrower key in either one serves
+ * stale content while claiming to describe the current catalog. The first
+ * version of this function walked only `skills/` and only one level deep, while
  * the registry's default roots are `["skills", "skills-library/ctf-skills"]` and
  * the loader recurses. The vendored tree holds most of the catalog (11 of 13
  * `SKILL.md` files in this repository), so a long-lived process would keep
@@ -157,39 +159,12 @@ async function versionRevision(projectRoot: string, configPath: string, revision
  * `run_started.versionSnapshot.skillCatalogHash` would describe the pre-pull
  * catalog while the lanes used the live one.
  *
- * Recursion and the root list are duplicated from the registry rather than
- * imported to keep this module free of a cycle (the registry imports this one).
- * Both are asserted against each other in version-cache.test.ts.
- *
  * @param root - project root.
- * @returns absolute `SKILL.md` paths, sorted.
+ * @returns absolute input file paths, sorted.
  */
 export async function skillInputFiles(root: string): Promise<string[]> {
-  const found: string[] = [];
-  for (const skillsRoot of [resolve(root, "skills"), resolve(root, "skills-library", "ctf-skills")]) {
-    await collectSkillFiles(skillsRoot, found);
-  }
-  return found.sort();
-}
-
-async function collectSkillFiles(directory: string, into: string[]): Promise<void> {
-  let listing: Dirent[];
-  try {
-    listing = await fs.readdir(directory, { withFileTypes: true });
-  } catch {
-    // A missing root contributes nothing, matching the registry's treatment of
-    // an absent skills directory as an empty catalog.
-    return;
-  }
-  for (const entry of listing) {
-    const path = resolve(directory, entry.name);
-    if (entry.isDirectory()) {
-      await collectSkillFiles(path, into);
-      continue;
-    }
-    if (entry.name !== "SKILL.md") continue;
-    into.push(path);
-  }
+  const roots = [resolve(root, "skills"), resolve(root, "skills-library", "ctf-skills")];
+  return (await collectSkillFiles(roots)).map((entry) => entry.slice(0, entry.indexOf("\u0000")));
 }
 
 /**

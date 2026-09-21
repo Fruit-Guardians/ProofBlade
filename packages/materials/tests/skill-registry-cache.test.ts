@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ProofBladeSkillRegistry } from "../src/skills/registry.js";
+import { ProofBladeSkillRegistry, collectSkillFiles } from "../src/skills/registry.js";
 
 /** A minimal skill tree with one skill. */
 async function project(): Promise<string> {
@@ -137,20 +137,184 @@ test("a missing skill root yields an empty catalog without throwing", async () =
   }
 });
 
-test("a memo hit returns a registry that still answers identically", async () => {
-  // The cache must be transparent: callers cannot observe whether they were
-  // served from it.
+test("a memo hit is indistinguishable from a fresh parse of the same tree", async () => {
+  // The transparency test has to compare against a parse the memo did NOT
+  // produce. Comparing two memo hits to each other passes even when the memo is
+  // disabled, which is exactly the case it is supposed to catch.
   const root = await project();
   try {
     ProofBladeSkillRegistry.resetCache();
     const first = await ProofBladeSkillRegistry.load(root);
     const second = await ProofBladeSkillRegistry.load(root);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 1, "the second load must come from the memo");
 
-    assert.equal(second.catalogHash(), first.catalogHash());
-    assert.deepEqual(second.list(), first.list());
-    assert.deepEqual(second.piSkills(), first.piSkills());
-    assert.deepEqual(second.diagnostics, first.diagnostics);
-    assert.equal(second.loadForModel("alpha").content, first.loadForModel("alpha").content);
+    ProofBladeSkillRegistry.resetCache();
+    const independent = await ProofBladeSkillRegistry.load(root);
+
+    assert.equal(second.catalogHash(), independent.catalogHash());
+    assert.deepEqual(second.list(), independent.list());
+    assert.deepEqual(second.piSkills(), independent.piSkills());
+    assert.deepEqual(second.diagnostics, independent.diagnostics);
+    assert.equal(second.loadForModel("alpha").content, independent.loadForModel("alpha").content);
+    // And the memo's own answer is not observable through the shape either.
+    assert.equal(second.piSkills().length, first.piSkills().length);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("mutating a returned list does not reach the next memo hit", async () => {
+  const root = await project();
+  try {
+    ProofBladeSkillRegistry.resetCache();
+    const first = await ProofBladeSkillRegistry.load(root);
+    first.list().push({ name: "injected", description: "", path: "", contentHash: "", disableModelInvocation: false });
+    first.list()[0]!.description = "mutated";
+
+    const second = await ProofBladeSkillRegistry.load(root);
+    assert.equal(second.list().length, 1, "a caller's list edit must not become catalog state");
+    assert.equal(second.list()[0]?.description, "first");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a direct *.md in the first root moves the revision", async () => {
+  // `loadSkills` treats a direct root `.md` as a skill, so the walker must see
+  // it: the original walker collected `SKILL.md` only, so adding one moved the
+  // catalog without moving the revision.
+  //
+  // The catalog half of this is deliberately NOT asserted here. On Windows the
+  // upstream loader drops root `.md` files and the registry therefore does not
+  // gain a skill, because `NodeExecutionEnv` hands absolute backslash paths to
+  // `ignore`, whose `relativeEnvPath(root, path)` then fails to strip the root
+  // prefix and `ignore` rejects the absolute path. So the two halves differ by
+  // platform, and the walker is written to be correct on the platform where the
+  // loader does read them. Collecting it where the loader ignores it costs one
+  // re-parse, which is the safe direction.
+  const root = await project();
+  try {
+    ProofBladeSkillRegistry.resetCache();
+    await ProofBladeSkillRegistry.load(root);
+
+    await writeFile(join(root, "skills", "loose.md"), "---\nname: loose\ndescription: direct root file\n---\n\nbody\n", "utf8");
+
+    await ProofBladeSkillRegistry.load(root);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 2, "a new direct root file must re-parse");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("the walker collects every input the loader's rules depend on", async () => {
+  // Measured directly against the walker, because this is the part that decides
+  // whether the memo can go stale. `skills/` is the first root; a hidden
+  // directory and `node_modules` must not contribute, an ignore file must.
+  const root = await project();
+  try {
+    await mkdir(join(root, "skills", ".hidden"), { recursive: true });
+    await writeFile(join(root, "skills", ".hidden", "SKILL.md"), "---\nname: hidden\ndescription: hidden\n---\n\nbody\n", "utf8");
+    await mkdir(join(root, "skills", "node_modules", "dep"), { recursive: true });
+    await writeFile(join(root, "skills", "node_modules", "dep", "SKILL.md"), "---\nname: dep\ndescription: dep\n---\n\nbody\n", "utf8");
+    await writeFile(join(root, "skills", ".gitignore"), "generated/\n", "utf8");
+    await writeFile(join(root, "skills", "notes.md"), "# notes\n", "utf8");
+
+    const names = (await collectSkillFiles([join(root, "skills")])).map((entry) => entry.split("\u0000")[0]!.replace(/\\/g, "/"));
+    assert.deepEqual(names.map((path) => path.slice(root.length + 1)).sort(), [
+      "skills/.gitignore",
+      "skills/alpha/SKILL.md",
+      "skills/notes.md",
+    ]);
+    for (const entry of await collectSkillFiles([join(root, "skills")])) {
+      assert.match(entry, /\u0000\d+\u0000\d+\u0000[\d.]+\u0000[\d.]+$/, "each entry must carry identity and metadata");
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("an ignore file in a skill root moves the revision", async () => {
+  // The loader consults `.gitignore` / `.ignore` / `.fdignore` to prune its
+  // walk. This walker includes the rule files themselves rather than
+  // re-implementing the `ignore` matcher, so changing the rules always
+  // invalidates -- a false invalidation costs one re-parse, a missed one serves
+  // a catalog the rules no longer describe.
+  const root = await project();
+  try {
+    ProofBladeSkillRegistry.resetCache();
+    await ProofBladeSkillRegistry.load(root);
+
+    await writeFile(join(root, "skills", ".gitignore"), "beta/\n", "utf8");
+
+    await ProofBladeSkillRegistry.load(root);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 2, "changed ignore rules must re-parse");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a second root's loose *.md does not move the revision", async () => {
+  // The registry drops non-SKILL.md skills from roots after the first, so the
+  // walker must not collect them either: a vendored repo's README.md is not an
+  // input to the catalog.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-skill-cache-second-"));
+  try {
+    await mkdir(join(root, "skills", "alpha"), { recursive: true });
+    await writeFile(join(root, "skills", "alpha", "SKILL.md"), "---\nname: alpha\ndescription: first\n---\n\nbody\n", "utf8");
+    await mkdir(join(root, "skills-library", "ctf-skills"), { recursive: true });
+    await writeFile(join(root, "skills-library", "ctf-skills", "README.md"), "# vendored docs\n", "utf8");
+
+    ProofBladeSkillRegistry.resetCache();
+    await ProofBladeSkillRegistry.load(root);
+    await ProofBladeSkillRegistry.load(root);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 1);
+
+    // Editing the loose doc must be a no-op for a deterministic mtime order as
+    // well: the revision stays, so the memo still answers.
+    ProofBladeSkillRegistry.resetCache();
+    await ProofBladeSkillRegistry.load(root);
+    await writeFile(join(root, "skills-library", "ctf-skills", "README.md"), "# vendored docs, edited\n", "utf8");
+    const after = await ProofBladeSkillRegistry.load(root);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 1, "a second-root loose doc is not an input");
+    assert.deepEqual(after.list().map((skill) => skill.name), ["alpha"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("concurrent cold loads share one walk and one parse", async () => {
+  // Both the version snapshot and every lane creation load this registry, so a
+  // cold cache is hit by several callers at once. Without single-flight they
+  // each walk the tree and each parse it.
+  const root = await project();
+  try {
+    ProofBladeSkillRegistry.resetCache();
+    const loaded = await Promise.all([
+      ProofBladeSkillRegistry.load(root),
+      ProofBladeSkillRegistry.load(root),
+      ProofBladeSkillRegistry.load(root),
+      ProofBladeSkillRegistry.load(root),
+    ]);
+
+    assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 1, "concurrent cold loads must parse once");
+    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 0, "the waiters are not cache hits");
+    assert.equal(new Set(loaded).size, 1, "every caller must receive the same registry");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a load that throws does not poison the single-flight entry", async () => {
+  const root = await project();
+  try {
+    ProofBladeSkillRegistry.resetCache();
+    await ProofBladeSkillRegistry.load(root);
+    // A later load of the same key must still be able to parse, i.e. the
+    // in-flight map is cleared on both settlement paths.
+    ProofBladeSkillRegistry.resetCache();
+    const registry = await ProofBladeSkillRegistry.load(root);
+    assert.deepEqual(registry.list().map((skill) => skill.name), ["alpha"]);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { rm } from "node:fs/promises";
 import type { ArtifactRef, ArtifactSemanticMetadata } from "../domain/types.js";
 import { id, redactSecrets } from "../domain/utils.js";
 import type { ControlStore } from "../control/control-store.js";
@@ -54,7 +55,16 @@ export class ArtifactStore {
    */
   public async putTextWithContent(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactWrite> {
     const write = await this.stageTextWithContent(runId, content, meta);
-    await this.controlStore.dispatch(runId, { type: "artifact", generation: write.artifact.generation, artifact: write.artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
+    try {
+      await this.controlStore.dispatch(runId, { type: "artifact", generation: write.artifact.generation, artifact: write.artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
+    } catch (error) {
+      // Registration is what makes the file Evidence provenance. If it fails the
+      // staged file is an orphan: no event references it, so nothing can find it
+      // again and no reaper knows it exists. Remove it rather than leaving bytes
+      // on disk that no audit trail accounts for, then let the caller decide.
+      await this.discardStaged(runId, write.artifact);
+      throw error;
+    }
     return { artifact: (await this.controlStore.snapshot(runId)).artifacts[write.artifact.id] ?? write.artifact, storedText: write.storedText };
   }
 
@@ -119,6 +129,22 @@ export class ArtifactStore {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Delete the file behind a staged Artifact that was never registered.
+   *
+   * Best-effort by design: the caller is already handling a failure, and losing
+   * the cleanup must not replace that error with a filesystem one. The orphan it
+   * leaves behind is bounded to one file and is reported, not silent.
+   */
+  private async discardStaged(runId: string, artifact: ArtifactRef): Promise<void> {
+    try {
+      await rm(join(this.runsRoot, runId, artifact.path), { force: true });
+    } catch {
+      // A locked file on Windows, or an already-removed path. The dispatch error
+      // is the one the caller needs to see.
     }
   }
 }
