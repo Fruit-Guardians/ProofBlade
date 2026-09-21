@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import type { Dirent } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
@@ -88,25 +88,28 @@ export interface RunVersionSnapshotCache {
 export function createCachedRunVersionSnapshot(
   projectRoot: string,
   config: ProofBladeConfig,
-  options: { configPath?: string; maxRevisionEntries?: number } = {},
+  options: { maxRevisionEntries?: number } = {},
 ): RunVersionSnapshotCache {
-  const configPath = options.configPath ?? "proofblade.config.json";
   const maxEntries = options.maxRevisionEntries ?? 64;
   if (!Number.isInteger(maxEntries) || maxEntries < 1) throw new Error("maxRevisionEntries must be a positive integer");
   /** Cache-key (file metadata) -> content revision; bounded so edits cannot grow it without limit. */
   const revisions = new Map<string, string>();
-  let current: { revision: string; promise: Promise<RunVersionSnapshot> } | undefined;
+  let current: { revision: string; promise: Promise<RunVersionSnapshot> } | undefined = undefined;
   let builds = 0;
 
   return {
     provider: async () => {
-      const revision = await versionRevision(projectRoot, configPath, revisions, maxEntries);
+      const revision = await versionRevision(projectRoot, config, revisions, maxEntries);
       if (current?.revision === revision) return await current.promise;
-      builds += 1;
       const promise = createRunVersionSnapshot(projectRoot, config);
       current = { revision, promise };
       try {
-        return await promise;
+        const snapshot = await promise;
+        // Counted after the build succeeds, not before: this is exposed as
+        // "how many times the snapshot was actually rebuilt", and a failed
+        // attempt that the next caller retries is not a rebuild of anything.
+        builds += 1;
+        return snapshot;
       } catch (error) {
         // Never cache a rejected build: one transient read failure must not
         // become a permanent one.
@@ -123,16 +126,28 @@ export function createCachedRunVersionSnapshot(
 /**
  * Content revision of every input the version snapshot is derived from.
  *
+ * Two kinds of input, and the distinction matters because the first version of
+ * this function confused them:
+ *
+ * - **Files on disk** whose contents the builder reads: `.mcp.json`,
+ *   `tool-catalog.json` and every skill input.
+ * - **Values from the already-parsed `config` object**: `runtime.piVersion` and
+ *   `modelProfiles.executor.thinkingLevel`. These are *not* read from
+ *   `proofblade.config.json` by the builder, and the GUI mutates the parsed
+ *   object at startup (`providerSettings.modelProfile()`), so hashing the file
+ *   keyed the cache on something the snapshot does not depend on while missing
+ *   the values it does. A caller that changed `thinkingLevel` in memory would
+ *   keep receiving a snapshot describing the previous one.
+ *
  * @param projectRoot - project root.
- * @param configPath - config path, relative to the root or absolute.
+ * @param config - the resolved config the builder will read.
  * @param revisions - per-file metadata cache, mutated in place.
  * @param maxEntries - capacity for that cache.
  * @returns a digest that changes whenever any input's content changes.
  */
-async function versionRevision(projectRoot: string, configPath: string, revisions: Map<string, string>, maxEntries: number): Promise<string> {
+async function versionRevision(projectRoot: string, config: ProofBladeConfig, revisions: Map<string, string>, maxEntries: number): Promise<string> {
   const root = resolve(projectRoot);
   const files = [
-    isAbsolute(configPath) ? configPath : resolve(root, configPath),
     resolve(root, ".mcp.json"),
     resolve(root, "tool-catalog.json"),
     ...await skillInputFiles(root),
@@ -142,6 +157,10 @@ async function versionRevision(projectRoot: string, configPath: string, revision
     const revision = await fileRevision(file, revisions, maxEntries);
     if (revision !== undefined) digests.push(`${file}:${revision}`);
   }
+  digests.push(`config:${sha256(canonicalJson({
+    piVersion: config.runtime.piVersion,
+    thinkingLevel: config.modelProfiles.executor.thinkingLevel ?? "off",
+  }))}`);
   return sha256(digests.join("\n"));
 }
 

@@ -73,8 +73,14 @@ export interface CreateServicesOptions {
   sessionRuntimeRequired?: boolean;
   /** Preserve fail-closed semantics when runtime.browserBroker has no token. */
   browserRuntimeRequired?: boolean;
-  /** Override the version-snapshot revision cache (config path, capacity). */
-  versionSnapshotOptions?: { configPath?: string; maxRevisionEntries?: number };
+  /**
+   * Override the version-snapshot revision cache capacity.
+   *
+   * There is no `configPath` here: the revision keys on the values the builder
+   * reads from the parsed `config`, not on the config file, so a path would have
+   * invited exactly the mismatch it used to cause.
+   */
+  versionSnapshotOptions?: { maxRevisionEntries?: number };
 }
 
 export function createServices(root: string, config: ProofBladeConfig, options: CreateServicesOptions | import("../effects/effect-journal.js").EffectFaultInjector = {}): AppServices {

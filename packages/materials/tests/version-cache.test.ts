@@ -103,20 +103,50 @@ test("adding a skill directory rebuilds the snapshot", async () => {
   }
 });
 
-test("editing the config file rebuilds the snapshot", async () => {
+test("a changed config value rebuilds the snapshot, and the file is not the input", async () => {
+  // The revision keys on the values the builder reads out of the *parsed*
+  // config, which is not the same thing as the config file. Keying on the file
+  // left a live mismatch: the GUI rewrites `config.modelProfiles.executor` at
+  // startup from provider settings, so a caller that changed the parsed config
+  // in memory kept receiving a snapshot describing the previous values.
   const root = await project();
   try {
-    const cache = createCachedRunVersionSnapshot(root, config);
-    await cache.provider();
-
-    await writeFile(join(root, "proofblade.config.json"), JSON.stringify({ ...config, runtime: { piVersion: "0.84.0" } }), "utf8");
-    // The provider is built from the config object it was handed, so assert on
-    // the rebuild and on the revision moving rather than on the new piVersion.
+    const mutable = { ...config, runtime: { ...config.runtime }, modelProfiles: { executor: { ...config.modelProfiles.executor } } } as ProofBladeConfig;
+    const cache = createCachedRunVersionSnapshot(root, mutable);
+    const first = await cache.provider();
+    assert.equal(first.piVersion, "0.83.0");
     const revisionBefore = cache.revision();
+
+    mutable.runtime.piVersion = "0.84.0";
+    const second = await cache.provider();
+
+    assert.equal(cache.buildCount(), 2, "a changed parsed config value must invalidate the cached snapshot");
+    assert.notEqual(cache.revision(), revisionBefore);
+    assert.equal(second.piVersion, "0.84.0", "the rebuilt snapshot must describe the value it was given");
+
+    // The file on disk was never touched, so the rebuild came from the value and
+    // not from metadata: this is the half the old key got wrong.
+    await writeFile(join(root, "proofblade.config.json"), JSON.stringify({ ...config, runtime: { piVersion: "9.9.9" } }), "utf8");
+    const third = await cache.provider();
+    assert.equal(cache.buildCount(), 2, "editing a config file the builder does not read must not rebuild");
+    assert.equal(third.piVersion, "0.84.0", "and it must certainly not change what the snapshot reports");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a changed thinking level rebuilds the snapshot", async () => {
+  const root = await project();
+  try {
+    const mutable = { ...config, runtime: { ...config.runtime }, modelProfiles: { executor: { ...config.modelProfiles.executor, thinkingLevel: "off" as const } } } as ProofBladeConfig;
+    const cache = createCachedRunVersionSnapshot(root, mutable);
     await cache.provider();
 
-    assert.equal(cache.buildCount(), 2, "a changed config file must invalidate the cached snapshot");
-    assert.notEqual(cache.revision(), revisionBefore);
+    mutable.modelProfiles.executor.thinkingLevel = "high";
+    const second = await cache.provider();
+
+    assert.equal(cache.buildCount(), 2);
+    assert.equal(second.thinkingLevel, "high");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
