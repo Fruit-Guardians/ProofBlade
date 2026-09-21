@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ProofBladeConfig } from "../src/config.js";
-import { createCachedRunVersionSnapshot, createRunVersionSnapshot } from "../src/runtime/version.js";
+import { createCachedRunVersionSnapshot, createRunVersionSnapshot, skillInputFiles } from "../src/runtime/version.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -201,6 +201,28 @@ test("a same-size rewrite is not hidden by the revision cache", async () => {
     assert.notEqual(cache.revision(), revisionBefore, "same-size different bytes must change the revision");
     assert.equal(cache.buildCount(), 2, "the snapshot must be rebuilt from the new bytes");
     assert.equal(after.skills.length, before.skills.length);
+
+    // Open lead, sharpened -- this is where the trail currently ends.
+    //
+    // Asserting that the rebuilt snapshot carries a NEW skill contentHash fails
+    // HERE, and the failure is specific to this path:
+    //
+    //   * calling ProofBladeSkillRegistry.load(root) directly, before and after
+    //     the same rewrite, DOES return a new contentHash (60e06da2 -> e21688fe
+    //     in a standalone probe) with cacheStats() reporting parses=2, hits=0
+    //   * through this snapshot, the revision moves and the snapshot is rebuilt,
+    //     yet contentHash comes back identical
+    //
+    // So the registry is not stale on its own; something about how the snapshot
+    // reaches it is. The snapshot's `skills` entries carry only name and
+    // contentHash -- no path -- so which file it actually read could not be
+    // confirmed from here, and that is where this stopped.
+    //
+    // Two candidates were ruled out and are recorded so the next attempt need
+    // not redo them: NodeExecutionEnv.readTextFile() returns the new bytes after
+    // this rewrite (reused and fresh env alike, checked directly), and the
+    // vendored Pi skill loader holds no cache of its own -- it reads only through
+    // env.readTextFile and returns per call.
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -287,4 +309,49 @@ test("the revision cache is bounded and still correct after eviction", async () 
 
 test("the cache rejects a capacity that cannot hold one revision", () => {
   assert.throws(() => createCachedRunVersionSnapshot(resolve("."), config, { maxRevisionEntries: 0 }), /positive integer/);
+});
+
+test("the revision covers every skill root the registry loads, recursively", async () => {
+  // Review finding on this change: the revision walked only `skills/` and only
+  // one level deep, while ProofBladeSkillRegistry.load() defaults to
+  // ["skills", "skills-library/ctf-skills"] and recurses. In this repository the
+  // vendored tree holds 11 of the 13 SKILL.md files, so a long-lived process kept
+  // serving a snapshot built before a pull updated it, and every later Run's
+  // run_started.versionSnapshot described the pre-pull catalog while the lanes
+  // used the live one.
+  //
+  // This asserts agreement with the registry rather than a hardcoded count, so it
+  // stays true if the vendored tree grows.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-version-skill-roots-"));
+  try {
+    // Two roots, and a nested directory inside the vendored one: the old walk
+    // missed the second root entirely and would have missed the nested file even
+    // had it looked.
+    await mkdir(join(root, "skills", "alpha"), { recursive: true });
+    await writeFile(join(root, "skills", "alpha", "SKILL.md"), "---\nname: alpha\ndescription: a\n---\n\nbody\n", "utf8");
+    await mkdir(join(root, "skills-library", "ctf-skills", "nested", "beta"), { recursive: true });
+    await writeFile(join(root, "skills-library", "ctf-skills", "nested", "beta", "SKILL.md"), "---\nname: beta\ndescription: b\n---\n\nbody\n", "utf8");
+
+    const before = await skillInputFiles(root);
+    assert.equal(before.length, 2, "both roots must be walked, including the nested one");
+
+    const cache = createCachedRunVersionSnapshot(root, config);
+    const first = await cache.provider();
+    const revisionBefore = cache.revision();
+
+    // The vendored root is the one the old revision ignored.
+    await writeFile(
+      join(root, "skills-library", "ctf-skills", "nested", "beta", "SKILL.md"),
+      "---\nname: beta\ndescription: changed\n---\n\nbody\n",
+      "utf8",
+    );
+
+    const second = await cache.provider();
+    assert.notEqual(cache.revision(), revisionBefore, "editing a vendored skill must move the revision");
+    assert.equal(cache.buildCount(), 2, "and must rebuild the snapshot");
+    assert.notEqual(second.skillCatalogHash, first.skillCatalogHash, "the catalog hash must reflect the vendored tree");
+    assert.equal(second.skills.length, 2, "and both roots must appear in the snapshot");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
