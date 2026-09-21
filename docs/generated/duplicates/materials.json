@@ -210,35 +210,6 @@
       "status": "candidate",
       "symbols": [
         {
-          "id": "@proofblade/materials::method::ObserverDiagnostics.failures",
-          "package": "@proofblade/materials",
-          "name": "ObserverDiagnostics.failures",
-          "kind": "method",
-          "signature": "(): readonly ObserverFailureSample[]",
-          "module": "src/observability/observer-diagnostics.ts",
-          "line": 92,
-          "summary": "Retained samples, oldest first."
-        },
-        {
-          "id": "@proofblade/materials::method::ToolTimingRecorder.samples",
-          "package": "@proofblade/materials",
-          "name": "ToolTimingRecorder.samples",
-          "kind": "method",
-          "signature": "(): readonly ToolTimingSample[]",
-          "module": "src/observability/tool-timing.ts",
-          "line": 152,
-          "summary": "Retained samples, oldest first."
-        }
-      ],
-      "signals": [
-        "same-structure-hash"
-      ],
-      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
-    },
-    {
-      "status": "candidate",
-      "symbols": [
-        {
           "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.cancel",
           "package": "@proofblade/materials",
           "name": "DisabledMultiAgentControlPort.cancel",
@@ -597,6 +568,6 @@
   ],
   "counts": {
     "exact": 0,
-    "candidates": 18
+    "candidates": 17
   }
 }

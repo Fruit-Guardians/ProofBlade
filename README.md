@@ -104,7 +104,9 @@ API 索引位于 `docs/generated/`：
 - `docs/project/PLAN.md`：当前计划、优先级、依赖、进度、交付物和验收条件；
 - `docs/project/UPDATE_LOG.md`：每次更新的变更内容、关联计划、分支、提交和验证；
 - `docs/project/COMPLETION_REPORT.md`：已经完成的计划、实际交付和验证结果；
-- `docs/project/MAINTENANCE_REPORT.md`：维护记录以及 25 个组件的版本、检查次数、时间和源码指纹。
+- `docs/project/MAINTENANCE_REPORT.md`：维护记录以及 26 个组件的版本、检查次数、时间和源码指纹。
+
+这四份报表**是生成物，不进版本库**（`docs/project/` 已在 `.gitignore` 中）。它们由 `project-status.json` 确定性派生，因此提交生成结果只会制造冲突：任何一次 `npm run reports:project` 都会重写全部四份文件，与别人基于旧 `project-status.json` 生成的版本必然冲突。仓库里的**唯一事实来源是 `project-status.json`**；报表在本地和 CI 中按需生成，CI 在生成后校验并把它们上传为构建产物。
 
 ```powershell
 npm run reports:project
@@ -236,7 +238,7 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 
 ## 设计文档
 
-- `docs/components.md`：25 个组件的开发入口、文档版本与强制更新规则。
+- `docs/components.md`：26 个组件的开发入口、文档版本与强制更新规则（数量以 `npm run check:components` 的输出为准）。
 - `docs/architecture.md`：依赖方向、运行时组件和上下文层级。
 - `docs/task-contract.md`：任务、事实、证据和完成条件。
 - `docs/tool-contract.md`：工具契约、效果、重放和制品规则。
@@ -248,8 +250,6 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 - `docs/deepseek-harness-reference.md`：DeepSeek Harness 架构调研、ProofBlade 差距映射、落地优先级与验收标准。
 - `docs/cordis-paper-reference.md`：Cordis 时空可组合性论文、可逆效果、反应式依赖与 ProofBlade 落地分析。
 - `docs/pentagi-reference-development-proposal.md`：PentAGI 架构调研、ProofBlade 能力映射、Work Graph/专家委派/持久 Fleet 与容器/经验索引/观测和报告的分阶段开发建议。
-- `docs/project/PLAN.md`：当前开发计划和依赖关系。
-- `docs/project/UPDATE_LOG.md`：按时间排列的更新记录。
-- `docs/project/COMPLETION_REPORT.md`：完成情况和验证证据。
-- `docs/project/MAINTENANCE_REPORT.md`：维护活动和组件审计状态。
+- `project-status.json`：计划、更新、完成与维护的唯一事实来源（四份报表由它生成）。
+- `docs/project/*.md`：`npm run reports:project` 生成的报表（`PLAN.md`、`UPDATE_LOG.md`、`COMPLETION_REPORT.md`、`MAINTENANCE_REPORT.md`），不进版本库。
 - `pi-ctf-agent-harness-design.md`：ProofBlade 的完整设计依据。

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-21T13:00:00+08:00",
+  "updatedAt": "2026-09-21T14:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2114,6 +2114,40 @@
         "3 条用例全部通过；判定的证据是事务真的提交了四条命令，不是代码阅读",
         "期间两次把断言写错并修正：artifactId 的 evidence 用 confidence 1 会先被 verifier 权限拒绝、annotation 用 annotatedBy harness 同理——两处都不是批处理限制，已改为与被测定案无关的取值",
         "check:changed-tests 通过（dispatch-transaction-batch.test.ts 已登记进 control-and-evidence 规则）"
+      ]
+    },
+    {
+      "id": "UPDATE-20260921-004",
+      "occurredAt": "2026-09-21T14:00:00+08:00",
+      "summary": "落实外部审查报告（PR #222–#245）中属于本栈的条目：脱敏/校验、能力列表再冻结、消费端快照、遥测队列、观察失败痕迹、技能输入集合、投影提交语义、卡尺口径。每条先独立验证是否成立，两条审查结论被实测推翻并记录。",
+      "branch": "fix/review-blockers",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "#229：finalizeAndArchive 返回的 archivedText 是脱敏前文本（stageText 先 redactSecrets 再落盘），观察器因此分类了 Artifact 里并不存在的字节。新增 ArtifactStore.putTextWithContent 返回真正写入的 storedText，并在 observeCodingArtifact 里用 sha256 校验——回读路径本来由 FileArtifactRepository.read 免费提供这道校验，跳过回读不能顺手跳过它。archivedText 从返回值中删除，改为与 projection 并列，使原文在类型上不可能进入 details",
+        "#229：归档失败时 putTextWithContent 会留下无人引用的孤儿文件（先写后 dispatch），失败路径现在删除已 stage 的文件并重新抛出",
+        "#226：PUT /preferences 把解析后的完整能力列表回写，用户改一次模型/文件夹就把 enabledTools/enabledSkills/enabledMcpServers 冻在当天取值，此后新增的 Skill/MCP 永久不可见。路由改为只持久化本次请求真正编辑的字段，客户端也不再回传整个已解析对象（两半缺一不可）。补丁构造器移到 apps/gui/src/conversation-preferences.ts 以便直接测试",
+        "#232：attachPiObservability 优先取 options.telemetry，lane 自建第二个 batcher 使 scheduling.batcher 成为死代码并留下两个 flush 屏障。删掉第二个 batcher，flush() 明确为 best-effort 并新增 pending()，lane close 时欠账改为记录诊断而不是看起来正常结束",
+        "#237：观察诊断的 record() 现在自己脱敏（原先声称调用方已脱敏，实际无人脱敏）；两处调用点从可选链改为守卫，无 sink 时不再构造字符串",
+        "#238：归档失败的回读路径现在说清它留下了什么——模型拿到内容与 UNARCHIVED_READ_NOTICE，工具结果带 details.archivalFailed，而 ControlStore 里刻意没有事件（Observation 是关于已注册 Artifact 的断言，此处没有 Artifact）",
+        "#243：lastEventSeq 与 #loadEvents 对「已提交」的定义统一。原先过滤空行后取最后一条可解析记录，会在最新记录仍在写入时返回前一条的 seq，而封印在那条 seq 上的投影比较相等并被当作当前。改为丢弃 split 后的最后一个元素（末尾是换行时它是空串，未写完时它是半条记录）。三处有界读改为检查 bytesRead：短读会让 Buffer.alloc 的尾部零填充，使所有行解析失败——那读作「没有记录」而不是「未知」",
+        "#242：实测确认 #projectionAlreadyCurrent 的通过分支从 flushProjection 不可达（屏障在提问前刚从日志读快照，流必然已前进），真正的收益来自第一行的提前返回。两次尝试固定该分支都失败，原因与失败过程写进了测试注释与源码注释；把「全量校验也不可能成功」的表述改为准确的单向陈述",
+        "#234：#234 的技能输入集合收敛为一处（collectSkillFiles），版本快照改为复用它而不是各写一份 walk。新增第一层根的直系 *.md（loadSkills 会当作 skill；并实测记录 Windows 上上游因 ignore 拒绝绝对路径而实际不读它们）、.gitignore/.ignore/.fdignore（保守包含规则文件本身，不重写 ignore 匹配器）、按 loader 规则剪枝隐藏目录与 node_modules、跟随目录符号链接。注册表 memo 增加 single-flight，淘汰改为真 LRU",
+        "#236：门禁改为断言计划真正要的契约。数字移入 .github/hot-path-budgets.json（同时记录 measured 与 target），提交次数在 withRunLock 上计数——那才是提交真正的成本点，数公共入口会双向出错（dispatch 委托给 dispatchBatch）。散文正则漂移守卫删除，该文件也补进 runtime-recovery 规则",
+        "#228：三个 evaluator 在比较 replayParity 前显式 flushProjection（热路径普遍 persistProjection:false，文件落后是预期状态，不 flush 会把正确运行判成不一致）；ExperimentGate 的注释删掉「checkpoint 是屏障」这一不存在的调用方；deferredProjectionRuns 经核查由 #recordProjectionMode 的 else 分支自然有界，加终态清理的尝试不改变任何可观测状态，因此删掉该分支并把真正起作用的机制写进注释",
+        "#225：deleteConversation 现在也删除 .proofblade-workspaces/<runId>（附件任务会在 runs 根同级留一份完整副本）；staging 根的断言原本复述 helper 自身定义，改为断言注释里宣称的约束",
+        "#227：版本快照的 revision 改为哈希 builder 真正读取的两个 config 值（piVersion、thinkingLevel）；原先哈希的是 Builder 从不读的 proofblade.config.json，而 GUI 启动时会替换解析后的 config 对象；移除无人赋值的 versionSnapshotOptions.configPath；builds 改为构建成功后才自增",
+        "#223：计时样本环形缓冲改为索引游标（原 shift() 是 O(n)，把测量成本放到被测路径上）；summarize() 返回 { groups, dropped, retained, capacity }，每个分位数带 n/min/max（n=8 时 nearest-rank p95 就是最大值）；「跳过未埋点阶段」改为显式集合；inner.call 保留 receiver；基线脚本补 n 列、丢弃数告警、主机信息与逐个提交的口径说明",
+        "文档：拆分文档 §2.2 的「每个提交约 12ms」标注为 25÷2 推导值而非实测；25ms 的口径更正为 command 列（工具体内含自身提交）；长 Run 基线补 n 列、replay 列 n=1、事件形态说明与 KiB 单位；4.6KB/28.7KB 矛盾更正为「投影时效」而非「文件大小」，211.6ms 标为不可复现；计划 §7.2 的中心论断改回「用户报告的现象」，秒级归因更正写进计划本身而非只留在未合并分支上",
+        "README（中/英）：四份报表说明为生成物、不进版本库、唯一事实来源是 project-status.json；组件数 25 更正为 26"
+      ],
+      "validation": [
+        "变异验证：把观察器输入还原为脱敏前的 visible → stored-text 用例转红；把补丁构造器还原为 {...current, ...patch} → 8 条偏好用例中 5 条转红；删掉 staged 文件清理 → 孤儿用例转红；把 lastEventSeq 还原为过滤空行取末条 → CURRENCY-6 转红；删掉 deferredProjectionRuns 的 else 分支 → 屏障用例转红；把第一层根的 *.md 规则关掉 → 两条技能用例转红",
+        "如实记录的两次失败尝试：#projectionAlreadyCurrent 的通过分支既无法用公共 API 计数（predicate 走 eventStore.loadProjection），也无法用行为区分（hint 不符时该分支本就不可达）；为空日志守卫做变异时，删掉三处守卫中的任意一处仍为绿，因为零字节同时被有界读与终止符规则拒绝",
+        "full build + test:staged（fast/slow/integration 三段）通过；check:components（26 组件）/ check:change-contracts（11 契约）/ check:project-reports / api:index:check / check:changed-tests / test:ci-gates 通过",
+        "PR #245 属于另一位作者（codex/pwn-exploit-builders，base 396a916，不在本栈内），未改其代码；审查发现以评论形式提交到该 PR（含 baseRecordId 未绑定镜像、fastbinIndex 守卫 <7 丢掉 index 7、readBytes 无上限等），并说明我的验证边界是只读代码核对"
       ]
     }
   ],

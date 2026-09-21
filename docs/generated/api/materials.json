@@ -4,7 +4,7 @@
   "packageId": "materials",
   "sourceRoot": "packages/materials",
   "moduleHashes": {
-    "src/app/demo.ts": "510d1b5e8ba85a2481f9f46a79bb50fa2ab4826760d653713735d2ea69ee39c1",
+    "src/app/demo.ts": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
     "src/app/fixture-task.ts": "77d62e1e632887c1a01251a6ac595050d61cee52cb1eb7977087ba6d01351c9e",
     "src/capabilities/backend.ts": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
     "src/capabilities/binary.ts": "fbeaff814f7a7c5802f72018fbbc0c9f13264d5ae9eb53a5ccb7345bc1c87c6f",
@@ -18,7 +18,7 @@
     "src/competition/api.ts": "00a3ead1c7666780af72153fce3012082e120436029dae5445431ca9d07e06d7",
     "src/competition/dasctf-api.ts": "538036302b118f2cf9942927c8ba5ca263384326d59b42d82586b1abb46af7b1",
     "src/competition/environment-janitor.ts": "e4d15beb8a2bb5e342fb453e42b5ba6916832493da525c848fb8ede334cac056",
-    "src/competition/experiment-gate.ts": "57cc2436841d0937b059135c1ad8bdeaec72fd357f173fd3ce9f95147843865f",
+    "src/competition/experiment-gate.ts": "efc1dad2934309f40b8937513a00000b265b3dadfa126ba34add45b8c7af835d",
     "src/competition/fleet.ts": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
     "src/competition/http-body.ts": "f8ce3de1b667bdeb30b7f776b100d5e9f45757db5dbb1bc9efa5d7898663d79e",
     "src/competition/loop.ts": "75c2bda9293038705a0f7006368efdd61e71468a2bc6eb1a67d08c643e04b512",
@@ -40,7 +40,7 @@
     "src/context/model-receipt.ts": "65a8fee2381ac0f50490145d162c2232343106cec18f8d1b05d23d9ce8c2c996",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
-    "src/control/control-store.ts": "851dd53edf03fb321c071d86aad078430a1c8bd2ffa148ba1820b10c4a0e757e",
+    "src/control/control-store.ts": "afb33f76ec0fb4522166f11cdcb87b5795d9372f25e03fd7237ea44c76d05d20",
     "src/control/lease-manager.ts": "71e1e334b21ce9a2083ccd5ef3dc4ba31de239f8352bac24aef8bc731561734c",
     "src/control/phase-machine.ts": "870185bade60194a641f4552fe772bcfcfe870144af914950ca82b67ec6fc9e2",
     "src/control/reducer.ts": "ffe52d053482f449f37cf16ecbf1802c4d445adc30c12708a4ab03c06101d814",
@@ -58,7 +58,7 @@
     "src/domain/types.ts": "39a298a6e6ea74fec2b8278f1fe342b2e3c2090e1b4fd5babd006d96059b842f",
     "src/domain/utils.ts": "fdd6f57ab57faf4d72dd3125a6b5cfc60321b19b6c76019f47e1c27fcd0b608b",
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
-    "src/effects/artifact-store.ts": "34c97f41c5adaa40c7c931c5bf81ee98348438b8ed5935cc7eb6dead080d4e3e",
+    "src/effects/artifact-store.ts": "49404eb4c0d78536212ee6ba06477f83d778d2cf9fb992cf021c13d42890e621",
     "src/effects/effect-journal.ts": "7c73e4b2946249ab397d3fcb994d7162be1c3445ef9afe13170f222b7ba9a392",
     "src/evaluation/ablation-ledger.ts": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
     "src/evaluation/ablation-policy.ts": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
@@ -66,14 +66,14 @@
     "src/evaluation/ablation.ts": "e58828bff6ebacfb7bef193b6659fbf44ed2a28e6fc44eac739f4489703bf152",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
-    "src/evaluation/fixture-evaluator.ts": "50c4f08dd5d54440cb4fc440cdfdebfc47393ab2f320ecc365986441810d64bd",
+    "src/evaluation/fixture-evaluator.ts": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
     "src/evaluation/information-value.ts": "f607d133f18f9d9f89f35695d6a63d88b17f5f68a429b5da80c94cf5b4191ab0",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "e1cc4ebd5b4a9d89599d2f43524bc26ab2045a2b36af1f052525be0b7c208f7e",
+    "src/evaluation/real-model-evaluator.ts": "fbdfd31dc78d35c90c00781f28d7fc6695e744c4c32973fd05098ea66e49e8f1",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
-    "src/evaluation/runtime-scenario-evaluator.ts": "025f88efa208cf52cdb1a9f51809348935e33b6a839003c09df6164ca4d0ca10",
+    "src/evaluation/runtime-scenario-evaluator.ts": "ea4465abb7f199ccfd280af918b1d43bbb83c49efd35a401f774657d63a60c31",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
     "src/index.ts": "029912b1a49025cce4624c86502b4282a5f3c03bee182b69f3e6642dd26ca921",
@@ -90,7 +90,7 @@
     "src/observability/pi-events.ts": "0dc35ed7277f4259f81f16e1767254bd3e5e36e9dd5ab697684e788d09523b1a",
     "src/observability/run-telemetry.ts": "80ee72129627cc518c393d98dec30c7dfaf904dd36e99e4338a7533dc5d38b91",
     "src/observability/telemetry-backend.ts": "ca004d56be7d21359d5d254cbf160f6d4ee66564e19093b92133aa8cb56697d8",
-    "src/observability/tool-timing.ts": "9a21d5ee75135cc7e69dccc36a40758944c5e49308fd501574d5e59e5b6b803e",
+    "src/observability/tool-timing.ts": "fda44968cd715dda37a6dd0ac90e1d87fbb984d445af8065ee72886191894044",
     "src/orchestration/event-ingress.ts": "63decfa9f941afdc8d47f95000501347430180a1de02285ff9b7b93cc9fa40d8",
     "src/orchestration/intent-filter.ts": "7a790876abc29e92332e819991dc6080aa549c86cb1c64747c49f366ab7bd1fc",
     "src/orchestration/intent-scheduler.ts": "46aa1eb531b93a3201a3e7aef28fa3f9d9689bb4d27f9d8067c7219ac310dec2",
@@ -123,7 +123,7 @@
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/coding-lane.ts": "3a379a9f4a99021946054cabd091a25c94f44c3b8bc7bca5691fa18fd581064d",
-    "src/runtime/coding-resources.ts": "ed942154c3101b6c1384db2ff9af7a350667e17e785daacbce73d1f3505f878d",
+    "src/runtime/coding-resources.ts": "ba2a7e3bc5222c5ca31da5e5014df0296b9b327d035a49222aa1356cfbfda0d4",
     "src/runtime/coding-turn-projection.ts": "9634c98b8440e19dc694ed92ed2521b54ba50c1b7974e338416441154586af22",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -141,15 +141,15 @@
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
-    "src/runtime/version.ts": "670fbf6648c3ed4c54997c17125dd90e52c5613305f1262c34767730da5c6687",
+    "src/runtime/version.ts": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
     "src/sandbox/fixture.ts": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
     "src/security/approval-policy.ts": "1f9d442218afddf3547d7bd481fc4121394b2fb0ad7bba66d7ab1934d6876e5c",
-    "src/skills/registry.ts": "fa18069a76b0bfb3068f875d08039f9eb25e0ad0cee414b530b8fab892727941",
+    "src/skills/registry.ts": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
     "src/storage/control-authority.ts": "8add37c36f821514cf985b4c9c96722351314ae4ffc516efd91d617a8c787647",
-    "src/storage/jsonl-store.ts": "695c9eae9f5bcf74b07b369b9ccc7bb411810266a089bcd33f61af2d94b7eac5",
+    "src/storage/jsonl-store.ts": "a44ad7fb99f181403ccfc87714114ea5fa23052ca101af6c2b7988e794bd738c",
     "src/storage/spill-store.ts": "be10856f0ca4e4ef962033559921dbce390efca16d0b55b683013954031c0a51",
     "src/tools/catalog.ts": "5501a98ee2a6215f1135ce8402ec554eea8dc0b545df2833e6133dfe13e49283",
     "src/tools/contracts.ts": "809bb08337ad6b77cc4950cf336b680db418c97a3ba85d6deb2e88a52bf0ead1",
@@ -621,7 +621,7 @@
       "visibility": "public",
       "module": "src/competition/experiment-gate.ts",
       "exportPath": "@proofblade/materials",
-      "line": 40,
+      "line": 49,
       "signature": "ExperimentGate",
       "summary": "Durable no-repeat gate for process/network experiments.",
       "summarySource": "tsdoc",
@@ -1064,7 +1064,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 41,
+      "line": 42,
       "signature": "ArtifactStore",
       "summary": "Inferred summary: artifact store class used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -1074,6 +1074,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -1688,7 +1689,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 239,
+      "line": 318,
       "signature": "ToolTimingHandle",
       "summary": "Per-call recording handle produced by {@link ToolTimingRecorder.begin}.",
       "summarySource": "tsdoc",
@@ -1706,7 +1707,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 138,
+      "line": 184,
       "signature": "ToolTimingRecorder",
       "summary": "In-process, bounded recorder for tool-call stage timings.",
       "summarySource": "tsdoc",
@@ -4143,7 +4144,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 99,
+      "line": 145,
       "signature": "512",
       "summary": "Default number of retained samples.",
       "summarySource": "tsdoc",
@@ -4163,7 +4164,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 25,
+      "line": 31,
       "signature": "readonly [\"scheduled\", \"executionStart\", \"executionEnd\", \"toolResultEmitted\", \"subscribersEnd\"]",
       "summary": "The stages of one tool call, in the order they occur.",
       "summarySource": "tsdoc",
@@ -5167,7 +5168,7 @@
       "visibility": "public",
       "module": "src/app/demo.ts",
       "exportPath": "@proofblade/materials",
-      "line": 80,
+      "line": 86,
       "signature": "(root: string, config: ProofBladeConfig, options?: CreateServicesOptions | import(\"../effects/effect-journal.js\").EffectFaultInjector): AppServices",
       "summary": "Inferred summary: create services operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -5243,7 +5244,7 @@
       "visibility": "public",
       "module": "src/app/demo.ts",
       "exportPath": "@proofblade/materials",
-      "line": 131,
+      "line": 137,
       "signature": "(runId: string, root: string, config: ProofBladeConfig): TaskContract",
       "summary": "Inferred summary: demo task operation used to validate input or state.",
       "summarySource": "inferred",
@@ -5324,7 +5325,7 @@
       "visibility": "public",
       "module": "src/app/demo.ts",
       "exportPath": "@proofblade/materials",
-      "line": 152,
+      "line": 158,
       "signature": "(root: string, runId: string, config: ProofBladeConfig): Promise<{ runId: string; flag: string; }>",
       "summary": "Inferred summary: run demo operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -5773,7 +5774,7 @@
       "visibility": "public",
       "module": "src/competition/experiment-gate.ts",
       "exportPath": "@proofblade/materials",
-      "line": 109,
+      "line": 118,
       "signature": "(value: unknown): unknown",
       "summary": "Remove presentation-only fields before repeat comparison.",
       "summarySource": "tsdoc",
@@ -6230,7 +6231,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 2378,
+      "line": 2407,
       "signature": "(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }",
       "summary": "Inferred summary: create effect input operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -7332,7 +7333,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 731,
+      "line": 735,
       "signature": "(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics",
       "summary": "Projects provider traffic onto durable executor turns without relying on",
       "summarySource": "tsdoc",
@@ -7996,7 +7997,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 120,
+      "line": 166,
       "signature": "(sorted: readonly number[], fraction: number): number",
       "summary": "Nearest-rank percentile over a sorted ascending array.",
       "summarySource": "tsdoc",
@@ -8030,7 +8031,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 343,
+      "line": 422,
       "signature": "<TContext extends CodingResourceContext>(tool: AgentHarnessTool<TContext>, recorder: ToolTimingRecorder | undefined, label?: string): AgentHarnessTool<TContext>",
       "summary": "Wrap a tool so its execution is timed into `recorder`.",
       "summarySource": "tsdoc",
@@ -8059,7 +8060,7 @@
       "testRefs": [
         "packages/materials/tests/tool-timing.test.ts"
       ],
-      "structureHash": "291ed0b2a12c2927e6e08cefd90743ca2115f3d5a45575a476b79b0d9ac9d149"
+      "structureHash": "6eb921a5f25b05310604675a3c2d22e667ced57b85adf1c6d05025edbc92d9ca"
     },
     {
       "id": "@proofblade/materials::function::withToolTimingOnTools",
@@ -8068,7 +8069,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 383,
+      "line": 466,
       "signature": "<TContext extends CodingResourceContext>(tools: AgentHarnessTool<TContext>[], recorder: ToolTimingRecorder | undefined, label?: string): AgentHarnessTool<TContext>[]",
       "summary": "Wrap every tool in a list.",
       "summarySource": "tsdoc",
@@ -9268,7 +9269,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1907,
+      "line": 1917,
       "signature": "(command: string): string | undefined",
       "summary": "Bash is intentionally an analysis escape hatch, not a second control-plane",
       "summarySource": "tsdoc",
@@ -9687,7 +9688,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1891,
+      "line": 1901,
       "signature": "(command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.",
       "summarySource": "tsdoc",
@@ -9733,7 +9734,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1881,
+      "line": 1891,
       "signature": "(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "When a bash command TIMED OUT and the command looks like it was holding a",
       "summarySource": "tsdoc",
@@ -10988,7 +10989,7 @@
       "module": "src/runtime/version.ts",
       "exportPath": "@proofblade/materials",
       "line": 88,
-      "signature": "(projectRoot: string, config: ProofBladeConfig, options?: { configPath?: string; maxRevisionEntries?: number; }): RunVersionSnapshotCache",
+      "signature": "(projectRoot: string, config: ProofBladeConfig, options?: { maxRevisionEntries?: number; }): RunVersionSnapshotCache",
       "summary": "Wrap {@link createRunVersionSnapshot} in a single-flight, revision-keyed cache.",
       "summarySource": "tsdoc",
       "tags": [
@@ -11024,7 +11025,7 @@
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ],
-      "structureHash": "7d7f7b8423adc3d5da107dc0a0b8db4a347c916f93c75ecf4baf06dcc21ee838"
+      "structureHash": "7fe223f74543bb1a9ad424af1a170b754aae07a5672dacff2eaf803ceeaaeae8"
     },
     {
       "id": "@proofblade/materials::function::createRunVersionSnapshot",
@@ -11062,9 +11063,9 @@
       "visibility": "public",
       "module": "src/runtime/version.ts",
       "exportPath": "@proofblade/materials",
-      "line": 167,
+      "line": 184,
       "signature": "(root: string): Promise<string[]>",
-      "summary": "Every `SKILL.md` the version snapshot's skill catalog is derived from.",
+      "summary": "Every file the version snapshot's skill catalog is derived from.",
       "summarySource": "tsdoc",
       "tags": [
         {
@@ -11073,7 +11074,7 @@
         },
         {
           "name": "returns",
-          "text": "absolute `SKILL.md` paths, sorted."
+          "text": "absolute input file paths, sorted."
         }
       ],
       "imports": [
@@ -11091,7 +11092,7 @@
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ],
-      "structureHash": "a5bf9a15c3e5c2ec0cdb5fe256bec1baf11853b75550e831f6d96b251e902e8c"
+      "structureHash": "4814f92c96a7a7a046778c327cbf0035a437ceb98c6cf4423c1a9e48a681a18e"
     },
     {
       "id": "@proofblade/materials::function::globWorkspace",
@@ -11259,13 +11260,48 @@
       ]
     },
     {
+      "id": "@proofblade/materials::function::collectSkillFiles",
+      "name": "collectSkillFiles",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/skills/registry.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 310,
+      "signature": "(roots: readonly string[]): Promise<string[]>",
+      "summary": "Every file the skill loaders derive their result from.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "param",
+          "text": "roots - absolute skill root directories, in precedence order."
+        },
+        {
+          "name": "returns",
+          "text": "`path \\0 ino \\0 size \\0 mtimeMs \\0 ctimeMs` entries, sorted."
+        }
+      ],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core/node",
+        "@proofblade/molecules",
+        "node:fs",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/skill-registry-cache.test.ts"
+      ],
+      "structureHash": "a955be63f56a3af4c147adc07ef0244921b72fd72864e2215b6a378081f59ec8"
+    },
+    {
       "id": "@proofblade/materials::function::makeEvent",
       "name": "makeEvent",
       "kind": "function",
       "visibility": "public",
       "module": "src/storage/jsonl-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 800,
+      "line": 830,
       "signature": "(runId: string, seq: number, type: HarnessEvent[\"type\"], actor: HarnessEvent[\"actor\"], lane: HarnessEvent[\"lane\"], payload?: Record<string, unknown>, correlationId?: string, envelopeInput?: Partial<RunEventEnvelope>): HarnessEvent",
       "summary": "Inferred summary: make event operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -13204,7 +13240,7 @@
       "visibility": "public",
       "module": "src/competition/experiment-gate.ts",
       "exportPath": "@proofblade/materials",
-      "line": 32,
+      "line": 41,
       "signature": "ExperimentGateResult",
       "summary": "Inferred summary: experiment gate result type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -15810,6 +15846,7 @@
         "@proofblade/atoms"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -16485,7 +16522,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 7,
+      "line": 8,
       "signature": "ArtifactMeta",
       "summary": "Inferred summary: artifact meta type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16495,6 +16532,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": []
@@ -16506,7 +16544,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 18,
+      "line": 19,
       "signature": "ArtifactTextRange",
       "summary": "Inferred summary: artifact text range type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16516,6 +16554,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": []
@@ -16527,7 +16566,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 35,
+      "line": 36,
       "signature": "ArtifactWrite",
       "summary": "A stored Artifact plus the exact text that was written for it.",
       "summarySource": "tsdoc",
@@ -16537,6 +16576,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -19491,9 +19531,45 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 42,
+      "line": 60,
       "signature": "ToolTimingCounters",
       "summary": "Acceptance-relevant counters for a single tool call.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../runtime/coding-resources.js",
+        "@earendil-works/pi-agent-core/node"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ToolTimingPercentiles",
+      "name": "ToolTimingPercentiles",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/observability/tool-timing.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 117,
+      "signature": "ToolTimingPercentiles",
+      "summary": "Percentiles plus the sample count they were computed from.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../runtime/coding-resources.js",
+        "@earendil-works/pi-agent-core/node"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ToolTimingReport",
+      "name": "ToolTimingReport",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/observability/tool-timing.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 134,
+      "signature": "ToolTimingReport",
+      "summary": "One group's summary, plus how much of the record was not retained.",
       "summarySource": "tsdoc",
       "tags": [],
       "imports": [
@@ -19509,7 +19585,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 59,
+      "line": 77,
       "signature": "ToolTimingSample",
       "summary": "One recorded tool call.",
       "summarySource": "tsdoc",
@@ -19529,7 +19605,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 83,
+      "line": 101,
       "signature": "ToolTimingSummary",
       "summary": "Aggregated summary over the retained samples.",
       "summarySource": "tsdoc",
@@ -25723,6 +25799,7 @@
         "packages/materials/tests/dispatch-transaction-batch.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/mcp.test.ts",
@@ -26873,6 +26950,7 @@
         "../runtime/scope.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27136,6 +27214,8 @@
         "../runtime/scope.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27262,6 +27342,7 @@
         "packages/materials/tests/dispatch-transaction-batch.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/mcp.test.ts",
@@ -27424,6 +27505,7 @@
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -27531,6 +27613,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -27569,6 +27652,8 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "e2aaac14ec2fd86aaf3a73431a5b78f9aa69a54da7529126772ec7aa8cd7c567",
@@ -28871,9 +28956,11 @@
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -28917,6 +29004,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -29236,7 +29325,7 @@
       "visibility": "public",
       "module": "src/competition/experiment-gate.ts",
       "exportPath": "@proofblade/materials",
-      "line": 84,
+      "line": 93,
       "signature": "(input: Omit<ExperimentGateInput, \"outcome\" | \"summary\">): Promise<{ repeatKey: string; previousFailures: number; }>",
       "summary": "Inferred summary: assert allowed operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -29261,7 +29350,7 @@
       "visibility": "public",
       "module": "src/competition/experiment-gate.ts",
       "exportPath": "@proofblade/materials",
-      "line": 65,
+      "line": 74,
       "signature": "(input: ExperimentGateInput): Promise<ExperimentGateResult>",
       "summary": "Inferred summary: record operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -29345,7 +29434,7 @@
       "visibility": "public",
       "module": "src/competition/experiment-gate.ts",
       "exportPath": "@proofblade/materials",
-      "line": 51,
+      "line": 60,
       "signature": "<T>(runId: string, operation: () => Promise<T>): Promise<T>",
       "summary": "Serialize one model experiment from assertion through outcome recording.",
       "summarySource": "tsdoc",
@@ -29607,6 +29696,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -29779,7 +29869,6 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
-        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -30059,6 +30148,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -30155,6 +30245,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
@@ -30220,6 +30311,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -30308,6 +30400,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/mcp.test.ts",
@@ -31338,6 +31431,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -31932,6 +32026,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -32298,7 +32393,6 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
-        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -32595,7 +32689,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 783,
+      "line": 812,
       "signature": "(runId: string, snapshot: RunSnapshot): Promise<void>",
       "summary": "Inferred summary: #cache snapshot operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -32630,7 +32724,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 798,
+      "line": 827,
       "signature": "(runId: string, before: RunSnapshot, commands: DomainCommand[], authority: ControlAuthority, writer: JsonlRunWriter, options?: ControlDispatchOptions): Promise<{ after: RunSnapshot; events: HarnessEvent[]; }>",
       "summary": "Inferred summary: #commit commands operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32655,7 +32749,8 @@
         "node:path"
       ],
       "testRefs": [
-        "packages/materials/tests/dispatch-transaction-batch.test.ts"
+        "packages/materials/tests/dispatch-transaction-batch.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts"
       ],
       "structureHash": "95ace50340f7fc8f03f323e7cd7154fdb43060654359ff215aec040c3bdb7ef0",
       "parentId": "@proofblade/materials::class::ControlStore"
@@ -32667,7 +32762,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 894,
+      "line": 923,
       "signature": "(): FixtureControlPort",
       "summary": "Inferred summary: #create fixture control port operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32702,7 +32797,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 928,
+      "line": 957,
       "signature": "(): UpdateEvaluationControlPort",
       "summary": "Inferred summary: #create update evaluation port operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32737,7 +32832,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 909,
+      "line": 938,
       "signature": "(): VerificationRecoveryControlPort",
       "summary": "Inferred summary: #create verification recovery port operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32772,7 +32867,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 871,
+      "line": 900,
       "signature": "(): VerifierEffectControlPort",
       "summary": "Inferred summary: #create verifier effect port operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32807,7 +32902,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 839,
+      "line": 868,
       "signature": "(): VerifierControlPort",
       "summary": "Inferred summary: #create verifier port operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32877,7 +32972,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 671,
+      "line": 682,
       "signature": "(runId: string, snapshot: RunSnapshot): Promise<boolean>",
       "summary": "Whether the on-disk projection already matches `snapshot`, cheaply.",
       "summarySource": "tsdoc",
@@ -32914,7 +33009,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 713,
+      "line": 742,
       "signature": "(runId: string, options?: { forceReplay?: boolean; skipMigration?: boolean; }): Promise<RunSnapshot>",
       "summary": "Read a Run using the in-memory fold, a durable projection, or full replay.",
       "summarySource": "tsdoc",
@@ -32951,10 +33046,10 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 678,
+      "line": 704,
       "signature": "(runId: string, persistProjection: boolean | undefined): void",
-      "summary": "Inferred summary: #record projection mode operation used to perform a durable write.",
-      "summarySource": "inferred",
+      "summary": "Track which Runs have a projection the hot path deferred.",
+      "summarySource": "tsdoc",
       "tags": [],
       "imports": [
         "../domain/candidate.js",
@@ -32986,7 +33081,7 @@
       "visibility": "public",
       "module": "src/control/control-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 683,
+      "line": 709,
       "signature": "<T>(runId: string, operation: (before: RunSnapshot, writer: JsonlRunWriter) => Promise<T>): Promise<T>",
       "summary": "Inferred summary: #with write operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -33011,7 +33106,7 @@
         "node:path"
       ],
       "testRefs": [],
-      "structureHash": "20c7600122f6263713d842ba2a0d821b16b8e642deed22bd91e6966ec93a9322",
+      "structureHash": "ac54018a5dc3617487b0eb7f9b6610793a71f1d0621d69a9665566a6695a5335",
       "parentId": "@proofblade/materials::class::ControlStore"
     },
     {
@@ -33506,6 +33601,8 @@
       ],
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33525,6 +33622,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
@@ -33581,6 +33679,7 @@
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts"
       ],
       "structureHash": "2294c6ba67b0cfbd753b47c6ec9ba26c615761186095b2e98200fc0cd6da309b",
@@ -33619,6 +33718,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "051f6a60c769dfc81a73ad963efa97e57e2cd44f1861c269046d5b7470b0250a",
@@ -33658,7 +33758,8 @@
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/dispatch-transaction-batch.test.ts",
-        "packages/materials/tests/experiment-gate-projection.test.ts"
+        "packages/materials/tests/experiment-gate-projection.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts"
       ],
       "structureHash": "a9e181aad2eb340fa17f17d062c881be4996d5fc8e1cf88b88b50dc4d2edeae5",
       "parentId": "@proofblade/materials::class::ControlStore"
@@ -33697,6 +33798,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -33896,6 +33998,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/control-store.test.ts"
       ],
       "structureHash": "bc3c82907cfb1941ddaad7dd829eed8a0b6aa039255fb60833eb6a390e60caa6",
@@ -34336,7 +34439,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 44,
+      "line": 45,
       "signature": "(runId: string, content: string, meta?: ArtifactMeta): Promise<ArtifactRef>",
       "summary": "Inferred summary: put text operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -34346,6 +34449,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -34380,7 +34484,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 55,
+      "line": 56,
       "signature": "(runId: string, content: string, meta?: ArtifactMeta): Promise<ArtifactWrite>",
       "summary": "`putText` for callers that need the stored text as well as the reference.",
       "summarySource": "tsdoc",
@@ -34390,13 +34494,14 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/coding-resources.test.ts"
       ],
-      "structureHash": "662ea6be4cb92cddd9ff4ba7c351705c4ad91e145afc06b100a8c269d2c7cb90",
+      "structureHash": "c6cd32e4eb5eae31347ef4254e3c8230b55f43dcf29bec509eb2a51b609c5b22",
       "parentId": "@proofblade/materials::class::ArtifactStore"
     },
     {
@@ -34406,7 +34511,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 98,
+      "line": 108,
       "signature": "(runId: string, artifact: ArtifactRef): Promise<string>",
       "summary": "Inferred summary: read text operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -34416,6 +34521,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -34445,7 +34551,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 104,
+      "line": 114,
       "signature": "(runId: string, artifact: ArtifactRef, maxBytes: number, offset?: number): Promise<ArtifactTextRange>",
       "summary": "Read a bounded UTF-8 prefix without allocating the complete Artifact.",
       "summarySource": "tsdoc",
@@ -34455,6 +34561,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -34472,7 +34579,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 65,
+      "line": 75,
       "signature": "(runId: string, content: string, meta?: ArtifactMeta): Promise<ArtifactRef>",
       "summary": "Store bytes without adding them to the Run. Registration remains a separate",
       "summarySource": "tsdoc",
@@ -34482,6 +34589,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -34501,7 +34609,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 70,
+      "line": 80,
       "signature": "(runId: string, content: string, meta?: ArtifactMeta): Promise<ArtifactWrite>",
       "summary": "`stageText` for callers that also need the redacted text that was written.",
       "summarySource": "tsdoc",
@@ -34511,9 +34619,12 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts"
+      ],
       "structureHash": "15d9b7b24bf8bb0280881d69b01b882946dffd1b8d9f4a937f61f009ad2b381e",
       "parentId": "@proofblade/materials::class::ArtifactStore"
     },
@@ -34524,7 +34635,7 @@
       "visibility": "public",
       "module": "src/effects/artifact-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 116,
+      "line": 126,
       "signature": "(runId: string, artifact: ArtifactRef): Promise<boolean>",
       "summary": "Inferred summary: verify operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -34534,6 +34645,7 @@
         "../domain/types.js",
         "../domain/utils.js",
         "@proofblade/molecules",
+        "node:fs/promises",
         "node:path"
       ],
       "testRefs": [
@@ -34994,6 +35106,7 @@
         "./artifact-store.js"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -35147,6 +35260,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
@@ -35468,6 +35582,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -35487,6 +35602,7 @@
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/version-cache.test.ts"
       ],
@@ -35681,7 +35797,9 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
-        "packages/materials/tests/projection-read-bound.test.ts"
+        "packages/materials/tests/barrier-projection.test.ts",
+        "packages/materials/tests/projection-read-bound.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ],
       "structureHash": "1e8f5d8b338fe1128a45071bfe57f7efad9a60403efb0146c7ba37771692ea80",
       "parentId": "@proofblade/materials::class::AblationPolicyController"
@@ -35785,6 +35903,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -36041,6 +36160,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -36184,6 +36304,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -36334,6 +36455,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -36496,6 +36618,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -36788,6 +36911,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -36900,6 +37024,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -36937,7 +37062,7 @@
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
-        "packages/materials/tests/barrier-projection.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37006,6 +37131,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -37350,6 +37476,7 @@
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38137,7 +38264,6 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -38359,6 +38485,8 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "6bb5cbd2fa2ecf3deab7a91e0eb2f1f59f57e01dcc6fa9e23d1d26714638c872",
@@ -38810,6 +38938,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -39255,6 +39384,8 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -39321,6 +39452,7 @@
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -39474,9 +39606,11 @@
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -39630,7 +39764,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 275,
+      "line": 354,
       "signature": "(counter: ToolTimingCounter, by?: number): void",
       "summary": "Increment an acceptance counter for this call.",
       "summarySource": "tsdoc",
@@ -39690,7 +39824,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 287,
+      "line": 366,
       "signature": "(isError?: boolean): void",
       "summary": "Close the sample and hand it to the recorder.",
       "summarySource": "tsdoc",
@@ -39705,6 +39839,7 @@
         "@earendil-works/pi-agent-core/node"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -39732,7 +39867,7 @@
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
-      "structureHash": "fa08b018dec9a50e537049c809c5bca1bc3d4c8dcf4a25b378bf56792310b58a",
+      "structureHash": "3b34a8f2bdb9162311c5f7e54a7b1c0bffc1801bd3e41a17481fb85e480a881b",
       "parentId": "@proofblade/materials::class::ToolTimingHandle"
     },
     {
@@ -39742,7 +39877,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 265,
+      "line": 344,
       "signature": "(stage: ToolTimingStage): void",
       "summary": "Record a stage boundary. Re-marking a stage keeps the first timestamp so a",
       "summarySource": "tsdoc",
@@ -39759,6 +39894,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -39799,7 +39935,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 177,
+      "line": 235,
       "signature": "(tool: string, label?: string): ToolTimingHandle",
       "summary": "Start recording one tool call.",
       "summarySource": "tsdoc",
@@ -39842,7 +39978,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 162,
+      "line": 219,
       "signature": "(): void",
       "summary": "Discard every retained sample.",
       "summarySource": "tsdoc",
@@ -39852,6 +39988,7 @@
         "@earendil-works/pi-agent-core/node"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -39863,7 +40000,7 @@
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts"
       ],
-      "structureHash": "8ef48398db955894b3520563880b1233f0123476d74ce806564fab15c9c92bba",
+      "structureHash": "264fe9f1361ff710b0105be0105606162af1b3cb98be06a024cef9e4147fd887",
       "parentId": "@proofblade/materials::class::ToolTimingRecorder"
     },
     {
@@ -39873,7 +40010,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 157,
+      "line": 214,
       "signature": "(): number",
       "summary": "How many samples were evicted because the buffer was full.",
       "summarySource": "tsdoc",
@@ -39895,7 +40032,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 188,
+      "line": 246,
       "signature": "(sample: ToolTimingSample): void",
       "summary": "Append a finished sample, evicting the oldest when at capacity.",
       "summarySource": "tsdoc",
@@ -39973,7 +40110,7 @@
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ],
-      "structureHash": "05fe5edc6250020dd3dcb8362ca0ff81b355ea32accf6857c52f3f3035212fa8",
+      "structureHash": "1d1999c157d686bdf990c8eeca33220f2cf43234503cfc7d4518314cdc3eeb09",
       "parentId": "@proofblade/materials::class::ToolTimingRecorder"
     },
     {
@@ -39983,7 +40120,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 152,
+      "line": 207,
       "signature": "(): readonly ToolTimingSample[]",
       "summary": "Retained samples, oldest first.",
       "summarySource": "tsdoc",
@@ -39996,7 +40133,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/tool-timing.test.ts"
       ],
-      "structureHash": "9387fe9452afa16a8577f16448fd9a84bc7de5aab4a0eca82852015b6581d076",
+      "structureHash": "1d2f6dcfbef1d2018b2996d61b6ff37b6e92328bfac5a789e005dd06c0e3aac2",
       "parentId": "@proofblade/materials::class::ToolTimingRecorder"
     },
     {
@@ -40006,8 +40143,8 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 203,
-      "signature": "(groups?: readonly string[]): ToolTimingSummary[]",
+      "line": 270,
+      "signature": "(groups?: readonly string[]): ToolTimingReport",
       "summary": "Aggregate the retained samples, grouped by label when one was supplied and",
       "summarySource": "tsdoc",
       "tags": [
@@ -40030,7 +40167,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/tool-timing.test.ts"
       ],
-      "structureHash": "3861c3249b73bf422ccf058c0e4efc1e3b1f8a4e798802563f4bb708ace93349",
+      "structureHash": "af426c0c0a69b35d56339b0be233c64918d7175a9b8bafa70069e8264982c8da",
       "parentId": "@proofblade/materials::class::ToolTimingRecorder"
     },
     {
@@ -40667,6 +40804,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -40873,6 +41011,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -40962,6 +41101,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -41379,6 +41519,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
@@ -41567,6 +41708,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -41585,6 +41727,7 @@
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -41744,7 +41887,8 @@
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
-        "packages/materials/tests/single-agent-loop.test.ts"
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ],
       "structureHash": "62fc3d10ced8566c126d47c449394f6a7f5ad9c855b43f096d1b5b973a2e07bc",
       "parentId": "@proofblade/materials::class::RunCoordinator"
@@ -41903,6 +42047,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
@@ -42060,6 +42205,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -42078,6 +42224,7 @@
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
@@ -42115,7 +42262,8 @@
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
-        "packages/materials/tests/single-agent-loop.test.ts"
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ],
       "structureHash": "ea3c6a894069014f845877c86a1975272f842ff80b0df40500cc6998a64d3b2b",
       "parentId": "@proofblade/materials::class::RunWorkScheduler"
@@ -42265,6 +42413,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
@@ -42843,6 +42992,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -43377,6 +43527,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -43696,6 +43847,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -44005,9 +44157,11 @@
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/experiment-gate-projection.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -44050,6 +44204,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -45988,6 +46144,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -46107,6 +46264,7 @@
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
@@ -46759,6 +46917,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -46848,6 +47007,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -46946,6 +47106,7 @@
         "../sandbox/fixture.js"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -48326,7 +48487,9 @@
         "packages/materials/tests/evaluation-replay.test.ts",
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -48449,6 +48612,7 @@
         "packages/materials/tests/experiment-gate-projection.test.ts",
         "packages/materials/tests/failure-policy.test.ts",
         "packages/materials/tests/general-task-contract.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -48622,7 +48786,6 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
-        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -48902,6 +49065,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -48998,6 +49162,7 @@
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
@@ -49355,7 +49520,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 169,
+      "line": 183,
       "signature": "(): string",
       "summary": "Inferred summary: catalog hash operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49391,7 +49556,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 173,
+      "line": 187,
       "signature": "(): RuntimeResourceSnapshot",
       "summary": "Inferred summary: context snapshot operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49420,7 +49585,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 163,
+      "line": 177,
       "signature": "(options?: { includeDisabled?: boolean; }): SkillCatalogEntry[]",
       "summary": "Inferred summary: list operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49469,6 +49634,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -49563,7 +49729,7 @@
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
-      "structureHash": "ab92f21e016505cd10a00873ea90f1ec95cde7ee168387b729892927592d72c2",
+      "structureHash": "d36551611ccd8c07f8fca9dd8dc00bed9695c514ee746b817f6d01c4a9084dcc",
       "parentId": "@proofblade/materials::class::ProofBladeSkillRegistry"
     },
     {
@@ -49573,7 +49739,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 189,
+      "line": 203,
       "signature": "(name: string, maxChars?: number): LoadedSkillContent",
       "summary": "Inferred summary: load for model operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49603,7 +49769,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 185,
+      "line": 199,
       "signature": "(): Skill[]",
       "summary": "Inferred summary: pi skills operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49658,7 +49824,7 @@
       "visibility": "public",
       "module": "src/storage/jsonl-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 647,
+      "line": 677,
       "signature": "(events: HarnessEvent[], authoritySecret: string): Promise<void>",
       "summary": "Inferred summary: #append authorized unlocked operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -49686,7 +49852,7 @@
       "visibility": "public",
       "module": "src/storage/jsonl-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 660,
+      "line": 690,
       "signature": "(events: HarnessEvent[]): Promise<void>",
       "summary": "Inferred summary: #append unchecked operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -49714,7 +49880,7 @@
       "visibility": "public",
       "module": "src/storage/jsonl-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 689,
+      "line": 719,
       "signature": "(runId: string): Promise<string>",
       "summary": "Inferred summary: #authority hash for operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -49760,6 +49926,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts"
       ],
       "structureHash": "1896a68cd7d33affe27847d2f300ff3aa2ea81b41b1b6600dc262814ab5e1f79",
@@ -50025,6 +50192,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -50199,7 +50367,7 @@
       "visibility": "public",
       "module": "src/storage/jsonl-store.ts",
       "exportPath": "@proofblade/materials",
-      "line": 643,
+      "line": 673,
       "signature": "(runId: string): Promise<string>",
       "summary": "Inferred summary: projection digest operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -50359,6 +50527,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/read-path-parse-budget.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "f51285fe09c419cf2e8ec64c5adb008e02f5ca250e3e70555bd22bccce0530e2",
@@ -50569,7 +50738,8 @@
         "node:path"
       ],
       "testRefs": [
-        "packages/materials/tests/control-store.test.ts"
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts"
       ],
       "structureHash": "e18c8b58006178dcef166b687e5a3cf2bff3adcd2c1fd55e9a11f40942a6c556",
       "parentId": "@proofblade/materials::class::JsonlControlStore"
@@ -50766,6 +50936,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skill-routing.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -50921,6 +51092,7 @@
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -51012,6 +51184,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -53853,6 +54026,7 @@
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
@@ -53894,6 +54068,7 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -54090,6 +54265,7 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -54097,6 +54273,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "efa8372fa966cadb4f78868df5bd16dbe9c07c17a3a74b40baf3eff5ef2499d7",
@@ -54422,6 +54599,7 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -54980,6 +55158,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -55321,6 +55500,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -55567,6 +55747,7 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/barrier-projection.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -55574,6 +55755,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "5c8c7dd30361c07781ad8e688787475c6b17b0b116ba5bd65534b5d4a47bd675",
@@ -56523,6 +56705,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -59451,7 +59634,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 56,
+      "line": 74,
       "signature": "keyof ToolTimingCounters",
       "summary": "Counter keys that a caller may increment while recording a sample.",
       "summarySource": "tsdoc",
@@ -59469,7 +59652,7 @@
       "visibility": "public",
       "module": "src/observability/tool-timing.ts",
       "exportPath": "@proofblade/materials",
-      "line": 34,
+      "line": 40,
       "signature": "\"scheduled\" | \"executionStart\" | \"executionEnd\" | \"toolResultEmitted\" | \"subscribersEnd\"",
       "summary": "One of the observed boundaries of a tool call.",
       "summarySource": "tsdoc",

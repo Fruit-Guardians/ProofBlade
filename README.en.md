@@ -64,7 +64,9 @@ Runs and artifacts are written below `runs/`. Downloads and source snapshots bel
 - `docs/project/PLAN.md` lists priorities, dependencies, progress, deliverables, and acceptance criteria;
 - `docs/project/UPDATE_LOG.md` records what changed, the related plans, branch, commit, and validation;
 - `docs/project/COMPLETION_REPORT.md` records completed plans, actual deliverables, and verification evidence;
-- `docs/project/MAINTENANCE_REPORT.md` records maintenance work and summarizes version and audit metadata for all 25 components.
+- `docs/project/MAINTENANCE_REPORT.md` records maintenance work and summarizes version and audit metadata for all 26 components.
+
+Those four reports are **generated, not tracked** (`docs/project/` is in `.gitignore`). They are a deterministic function of `project-status.json`, so committing their output only manufactures conflicts: any `npm run reports:project` rewrites all four, and a stale copy generated from an older `project-status.json` cannot merge. `project-status.json` is the only source of truth in the repository; the reports are generated on demand locally and in CI, and CI uploads them as a build artifact after checking them.
 
 ```powershell
 npm run reports:project
@@ -186,6 +188,6 @@ Imports only point downward in this diagram. Each package adds information inste
 
 Built-in tools, the Capability Router, the Effect Journal, the project Skill Registry and MCP stdio are implemented. Skill and MCP metadata enter the ContextManifest while full instructions and tool schemas load on demand. MCP calls follow the same `Tool -> Capability Router -> Effect Journal -> Artifact/Evidence` audit path. See `docs/extensions.md` for implementation status, contracts, examples and the verification checklist.
 
-Every maintainable component has a versioned `COMPONENT.md`. See `docs/components.md` for the 25-component index and the enforced rule requiring a SemVer bump and updated timestamp whenever related source changes.
+Every maintainable component has a versioned `COMPONENT.md`. See `docs/components.md` for the component index (26 today, as `npm run check:components` reports) and the enforced rule requiring a SemVer bump and updated timestamp whenever related source changes.
 
-See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, `docs/project/PLAN.md`, `docs/project/UPDATE_LOG.md`, `docs/project/COMPLETION_REPORT.md`, `docs/project/MAINTENANCE_REPORT.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts, current work, maintenance state, and design basis.
+See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, `project-status.json` (with the reports `npm run reports:project` generates from it), and `pi-ctf-agent-harness-design.md` for the implemented contracts, current work, maintenance state, and design basis.
