@@ -25,7 +25,7 @@ import {
   createCodingTools,
   withToolTiming,
   type CodingResourceContext,
-  type ToolTimingSummary,
+  type ToolTimingReport,
 } from "@proofblade/materials";
 
 interface BenchmarkCase {
@@ -95,11 +95,11 @@ try {
     }
   }
 
-  const summaries = recorder.summarize(cases.map((benchmark) => benchmark.name));
+  const report = recorder.summarize(cases.map((benchmark) => benchmark.name));
   if (asJson) {
     process.stdout.write(`${JSON.stringify({ iterations, summaries }, null, 2)}\n`);
   } else {
-    printReport(iterations, cases, summaries);
+    printReport(iterations, cases, report);
   }
 } finally {
   await rm(root, { recursive: true, force: true });
@@ -115,10 +115,15 @@ function readNumberArgument(name: string): number | undefined {
   return value;
 }
 
-function printReport(iterations: number, cases: readonly BenchmarkCase[], summaries: readonly ToolTimingSummary[]): void {
+function printReport(iterations: number, cases: readonly BenchmarkCase[], report: ToolTimingReport): void {
+  const summaries = report.groups;
   console.log(`Tool hot-path baseline (${iterations} iterations per case, provider-free)`);
   console.log("");
-  console.log("| case | tool | n | errors | exec p50 | exec p95 | framework p50 | framework p95 | total p50 | total p95 | total p99 |");
+  // `wrapper` rather than `framework`: both marks are taken inside the timing
+  // wrapper, so this span is the wrapper's own entry cost, not agent-loop
+  // dispatch delay. The previous column name attributed it to the framework,
+  // which nothing here can observe.
+  console.log("| case | tool | n | errors | exec p50 | exec p95 | wrapper p50 | wrapper p95 | total p50 | total p95 | total p99 |");
   console.log("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
   for (const benchmark of cases) {
     const summary = summaries.find((item) => item.group === benchmark.name);
@@ -127,7 +132,7 @@ function printReport(iterations: number, cases: readonly BenchmarkCase[], summar
       continue;
     }
     const execution = summary.phases.executionStart_executionEnd;
-    const framework = summary.phases.scheduled_executionStart;
+    const wrapper = summary.phases.scheduled_executionStart;
     console.log([
       `| ${benchmark.name}`,
       benchmark.tool,
@@ -135,15 +140,21 @@ function printReport(iterations: number, cases: readonly BenchmarkCase[], summar
       String(summary.errorCount),
       format(execution?.p50),
       format(execution?.p95),
-      format(framework?.p50),
-      format(framework?.p95),
+      format(wrapper?.p50),
+      format(wrapper?.p95),
       format(summary.total.p50),
       format(summary.total.p95),
       format(summary.total.p99),
     ].join(" | ") + " |");
   }
   console.log("");
-  console.log("Counters (must stay at zero on the synchronous path; see plan §7.2.2):");
+  // The counter columns are all zero here, and the reason is not that the hot
+  // path is clean: nothing in this harness increments them. They exist on the
+  // handle for a producer to call, and a producer needs a ControlStore. Saying
+  // "must stay at zero" invited reading them as evidence, which they are not.
+  console.log("Counters: all zero, and that means \"nothing incremented them\" in this harness -- not");
+  console.log("\"the synchronous path is clean\". This harness has no ControlStore, so nothing can");
+  console.log("increment these; `scripts/tool-hot-path-real-run-baseline.ts` is where they carry data.");
   console.log("");
   console.log("| case | n | controlCommits | eventFsyncs | projectionWrites | artifactReadbacks | hashRuns |");
   console.log("|---|---:|---:|---:|---:|---:|---:|");
@@ -151,7 +162,8 @@ function printReport(iterations: number, cases: readonly BenchmarkCase[], summar
     console.log(`| ${summary.group} | ${summary.count} | ${summary.counters.controlCommits} | ${summary.counters.eventFsyncs} | ${summary.counters.projectionWrites} | ${summary.counters.artifactReadbacks} | ${summary.counters.hashRuns} |`);
   }
   console.log("");
-  console.log(`Retained samples: ${summaries.reduce((total, summary) => total + summary.count, 0)}. Per-case percentiles are over the retained window.`);
+  console.log(`Retained samples: ${report.retained} of capacity ${report.capacity}; dropped: ${report.dropped}.`);
+  if (report.dropped > 0) console.log("WARNING: samples were evicted, so the percentiles above describe a suffix of the run, not all of it.");
   console.log("");
   console.log("NOT measured here: ControlStore commit, `fsync`, projection rewrite, Artifact read-back and");
   console.log("hash counts are counted (all zero above) rather than executed, because this harness has no");

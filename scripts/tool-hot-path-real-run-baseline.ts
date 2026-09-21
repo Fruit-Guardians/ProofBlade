@@ -19,7 +19,7 @@
  *   tsx scripts/tool-hot-path-real-run-baseline.ts [--iterations N] [--json]
  */
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { cpus, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
@@ -36,7 +36,7 @@ import {
   type CodingResourceContext,
   type ControlStore,
   type ProofBladeConfig,
-  type ToolTimingSummary,
+  type ToolTimingReport,
 } from "@proofblade/materials";
 
 const iterations = readNumberArgument("--iterations") ?? 10;
@@ -160,12 +160,12 @@ try {
     }
   }
 
-  const summaries = recorder.summarize(cases.map((item) => item.name));
+  const report = recorder.summarize(cases.map((item) => item.name));
   assertMeasured(samples);
   if (asJson) {
-    process.stdout.write(`${JSON.stringify({ iterations, samples, summaries }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ iterations, samples, ...report }, null, 2)}\n`);
   } else {
-    printReport(iterations, samples, summaries);
+    printReport(iterations, samples, report);
   }
   await services.control.flushProjection(runId).catch(() => undefined);
 } finally {
@@ -281,8 +281,12 @@ function passthroughRewrite(artifactStore: ReturnType<typeof createServices>["ar
   } as unknown as NonNullable<CodingResourceContext["outputRewrite"]>;
 }
 
-function printReport(iterations: number, samples: readonly RealRunSample[], summaries: readonly ToolTimingSummary[]): void {
+function printReport(iterations: number, samples: readonly RealRunSample[], report: ToolTimingReport): void {
+  const summaries = report.groups;
   console.log(`Real-Run tool hot-path baseline (${iterations} iterations per case, real ControlStore)`);
+  console.log("");
+  console.log(`Host: node ${process.version} on ${process.platform}/${process.arch}, ${cpus().length} logical CPUs (${cpus()[0]?.model ?? "unknown"}), runs root on the OS temp volume.`);
+  console.log("A single-machine measurement: treat absolute milliseconds as indicative and the counts as the finding.");
   console.log("");
   console.log("| case | n | failed | durable events appended | projection writes | artifact read-backs |");
   console.log("|---|---:|---:|---:|---:|---:|");
@@ -291,20 +295,30 @@ function printReport(iterations: number, samples: readonly RealRunSample[], summ
     console.log(`| ${name} | ${group.length} | ${group.filter((item) => item.failed).length} | ${sum(group.map((item) => item.events))} | ${sum(group.map((item) => item.projectionWrites))} | ${sum(group.map((item) => item.artifactReadbacks))} |`);
   }
   console.log("");
-  console.log("Per-call latency (command = tool body, framework = everything around it):");
+  console.log("Per-call latency (command = the tool body, wrapper = the timing wrapper plus the caller's scheduled mark):");
   console.log("");
-  console.log("| case | command p50 | command p95 | framework p50 | framework p95 |");
-  console.log("|---|---:|---:|---:|---:|");
+  // `n` is printed in every row and percentiles are only claimed from n >= 20,
+  // because nearest-rank p95 over 8 samples IS the maximum: reporting it as a
+  // "p95" reads a single observation as a tail. The column names say `wrapper`
+  // rather than `framework` for the same reason -- both marks are taken inside
+  // the wrapper, so it is not agent-loop dispatch delay.
+  console.log("| case | n | command p50 | command p95 | wrapper p50 | wrapper p95 |");
+  console.log("|---|---:|---:|---:|---:|---:|");
   for (const name of [...new Set(samples.map((sample) => sample.case))]) {
     const group = samples.filter((sample) => sample.case === name).map((item) => item.commandMs).sort((a, b) => a - b);
-    const framework = samples.filter((sample) => sample.case === name).map((item) => item.frameworkMs).sort((a, b) => a - b);
-    console.log(`| ${name} | ${ms(percentileOf(group, 0.5))} | ${ms(percentileOf(group, 0.95))} | ${ms(percentileOf(framework, 0.5))} | ${ms(percentileOf(framework, 0.95))} |`);
+    const wrapper = samples.filter((sample) => sample.case === name).map((item) => item.frameworkMs).sort((a, b) => a - b);
+    const floor = group.length >= 20 ? "ok" : "n<20, p95 is the max";
+    console.log(`| ${name} | ${group.length} (${floor}) | ${ms(percentileOf(group, 0.5))} | ${ms(percentileOf(group, 0.95))} | ${ms(percentileOf(wrapper, 0.5))} | ${ms(percentileOf(wrapper, 0.95))} |`);
   }
   console.log("");
   console.log(`Recorder groups: ${summaries.map((item) => `${item.group}=${item.count}`).join(", ")}`);
+  console.log(`Ring buffer: retained ${report.retained} of ${report.capacity}, dropped ${report.dropped}.`);
+  if (report.dropped > 0) console.log("WARNING: the buffer evicted samples, so the durations above describe a suffix of the run.");
   console.log("");
-  console.log("Read as: each row is ONE tool call. The event column is the durable appends the");
-  console.log("model waits on -- each one is a run-lock acquire plus an event-log fsync.");
+  console.log("Read as: each row is ONE tool call. `durable events appended` counts the records a");
+  console.log("call still owes the model, not one fsync each: a read registers an Artifact and");
+  console.log("then derives an observation, which is 4 events across 2 commits (see the cost");
+  console.log("breakdown, section 2.1). The commit count is the run-lock + fsync cost.");
   console.log("A ZERO in a column is only meaningful together with the failure column: a case");
   console.log("that failed every iteration did no work and must not be read as 'free'.");
 }

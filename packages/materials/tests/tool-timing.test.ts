@@ -139,7 +139,7 @@ test("summarize groups by tool and sums the acceptance counters", () => {
   bash.count("eventFsyncs");
   bash.finish();
 
-  const summaries = recorder.summarize();
+  const summaries = recorder.summarize().groups;
   assert.deepEqual(summaries.map((summary) => summary.group), ["bash", "read"]);
   const read = summaries.find((summary) => summary.group === "read");
   assert.ok(read);
@@ -161,7 +161,7 @@ test("a label separates calls that share one tool name", () => {
   recorder.begin("read", "read-1B").finish();
   recorder.begin("read", "read-64KiB").finish();
 
-  const summaries = recorder.summarize();
+  const summaries = recorder.summarize().groups;
   assert.deepEqual(summaries.map((summary) => summary.group), ["read-1B", "read-64KiB"]);
   assert.equal(summaries[0]?.tool, "read");
   assert.equal(summaries[0]?.count, 2);
@@ -173,7 +173,7 @@ test("an unlabelled sample groups under its tool name", () => {
   recorder.begin("read").finish();
   recorder.begin("read", "read-1B").finish();
 
-  const summaries = recorder.summarize();
+  const summaries = recorder.summarize().groups;
   assert.deepEqual(summaries.map((summary) => summary.group), ["read", "read-1B"]);
   assert.equal(recorder.samples()[0]?.label, undefined);
   assert.equal(recorder.samples()[1]?.label, "read-1B");
@@ -189,7 +189,7 @@ test("summarize can restrict to named groups", () => {
   recorder.begin("read").finish();
   recorder.begin("bash").finish();
 
-  assert.deepEqual(recorder.summarize(["bash"]).map((summary) => summary.group), ["bash"]);
+  assert.deepEqual(recorder.summarize(["bash"]).groups.map((summary) => summary.group), ["bash"]);
 });
 
 test("withToolTiming returns the original tool when no recorder is given", () => {
@@ -292,7 +292,6 @@ test("recording performs no durable write", () => {
   // A recorder that persisted each sample would add the very synchronous
   // barrier this work removes, and would perturb what it measures.
   const recorder = new ToolTimingRecorder();
-  const before = process.memoryUsage().heapUsed;
   for (let index = 0; index < 200; index += 1) {
     const handle = recorder.begin("read");
     handle.mark("executionStart");
@@ -302,12 +301,60 @@ test("recording performs no durable write", () => {
   }
 
   assert.equal(recorder.samples().length, 200);
-  assert.equal(typeof before, "number");
   const sample: ToolTimingSample | undefined = recorder.samples()[0];
   assert.ok(sample);
-  // The sample is a plain value: no store, journal, or stream handle can ride along.
-  assert.deepEqual(Object.keys(sample).sort(), ["counters", "isError", "marks", "phases", "tool", "totalMs"]);
-  assert.equal(recorder.summarize()[0]?.counters.controlCommits, 200);
+  // "Plain value" is a claim about what can ride along, so assert what the claim
+  // means rather than a list of six key names: a JSON round-trip must be
+  // lossless, the prototype must be Object, and no value may be a function or a
+  // class instance. Comparing key names passed with a private field, a symbol, or
+  // a closure attached.
+  assert.deepEqual(JSON.parse(JSON.stringify(sample)), sample, "a sample must survive a JSON round-trip unchanged");
+  assert.equal(Object.getPrototypeOf(sample), Object.prototype, "a sample must be a plain object, not a class instance");
+  for (const [key, value] of Object.entries(sample)) {
+    assert.equal(typeof value === "function", false, `sample.${key} must not be a function`);
+    assert.ok(value === null || typeof value !== "object" || Object.getPrototypeOf(value) === Object.prototype || Array.isArray(value), `sample.${key} must be a primitive or a plain object`);
+  }
+  assert.equal(recorder.summarize().groups[0]?.counters.controlCommits, 200);
+});
+
+test("the ring buffer evicts the oldest sample and reports what it dropped", () => {
+  // `shift()` on an array is O(n) per eviction, which puts the cost of
+  // measurement on the path being measured once the buffer fills. What is
+  // observable is that eviction still drops the OLDEST sample, keeps the order,
+  // and is reported rather than silent: percentiles over a truncated buffer
+  // describe a suffix, and nothing else in the report would say so.
+  const recorder = new ToolTimingRecorder(3);
+  for (let index = 0; index < 5; index += 1) {
+    const handle = recorder.begin("read", `n${index}`);
+    handle.mark("executionStart");
+    handle.finish();
+  }
+
+  assert.deepEqual(recorder.samples().map((sample) => sample.label), ["n2", "n3", "n4"], "the oldest samples must be the ones evicted");
+  const report = recorder.summarize();
+  assert.equal(report.dropped, 2, "evictions must be reported");
+  assert.equal(report.retained, 3);
+  assert.equal(report.capacity, 3);
+  assert.equal(report.groups.length, 3);
+
+  recorder.clear();
+  assert.deepEqual(recorder.samples(), []);
+  assert.equal(recorder.droppedCount(), 0, "clear resets the eviction count with the samples");
+});
+
+test("every percentile reports the n it was computed from", () => {
+  // Nearest-rank p95 over 8 samples IS the maximum. A percentile without its `n`
+  // invites a reader to treat a single observation as a tail, which is how the
+  // real-run baseline's `bash p95 = 2.9s` was misread.
+  const recorder = new ToolTimingRecorder();
+  for (let index = 0; index < 8; index += 1) recorder.begin("bash").finish();
+
+  const [summary] = recorder.summarize().groups;
+  assert.ok(summary);
+  assert.equal(summary.total.n, 8);
+  assert.equal(summary.total.p95, summary.total.max, "with n=8 the p95 must be the maximum, and the n is what says so");
+  assert.ok(summary.total.min <= summary.total.p50);
+  assert.ok(summary.total.p50 <= summary.total.max);
 });
 
 test("the default capacity retains a useful window for percentile reporting", () => {

@@ -15,12 +15,18 @@ function monotonicNow(): number {
 /**
  * The stages of one tool call, in the order they occur.
  *
- * `scheduled -> executionStart` covers the framework's own dispatch delay,
- * `executionStart -> executionEnd` the tool body, and
- * `executionEnd -> subscribersEnd` everything the ProofBlade control chain adds
- * after the tool itself has finished — which is the span this work exists to
- * shrink. `executionEnd -> toolResultEmitted` is recorded by the result
- * projection, so it stays `undefined` until that boundary is instrumented.
+ * `scheduled -> executionStart` is **wrapper entry overhead**, not framework
+ * dispatch delay: both marks are taken inside `withToolTiming`, so the span
+ * measures the wrapper's own entry plus the caller's `scheduled` mark, and in
+ * the baseline it is a fraction of a millisecond by construction. An earlier
+ * name and its documentation attributed it to the agent loop's dispatch, which
+ * nothing here can observe.
+ *
+ * `executionStart -> executionEnd` is the tool body. `executionEnd ->
+ * subscribersEnd` is everything the ProofBlade control chain adds after the tool
+ * itself has finished — the span this work exists to shrink.
+ * `executionEnd -> toolResultEmitted` is recorded by the result projection, so it
+ * stays `undefined` until that boundary is instrumented.
  */
 export const TOOL_TIMING_STAGES = [
   "scheduled",
@@ -32,6 +38,18 @@ export const TOOL_TIMING_STAGES = [
 
 /** One of the observed boundaries of a tool call. */
 export type ToolTimingStage = (typeof TOOL_TIMING_STAGES)[number];
+
+/**
+ * Stage pairs that are deliberately not reported, by name.
+ *
+ * `executionEnd -> subscribersEnd` is closed by `finish()` rather than by the
+ * projection, so emitting it would attribute the projection's uninstrumented
+ * work to the subscriber boundary and overstate it. This used to be an inline
+ * `if (from === "executionEnd" && to === "subscribersEnd") continue`, which meant
+ * a new stage silently produced a wrong number instead of no number: an explicit
+ * set is what the rule actually was.
+ */
+const UNINSTRUMENTED_PHASE_BOUNDARIES: ReadonlySet<string> = new Set(["executionEnd_subscribersEnd"]);
 
 /**
  * Acceptance-relevant counters for a single tool call.
@@ -95,6 +113,34 @@ export interface ToolTimingSummary {
   readonly counters: ToolTimingCounters;
 }
 
+/** Percentiles plus the sample count they were computed from. */
+export interface ToolTimingPercentiles {
+  readonly p50: number;
+  readonly p95: number;
+  readonly p99: number;
+  /**
+   * Samples retained for this group.
+   *
+   * Carried alongside the percentiles because a percentile without its `n` is
+   * not interpretable: nearest-rank p95 over 8 samples *is* the maximum, and a
+   * reader who cannot see the `n` will read a single observation as a tail.
+   */
+  readonly n: number;
+  readonly min: number;
+  readonly max: number;
+}
+
+/** One group's summary, plus how much of the record was not retained. */
+export interface ToolTimingReport {
+  readonly groups: readonly ToolTimingSummary[];
+  /** Samples evicted by the ring buffer since the last reset. */
+  readonly dropped: number;
+  /** Samples currently retained. */
+  readonly retained: number;
+  /** Capacity of the ring buffer the samples came from. */
+  readonly capacity: number;
+}
+
 /** Default number of retained samples. */
 export const DEFAULT_TOOL_TIMING_CAPACITY = 512;
 
@@ -137,7 +183,16 @@ export function percentile(sorted: readonly number[], fraction: number): number 
  */
 export class ToolTimingRecorder {
   readonly #capacity: number;
-  #samples: ToolTimingSample[] = [];
+  /**
+   * Ring buffer of retained samples, oldest at `#next`.
+   *
+   * An array with `shift()` is O(n) per eviction, which puts the cost of
+   * measurement on the path being measured once the buffer is full. This holds
+   * the same samples with an index cursor: appending overwrites the oldest slot
+   * in constant time, and the readable order is reconstructed on demand.
+   */
+  #ring: Array<ToolTimingSample | undefined> = [];
+  #next = 0;
   #dropped = 0;
 
   /**
@@ -150,7 +205,9 @@ export class ToolTimingRecorder {
 
   /** Retained samples, oldest first. */
   public samples(): readonly ToolTimingSample[] {
-    return this.#samples;
+    if (this.#ring.length < this.#capacity) return this.#ring.filter((sample): sample is ToolTimingSample => sample !== undefined);
+    return [...this.#ring.slice(this.#next), ...this.#ring.slice(0, this.#next)]
+      .filter((sample): sample is ToolTimingSample => sample !== undefined);
   }
 
   /** How many samples were evicted because the buffer was full. */
@@ -160,7 +217,8 @@ export class ToolTimingRecorder {
 
   /** Discard every retained sample. */
   public clear(): void {
-    this.#samples = [];
+    this.#ring = [];
+    this.#next = 0;
     this.#dropped = 0;
   }
 
@@ -186,24 +244,33 @@ export class ToolTimingRecorder {
    * @param sample - the completed sample.
    */
   public record(sample: ToolTimingSample): void {
-    this.#samples.push(sample);
-    while (this.#samples.length > this.#capacity) {
-      this.#samples.shift();
-      this.#dropped += 1;
+    if (this.#ring.length < this.#capacity) {
+      this.#ring.push(sample);
+      return;
     }
+    // Full: overwrite the oldest slot so no sample is ever shifted.
+    if (this.#ring[this.#next] !== undefined) this.#dropped += 1;
+    this.#ring[this.#next] = sample;
+    this.#next = (this.#next + 1) % this.#capacity;
   }
 
   /**
    * Aggregate the retained samples, grouped by label when one was supplied and
    * by tool name otherwise.
    *
+   * Every percentile carries its `n`, `min` and `max`, and the report carries the
+   * eviction count. Both matter for reading the numbers honestly: nearest-rank
+   * p95 over 8 samples *is* the maximum, so a percentile without its `n` invites
+   * reading one observation as a tail, and a silently-truncated buffer makes the
+   * percentiles describe a suffix with nothing saying so.
+   *
    * @param groups - restrict the summary to these group keys; all when omitted.
    * @returns one summary per group that has at least one retained sample.
    */
-  public summarize(groups?: readonly string[]): ToolTimingSummary[] {
+  public summarize(groups?: readonly string[]): ToolTimingReport {
     const wanted = groups === undefined ? undefined : new Set(groups);
     const grouped = new Map<string, ToolTimingSample[]>();
-    for (const sample of this.#samples) {
+    for (const sample of this.samples()) {
       const key = sample.label ?? sample.tool;
       if (wanted && !wanted.has(key)) continue;
       const bucket = grouped.get(key);
@@ -226,13 +293,25 @@ export class ToolTimingRecorder {
         group: key,
         count: samples.length,
         errorCount: samples.filter((sample) => sample.isError).length,
-        total: { p50: percentile(totals, 0.5), p95: percentile(totals, 0.95), p99: percentile(totals, 0.99) },
+        total: describe(totals),
         phases,
         counters: sumCounters(samples),
       });
     }
-    return summaries;
+    return { groups: summaries, dropped: this.#dropped, retained: this.#ring.length, capacity: this.#capacity };
   }
+}
+
+/** Percentiles plus the sample count and range they were computed from. */
+function describe(sorted: readonly number[]): ToolTimingPercentiles {
+  return {
+    p50: percentile(sorted, 0.5),
+    p95: percentile(sorted, 0.95),
+    p99: percentile(sorted, 0.99),
+    n: sorted.length,
+    min: sorted[0] ?? 0,
+    max: sorted[sorted.length - 1] ?? 0,
+  };
 }
 
 /** Per-call recording handle produced by {@link ToolTimingRecorder.begin}. */
@@ -297,7 +376,7 @@ export class ToolTimingHandle {
     for (let index = 1; index < TOOL_TIMING_STAGES.length; index += 1) {
       const from = TOOL_TIMING_STAGES[index - 1]!;
       const to = TOOL_TIMING_STAGES[index]!;
-      if (from === "executionEnd" && to === "subscribersEnd") continue;
+      if (UNINSTRUMENTED_PHASE_BOUNDARIES.has(`${from}_${to}`)) continue;
       const start = this.#marks[from];
       const end = this.#marks[to];
       if (start !== undefined && end !== undefined) phases[`${from}_${to}`] = round(end - start);
@@ -346,6 +425,10 @@ export function withToolTiming<TContext extends CodingResourceContext>(
   label?: string,
 ): AgentHarnessTool<TContext> {
   if (!recorder) return tool;
+  // Bound and then invoked with `call` so a tool implemented as a method keeps
+  // its receiver. `const inner = tool.execute` followed by a bare call loses it,
+  // which is invisible for today's closure-built tools and a trap for the first
+  // one that is not.
   const inner = tool.execute;
   const wrapped: AgentHarnessTool<TContext> = {
     ...tool,
@@ -353,7 +436,7 @@ export function withToolTiming<TContext extends CodingResourceContext>(
       const handle = recorder.begin(tool.name, label);
       handle.mark("executionStart");
       try {
-        const result = await inner(toolCallId, params, signal, onUpdate, context);
+        const result = await inner.call(tool, toolCallId, params, signal, onUpdate, context);
         handle.mark("executionEnd");
         // A tool that returns an error result must not be counted as a success
         // in the baseline, or error paths disappear from the summary. The
