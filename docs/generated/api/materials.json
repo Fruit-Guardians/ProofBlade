@@ -141,7 +141,7 @@
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
-    "src/runtime/version.ts": "a7927a9740181a294a387f3c0f4614c9471b3ba912798d9d53ba6a4e75093cf6",
+    "src/runtime/version.ts": "b15eceb7ff28f01789e264895911a5fe6b3a99276dd8cb84eb6b34d63b8ddbe8",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
@@ -27388,6 +27388,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -42807,6 +42808,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "945005e1206450ca9f8cb92628e4858c4e02505d1c39211c97a21900db74741d",
@@ -48771,6 +48773,7 @@
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/update-evaluation-gates.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ],
       "structureHash": "03a29db2ef415ac91850c98f7f67225def2c6013f20ac3f23336245939337e31",
@@ -52472,6 +52475,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "423dff1f8eaaac1f4d5eefbd3d86bd4377352f849a55a3b3840e147ed13fdb56",
@@ -53142,6 +53146,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "012bf8d60229de68f7baf8880a09e2870ba69d0a5b93f3cc28a2246bc564d281",
@@ -53211,6 +53216,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "c9ec1787d7fb3dcd97a4081b665a4b529d6ac29a9dec18ad5deae68a0c3f6afd",
@@ -53294,6 +53300,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "6113289ada77ba6037459aadd82b1234a5b3bb8ed1156b8f44ebfe67cf3fc1b1",

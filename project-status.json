@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-21T09:00:00+08:00",
+  "updatedAt": "2026-09-21T11:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2070,6 +2070,27 @@
       "validation": [
         "变异验证：移除工具上下文的 observerDiagnostics 注入后，端到端用例失败（ok 1 / not ok 2），证明断言抓的是接线的缺失而非仅读取器的存在",
         "92 个断言通过：control-store / barrier-projection / projection-hint-currency / projection-read-bound / control-store-concurrency / control-store-evidence-invariants / read-path-parse-budget / debug-data",
+        "check:components / check:change-contracts / check:project-reports / api:index:check / check:changed-tests 全部通过"
+      ]
+    },
+    {
+      "id": "UPDATE-20260921-002",
+      "occurredAt": "2026-09-21T11:00:00+08:00",
+      "summary": "修复评审阻塞项 #227：版本快照的 revision 缓存键从 size+mtime 扩展到 ino+ctime，避免同长度就地改写并复位 mtime 时复用陈旧内容摘要。",
+      "branch": "fix/review-blockers",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "fileRevision() 的缓存键改为 path|ino|size|mtimeMs|ctimeMs：ctime 在任何内容或元数据变更时前进且普通写入者无法设置，因此 mtime 被复位后仍能识别变化；ino 区分原子替换与同长度就地写入",
+        "三者同属一次 stat() 返回，快路径仍是快路径",
+        "范围写入源码注释而非隐含：这能挡住普通写入与近似命中，不针对能写内容又冻结 ctime 的特权攻击者——那种攻击者同样可以直接改写缓存摘要"
+      ],
+      "validation": [
+        "变异验证并如实记录：把键回退为 size|mtimeMs 后新增用例仍然通过，因为本文件系统上 writeFile 无法还原到比特级相同的 mtime（utimes 保留亚毫秒精度），所以仅 mtime 变化就足以推动 revision",
+        "因此该改动是推理所得而非门禁所得，测试注释已写明这一点；断言只覆盖可观测结果（同长度改写必须推动 revision 并触发重建）",
+        "111 个断言通过：version-cache / lane-observer-diagnostics / observer-diagnostics / archival-failure-semantics / skill-registry-cache / projection-read-bound / barrier-projection / projection-hint-currency / control-store / debug-data",
         "check:components / check:change-contracts / check:project-reports / api:index:check / check:changed-tests 全部通过"
       ]
     }

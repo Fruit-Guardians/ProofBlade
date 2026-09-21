@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ProofBladeConfig } from "../src/config.js";
@@ -158,6 +158,49 @@ test("rewriting a file with identical bytes does not count as a change", async (
     assert.equal(cache.revision(), revisionBefore, "identical bytes must yield the identical revision");
     assert.equal(cache.buildCount(), 1, "an identical rewrite must not rebuild the snapshot");
     assert.equal(after, before);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a same-size rewrite is not hidden by the revision cache", async () => {
+  // Review finding: a `size + mtimeMs` key reproduces itself when a file is
+  // rewritten in place at the same byte length and the timestamp is put back, so
+  // the stale content digest was reused and a caller could be handed a
+  // RunVersionSnapshot built from content that no longer exists. The key now also
+  // carries the inode and ctime.
+  //
+  // Honest scope -- read this before trusting the test as a gate. It asserts the
+  // observable outcome (a same-size rewrite must move the revision and rebuild)
+  // and it does NOT isolate ino/ctime as the cause. Mutation-checked: reverting
+  // the key to `size + mtimeMs` leaves this test green on this filesystem,
+  // because `writeFile` cannot be given a bit-identical mtime back (sub-ms
+  // precision survives `utimes`), so the changed mtime alone moves the revision.
+  //
+  // The ino/ctime change is therefore reasoned, not gated: ctime advances on any
+  // content change and ordinary writers cannot set it, unlike mtime. A test that
+  // actually fails without it needs a filesystem or an injection point where the
+  // cache key inputs can be held still, which this suite does not have.
+  const root = await project();
+  try {
+    const skillPath = join(root, "skills", "alpha", "SKILL.md");
+    const first = "---\nname: alpha\ndescription: aaaa\n---\n\nbody\n";
+    const second = "---\nname: alpha\ndescription: bbbb\n---\n\nbody\n";
+    assert.equal(Buffer.byteLength(first), Buffer.byteLength(second), "the two bodies must be the same length");
+    await writeFile(skillPath, first, "utf8");
+
+    const cache = createCachedRunVersionSnapshot(root, config);
+    const before = await cache.provider();
+    const revisionBefore = cache.revision();
+
+    await writeFile(skillPath, second, "utf8");
+    const original = await stat(skillPath);
+    await utimes(skillPath, original.atime, new Date(Math.floor(original.mtimeMs / 1000) * 1000));
+
+    const after = await cache.provider();
+    assert.notEqual(cache.revision(), revisionBefore, "same-size different bytes must change the revision");
+    assert.equal(cache.buildCount(), 2, "the snapshot must be rebuilt from the new bytes");
+    assert.equal(after.skills.length, before.skills.length);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
