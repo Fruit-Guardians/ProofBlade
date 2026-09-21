@@ -147,7 +147,7 @@
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
     "src/sandbox/fixture.ts": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
     "src/security/approval-policy.ts": "1f9d442218afddf3547d7bd481fc4121394b2fb0ad7bba66d7ab1934d6876e5c",
-    "src/skills/registry.ts": "80033d73d5f96c78d76dd791f92342dc4e3c0539d55b907d660de91ac37cbe7b",
+    "src/skills/registry.ts": "fa18069a76b0bfb3068f875d08039f9eb25e0ad0cee414b530b8fab892727941",
     "src/storage/control-authority.ts": "8add37c36f821514cf985b4c9c96722351314ae4ffc516efd91d617a8c787647",
     "src/storage/jsonl-store.ts": "6117d2408344db512d96be98361c5b780782db6aaa1c4ee410a655eccfb1ca61",
     "src/storage/spill-store.ts": "be10856f0ca4e4ef962033559921dbce390efca16d0b55b683013954031c0a51",
@@ -2571,6 +2571,7 @@
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
     },
@@ -2675,7 +2676,8 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/skill-registry-cache.test.ts",
-        "packages/materials/tests/skills.test.ts"
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ]
     },
     {
@@ -29373,6 +29375,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "a5b8e651a5887607264fb72cc67ad20e1a09ce67ec9b6eadd1b04357daa28246",
@@ -30064,6 +30067,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "7316a5c9336a860d883c111e9f03660ee7671d8df3335ff086cb06ed8046e63c",
@@ -35249,6 +35253,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "6c4d92bd50ea8c2488a95eb46796f1f0ee80fd50cc17ad697eb676101d7b9bb1",
@@ -35703,6 +35708,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "a53ce3c532572b8ce497ac046cfbbbf8bf12d145fd63c54be13f91033762ef04",
@@ -38419,6 +38425,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "d64988e32e2ed8d5506dfdde332a9ed3001afb3d3a711bf5ac03830b5413b069",
@@ -48704,6 +48711,7 @@
         "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "adead5e72267b20524b636593147890fb1ea772e671fef25c28e3a8063ee192d",
@@ -49043,7 +49051,8 @@
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts"
+        "packages/materials/tests/skill-registry-cache.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "ad9b068917c31dfcf1af1d1fc7777228b7a2a16a2d21dee3f5962a8c251c029e",
       "parentId": "@proofblade/materials::class::ProofBladeSkillRegistry"
@@ -49260,6 +49269,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "ab92f21e016505cd10a00873ea90f1ec95cde7ee168387b729892927592d72c2",
@@ -49345,7 +49355,8 @@
       ],
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts"
+        "packages/materials/tests/skill-registry-cache.test.ts",
+        "packages/materials/tests/version-cache.test.ts"
       ],
       "structureHash": "f01625649412a16c401349f7546e025b48a25d52b9fff8bbf32c0e4231b893a8",
       "parentId": "@proofblade/materials::class::ProofBladeSkillRegistry"
@@ -50794,6 +50805,7 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/tool-timing.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "534299e42c3cd4be6bf19ce86fd554abe63c8cbb26b2ef2cf0b736d161cd1e70",

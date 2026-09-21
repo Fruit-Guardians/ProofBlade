@@ -226,12 +226,22 @@ function cacheKey(root: string, dirList: readonly string[]): string {
 /**
  * A cheap structural revision of every skill root.
  *
- * Walks the roots for `SKILL.md` files and records each one's path, size and
- * mtime. That catches every change the parse depends on — a skill added,
- * removed, renamed or edited — without reading any file body. A `mtimeMs + size`
- * key is acceptable here where it was not for the version snapshot: skills are
- * repository content, and the snapshot itself still hashes file contents, so a
- * same-metadata edit cannot silently change what a Run records.
+ * Walks the roots for `SKILL.md` files and records each one's path, identity and
+ * metadata. That catches a skill added, removed, renamed or edited without
+ * reading any file body.
+ *
+ * The key is `path \0 ino \0 size \0 mtimeMs \0 ctimeMs`, and `size + mtimeMs`
+ * alone is NOT acceptable here. An earlier version of this comment argued it was,
+ * on the grounds that the version snapshot hashes file contents anyway -- but
+ * that reasoning does not hold. This registry is what produces the per-skill
+ * `contentHash` the snapshot records, so while the revision key looks unchanged
+ * the memoised registry keeps handing back the pre-edit parse result, and the
+ * snapshot ends up reporting the old content hash for a body that has changed.
+ * That is measured, not hypothetical: see the same-size rewrite assertion in
+ * packages/materials/tests/version-cache.test.ts.
+ *
+ * `ctimeMs` moves on any content change and cannot be set by ordinary writers;
+ * `ino` separates a replaced file from an in-place write of the same length.
  *
  * @param roots - absolute skill root directories.
  * @returns a digest that changes whenever the skill set or any skill file does.
@@ -261,7 +271,7 @@ async function collectSkillFiles(directory: string, into: string[]): Promise<voi
     if (entry.name !== "SKILL.md") continue;
     try {
       const stats = await stat(path);
-      into.push(`${path}\u0000${stats.size}\u0000${stats.mtimeMs}`);
+      into.push(`${path}\u0000${stats.ino}\u0000${stats.size}\u0000${stats.mtimeMs}\u0000${stats.ctimeMs}`);
     } catch {
       // Raced with a deletion; the next load recomputes the revision.
     }
