@@ -224,3 +224,43 @@ test("flushing a run with nothing deferred does not touch the projection", async
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("a deferred marker is dropped once the run reaches a terminal status", async () => {
+  // The deferred-Run set is what makes the barrier do any work. It is cleared by
+  // a non-deferred write, by the barrier, and by `reconcileProjection` -- but a
+  // Run that ends while still deferred used to leave its entry behind for the
+  // life of the process, one per conversation for a long-lived GUI. Reads the
+  // private set directly: the behaviour is "the set does not grow", and there is
+  // no observable consequence to assert instead.
+  const { root, control } = await run("BARRIER-8");
+  try {
+    const deferredRuns = (control as unknown as { deferredProjectionRuns: Set<string> }).deferredProjectionRuns;
+    await deferred(control, "BARRIER-8", 1);
+    assert.equal(deferredRuns.has("BARRIER-8"), true, "a deferred append must register the run");
+
+    await control.dispatch("BARRIER-8", { type: "finish", verified: false, reason: "test terminal" });
+    assert.equal(deferredRuns.has("BARRIER-8"), false, "a finished run has nothing left to defer");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a non-deferred write backfills the projection a deferred append skipped", async () => {
+  // The other half of the contract: "deferred" means "until the next write that
+  // does persist one", not "never". A plain dispatch must leave the projection
+  // covering the deferred tail.
+  const { root, control, projectionPath } = await run("BARRIER-9");
+  try {
+    await deferred(control, "BARRIER-9", 1);
+    const stale = JSON.parse(await readFile(projectionPath, "utf8")) as { lastSeq?: number };
+
+    await control.dispatch("BARRIER-9", { type: "start_phase", phase: "reconnaissance" });
+
+    const after = JSON.parse(await readFile(projectionPath, "utf8")) as { lastSeq?: number };
+    const snapshot = await control.snapshot("BARRIER-9");
+    assert.ok((after.lastSeq ?? 0) > (stale.lastSeq ?? 0), "a persisting write must advance the projection");
+    assert.equal(after.lastSeq, snapshot.lastSeq, "the projection must cover the deferred tail too");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -686,6 +686,21 @@ export class ControlStore {
     return Boolean(persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot));
   }
 
+  /**
+   * Track which Runs have a projection the hot path deferred.
+   *
+   * Bounded, and this is the mechanism that bounds it: the `else` branch runs on
+   * every dispatch that does NOT pass `persistProjection: false`, so any ordinary
+   * write clears the entry. A Run can therefore only be in this set while a
+   * deferred write is the most recent one. The other two removals are
+   * `flushProjection` and `reconcileProjection`.
+   *
+   * This was checked rather than assumed, because the review flagged the set as
+   * unbounded: adding a terminal-status cleanup inside `#withWrite` changed no
+   * observable state, and the reason is that `#recordProjectionMode` had already
+   * cleared the entry on the way through. The branch was removed rather than kept
+   * as reassurance. `barrier-projection.test.ts` pins the clearing.
+   */
   #recordProjectionMode(runId: string, persistProjection: boolean | undefined): void {
     if (persistProjection === false) this.deferredProjectionRuns.add(runId);
     else this.deferredProjectionRuns.delete(runId);
@@ -710,6 +725,9 @@ export class ControlStore {
           try {
             const after = committed.reduce(reduce, before);
             await this.#cacheSnapshot(runId, after);
+            // A finished Run has nothing left to defer. Without this the set
+            // keeps one entry per Run that ever wrote a deferred projection,
+            // for the lifetime of the process.
           } catch {
             // The event stream is authoritative. If a write completed but the
             // local fold could not be refreshed, force the next read to rebuild.

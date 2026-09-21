@@ -218,6 +218,14 @@ export class FixtureEvaluationRunner {
     let factEvidenceCoverage = 0;
     let failureCategory: EvaluationFailureCategory | undefined;
     try {
+      // The hot path defers `projection.json` (every Artifact write, every
+      // checkpoint, every recorded experiment), so the file legitimately trails
+      // the log until a barrier runs. Force that barrier before reading anything
+      // derived from the projection, or a correct run is scored as a parity
+      // failure. `flushProjection` is a no-op when nothing is deferred, which is
+      // what makes this safe on the crash paths too: there it simply leaves a
+      // lagging projection lagging.
+      await services.control.flushProjection(runId).catch(() => undefined);
       const snapshot = await services.control.snapshot(runId);
       const replayed = await services.control.replay(runId);
       const persisted = await services.control.loadProjection(runId);
