@@ -22,24 +22,47 @@ test("unresolvable specifiers report undefined instead of throwing", () => {
   assert.equal(resolveRuntimeEntry("@proofblade/definitely-not-installed"), undefined);
 });
 
+/** A control plane exposing every required member, for positive-path cases. */
+function completeControl(): Record<string, unknown> {
+  return Object.fromEntries(REQUIRED_CONTROL_METHODS.map((member) => [member, async () => undefined]));
+}
 test("a stale runtime reports every missing member", () => {
   const report = probeRuntimeShape({}, "@proofblade/materials");
 
   assert.deepEqual(report.present, []);
   assert.deepEqual(report.missing, [...REQUIRED_CONTROL_METHODS]);
   assert.equal(report.specifier, "@proofblade/materials");
+  // The list must cover more than the one member whose absence was originally
+  // reported: every method the GUI calls unconditionally fails the same way.
+  assert.ok(REQUIRED_CONTROL_METHODS.length > 1, "the contract must cover every member the GUI calls");
 });
 
 test("a non-function member counts as missing", () => {
-  const report = probeRuntimeShape({ loadProjectionHint: "not-a-function" }, "@proofblade/materials");
+  const control = completeControl();
+  control.loadProjectionHint = "not-a-function" as unknown as () => Promise<undefined>;
+  const report = probeRuntimeShape(control, "@proofblade/materials");
 
   assert.deepEqual(report.missing, ["loadProjectionHint"]);
-  assert.deepEqual(report.present, []);
+  assert.equal(report.present.length, REQUIRED_CONTROL_METHODS.length - 1);
+});
+
+test("every required member is individually load-bearing", () => {
+  // A contract that silently tolerated a missing member would leave that member
+  // failing with `is not a function` at request time, which is the failure this
+  // module exists to convert into a boot error.
+  for (const member of REQUIRED_CONTROL_METHODS) {
+    const control = completeControl() as Record<string, unknown>;
+    delete control[member];
+    assert.deepEqual(
+      probeRuntimeShape(control, "@proofblade/materials").missing,
+      [member],
+      `${member} must be required`,
+    );
+  }
 });
 
 test("a complete runtime reports no missing members and is accepted by the assertion", () => {
-  const control = { loadProjectionHint: async () => undefined };
-  const report = assertMaterialsRuntime(control);
+  const report = assertMaterialsRuntime(completeControl());
 
   assert.deepEqual(report.missing, []);
   assert.deepEqual(report.present, [...REQUIRED_CONTROL_METHODS]);
@@ -54,7 +77,7 @@ test("the assertion throws with the member, the resolved path, and the remedy", 
   }
 
   assert.ok(thrown, "expected the assertion to reject a stale runtime");
-  assert.match(thrown.message, /missing loadProjectionHint/);
+  assert.match(thrown.message, /missing clearReadCaches/);
   assert.match(thrown.message, /packages[\\/]materials[\\/]dist[\\/]index\.js/);
   assert.match(thrown.message, /npm run build:gui-deps/);
 });

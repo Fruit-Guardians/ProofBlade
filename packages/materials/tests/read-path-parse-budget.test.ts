@@ -148,7 +148,7 @@ test("[contract:read-path-parse-is-counted] a new revision is parsed and counted
   }
 });
 
-test("[contract:cold-read-parse-budget] a cold read of a completed Run parses the whole stream to return only a window of it", async () => {
+test("[contract:cold-read-parse-budget] a cold read of a completed Run parses the whole stream", async () => {
   const { root, runsRoot, store, writer, cleanup } = await fixture("BUDGET-4", 1_000);
   try {
     // Complete the Run and leave a current projection, so the read below has an
@@ -168,21 +168,34 @@ test("[contract:cold-read-parse-budget] a cold read of a completed Run parses th
     const after = parsed(store);
     const parsedBytes = after.parsedBytes - before.parsedBytes;
 
-    // This is the finding, as numbers: the durable projection is constant-size,
-    // the returned event list is a bounded window, and the parse is neither. A
-    // read that needs N events costs O(history) to build.
-    assert.equal(after.parsedEvents - before.parsedEvents, lastSeq, "the read parsed the complete stream");
+    // This records a measurement of the CURRENT read path, not a contract the
+    // path must keep. The durable projection is constant-size and the read input
+    // is not: `events()` returns every committed event, so a reader deserializes
+    // the whole 5.4 MB history to answer with a 4.5 KB projection.
+    //
+    // Deliberately NOT asserted as an upper bound. An earlier version pinned
+    // `delta === lastSeq` and `parsedBytes > 250_000` here, which turned the
+    // O(history) behaviour this test documents into a gate that would fail the
+    // moment the read path stops parsing the whole stream -- i.e. it forbade the
+    // improvement it measures. The assertions below only require that the read
+    // still returns the right state and that the parse is non-trivial, so the
+    // numbers can move down without breaking the suite.
     assert.equal(snapshot.lastSeq, lastSeq, "the snapshot is the one the projection was sealed at");
     assert.ok(
-      events.length <= lastSeq,
-      `the requested window (${events.length} events) is not larger than the parsed history (${lastSeq})`,
+      after.parsedEvents - before.parsedEvents > 0,
+      "a cold read of a completed Run parses the stream, as the counter shows",
     );
+    // `events()` is unbounded by design (the 600-event window lives in the GUI
+    // DTO, apps/gui/src/debug-data.ts), so the honest statement is that it
+    // returns the committed history -- and an earlier `events.length <= lastSeq`
+    // here was vacuous, true for any return value.
+    assert.equal(events.length, lastSeq, "events() returns every committed event");
     assert.ok(
-      parsedBytes > 250_000,
-      `a cold read deserialized ${parsedBytes} bytes of history to answer with a ${projectionBytes}-byte projection`,
+      parsedBytes > 0 && projectionBytes > 0,
+      "both the read input and the projection are non-empty",
     );
 
-    // And a warm read of the same Run in the same process pays nothing.
+    // The invariant that must hold: a warm read at an unchanged revision is free.
     const warm = parsed(store);
     await reader.control.events("BUDGET-4");
     await reader.control.snapshot("BUDGET-4");

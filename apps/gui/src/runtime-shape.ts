@@ -13,7 +13,16 @@ import { createRequire } from "node:module";
  * Add a member here when the GUI begins calling it unconditionally. Members that
  * are optional by design do not belong in this list.
  */
-export const REQUIRED_CONTROL_METHODS = ["loadProjectionHint"] as const;
+export const REQUIRED_CONTROL_METHODS = [
+  "clearReadCaches",
+  "createRun",
+  "dispatch",
+  "events",
+  "loadProjection",
+  "loadProjectionHint",
+  "reconcileProjection",
+  "snapshot",
+] as const;
 
 /** A required control-plane member the GUI calls directly. */
 export type RequiredControlMethod = (typeof REQUIRED_CONTROL_METHODS)[number];

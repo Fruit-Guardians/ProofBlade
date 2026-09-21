@@ -310,29 +310,38 @@ export class JsonlControlStore {
    */
   public async migrateLegacyRun(runId: string, authorityHash: string): Promise<"anchored" | "migrated" | "read_only"> {
     if (!/^[a-f0-9]{64}$/i.test(authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
-    // A Run is anchored exactly when `authorityAnchor()` finds an authority
-    // hash, and a current-format Run records that hash in its very first
-    // `run_started` event. Two bounded reads (`firstEvent` + `lastEventSeq`)
-    // settle that case without parsing the stream, which otherwise made every
-    // cache-missing read O(history) before it could consult the projection.
-    //
-    // `run_authority_migrated` is itself an anchor, so a stream carrying one
-    // must still take the full path below. A mis-signalled Run therefore only
-    // costs the parse, never a wrong answer.
-    const first = await this.firstEvent(runId);
-    if (first !== undefined && first.type === "run_started" && first.seq === 1 && typeof first.payload?.authorityHash === "string") {
-      const tailSeq = await this.lastEventSeq(runId);
-      if (tailSeq === 1) return "anchored";
-      const last = tailSeq === undefined ? undefined : await this.lastEvent(runId);
-      if (last !== undefined && last.type !== "run_authority_migrated") return "anchored";
-    }
+    // Whole body under the Run lock. The fast path below only reads, but it
+    // decides "this Run needs no migration" and returns it to callers who may
+    // then write; taking the lock here keeps that decision serialised against a
+    // concurrent migration instead of racing it.
     return await this.withRunLock(runId, async () => {
+      // A Run is anchored exactly when `authorityAnchor()` finds an authority
+      // hash, and a current-format Run records that hash in its very first
+      // `run_started` event. Two bounded reads (`firstEvent` + `lastEventSeq`)
+      // settle that case without parsing the stream, which otherwise made every
+      // cache-missing read O(history) before it could consult the projection.
+      //
+      // The anchor predicate must match `authorityAnchor()` exactly, including
+      // its 64-hex requirement: accepting any string here would report a Run
+      // with a malformed anchor as "anchored" while the authoritative path
+      // rejects or rewrites it.
+      //
+      // `run_authority_migrated` is itself an anchor, so a stream carrying one
+      // must still take the full path below. A mis-signalled Run therefore only
+      // costs the parse, never a wrong answer.
+      const first = await this.firstEvent(runId);
+      if (first !== undefined && first.type === "run_started" && first.seq === 1 && isAuthorityAnchor(first.payload?.authorityHash)) {
+        const tailSeq = await this.lastEventSeq(runId);
+        if (tailSeq === 1) return "anchored";
+        const last = tailSeq === undefined ? undefined : await this.lastEvent(runId);
+        if (last !== undefined && last.type !== "run_authority_migrated") return "anchored";
+      }
       const events = await this.events(runId);
-      const first = events[0];
-      if (!first || first.type !== "run_started" || first.seq !== 1) throw new Error(`Run ${runId} has no valid first run_started event`);
+      const head = events[0];
+      if (!head || head.type !== "run_started" || head.seq !== 1) throw new Error(`Run ${runId} has no valid first run_started event`);
       const existing = authorityAnchor(events);
       if (existing) return "anchored";
-      if (first.payload?.taskHash !== undefined || first.payload?.authorityHash !== undefined) {
+      if (head.payload?.taskHash !== undefined || head.payload?.authorityHash !== undefined) {
         return "read_only";
       }
       const task = await this.loadTask(runId);
@@ -700,11 +709,23 @@ function sameEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boo
   return left.size === right.size && left.mtimeMs === right.mtimeMs;
 }
 
+/**
+ * Whether a payload value is a well-formed authority anchor.
+ *
+ * Extracted so the bounded fast path in `migrateLegacyRun` and
+ * `authorityAnchor` below cannot drift: the fast path used to accept any
+ * string, which would report a Run with a malformed anchor as "anchored" while
+ * the authoritative reader rejected or rewrote it.
+ */
+function isAuthorityAnchor(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+}
+
 function authorityAnchor(events: HarnessEvent[]): string | undefined {
   const anchors = events.flatMap((event) => {
     if (event.type !== "run_started" && event.type !== "run_authority_migrated") return [];
     const value = event.payload?.authorityHash;
-    return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value) ? [value] : [];
+    return isAuthorityAnchor(value) ? [value] : [];
   });
   if (anchors.length === 0) return undefined;
   if (new Set(anchors).size !== 1) throw new Error("Run contains conflicting authority anchors");
