@@ -110,8 +110,8 @@ export class DebugDataService {
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
   private readonly runDetailLoads = new Map<string, Promise<RunDetail>>();
   private readonly runDetailCache = new BoundedLruCache<string, {
-    mtimeMs: number;
-    size: number;
+    /** `runDetailEventsVersion()` of the log this detail was built from. */
+    eventsVersion: string;
     sessionsVersion: string;
     bytes: number;
     detail: RunDetail;
@@ -298,16 +298,21 @@ export class DebugDataService {
     const eventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
     const sessionsRoot = join(this.services.runsRoot, runId, "pi-sessions");
     const sessionsVersion = await filesystemVersion(sessionsRoot);
-    const cacheKey = runDetailVersionKey(runId, eventsStat.mtimeMs, eventsStat.size, sessionsVersion);
+    // The identity of the log, not just its timestamp: see the `ino`/`ctimeMs`
+    // checks below. A rewrite of `events.jsonl` that keeps the byte length and
+    // restores mtime used to look identical here, so the stale RunDetail was
+    // served for a log that had changed.
+    const eventsVersion = runDetailEventsVersion(eventsStat);
+    const cacheKey = runDetailVersionKey(runId, eventsVersion, sessionsVersion);
     const cached = this.runDetailCache.peek(runId);
-    if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size && cached.sessionsVersion === sessionsVersion) {
+    if (cached?.eventsVersion === eventsVersion && cached.sessionsVersion === sessionsVersion) {
       const current = this.runDetailCache.get(runId);
       return { ...current!.detail, active: this.active.get(runId) };
     }
     if (cached) this.runDetailCache.delete(runId);
     const existing = this.runDetailLoads.get(cacheKey);
     if (existing) return { ...(await existing), active: this.active.get(runId) };
-    const load = this.loadRunDetail(runId, eventsStat, sessionsRoot, sessionsVersion);
+    const load = this.loadRunDetail(runId, eventsStat, eventsVersion, sessionsRoot, sessionsVersion);
     this.runDetailLoads.set(cacheKey, load);
     try {
       return { ...(await load), active: this.active.get(runId) };
@@ -316,7 +321,7 @@ export class DebugDataService {
     }
   }
 
-  private async loadRunDetail(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
+  private async loadRunDetail(runId: string, eventsStat: Stats, eventsVersion: string, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
     const snapshotPromise = this.loadSnapshotForDetail(runId);
     const eventsPromise = this.services.control.events(runId);
     const [snapshot, events, telemetry, sessionRead] = await Promise.all([
@@ -328,7 +333,7 @@ export class DebugDataService {
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const clientEvents = events.length > clientEventLimit ? events.slice(-clientEventLimit) : events;
     const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
-    const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
+    const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsVersion, sessionsRoot, loadedSessionsVersion);
     // `detail` contains the raw session entries plus derived message/tool
     // projections that intentionally repeat parts of that data. Walking the
     // whole object to estimate JSON size turns large histories into an
@@ -341,7 +346,7 @@ export class DebugDataService {
       : runDetailCacheMaxEntryBytes + 1;
     const cacheLimit = eventsStat.size > 8 * 1024 * 1024 ? largeRunDetailCacheMaxEntryBytes : runDetailCacheMaxEntryBytes;
     if (!this.closing && currentVersion && bytes <= cacheLimit) {
-      this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
+      this.runDetailCache.set(runId, { eventsVersion, sessionsVersion: loadedSessionsVersion, bytes, detail });
     }
     return detail;
   }
@@ -367,10 +372,10 @@ export class DebugDataService {
     return await new RunTelemetry(readOnlyControl).report(runId);
   }
 
-  private async isCurrentRunVersion(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
+  private async isCurrentRunVersion(runId: string, eventsVersion: string, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
     try {
       const currentEventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
-      if (currentEventsStat.mtimeMs !== eventsStat.mtimeMs || currentEventsStat.size !== eventsStat.size) return false;
+      if (runDetailEventsVersion(currentEventsStat) !== eventsVersion) return false;
       return await filesystemVersion(sessionsRoot) === sessionsVersion;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
@@ -754,8 +759,22 @@ async function filesystemVersion(root: string): Promise<string> {
   return entries.join("\n");
 }
 
-function runDetailVersionKey(runId: string, eventsMtimeMs: number, eventsSize: number, sessionsVersion: string): string {
-  return runId + "\0" + eventsMtimeMs + "\0" + eventsSize + "\0" + sessionsVersion;
+/**
+ * Identity of `events.jsonl` for cache purposes.
+ *
+ * `mtimeMs + size` alone is not enough: rewriting the log in place at the same
+ * byte length and restoring its timestamp reproduces both, so a cached
+ * RunDetail survived a change to the very data it describes. `ctimeMs` moves on
+ * any content change and cannot be set by an ordinary writer; `ino` separates a
+ * replaced file from an in-place write. Both come from the `stat()` the caller
+ * already performs, so this costs nothing extra.
+ */
+function runDetailEventsVersion(eventsStat: Stats): string {
+  return `${eventsStat.ino}\0${eventsStat.size}\0${eventsStat.mtimeMs}\0${eventsStat.ctimeMs}`;
+}
+
+function runDetailVersionKey(runId: string, eventsVersion: string, sessionsVersion: string): string {
+  return runId + "\0" + eventsVersion + "\0" + sessionsVersion;
 }
 
 export function boundedJsonByteSize(value: unknown, limit: number): number {

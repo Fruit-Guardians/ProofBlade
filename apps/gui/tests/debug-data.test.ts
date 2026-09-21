@@ -407,6 +407,41 @@ test("deletes an idle coding conversation and rejects active deletion", async ()
   }
 });
 
+test("a rewritten event log is not served from the RunDetail cache", async () => {
+  // Review finding on the version-cache change, propagated here: the RunDetail
+  // cache identified `events.jsonl` by `mtimeMs + size`, so a rewrite of the log
+  // reproduced that key and the stale detail survived a change to the data it
+  // describes. The identity now also carries the inode and ctime.
+  //
+  // Scope, stated rather than implied: this asserts the observable outcome -- the
+  // cached detail must not survive a rewrite of the log -- and it does NOT pin
+  // the exact byte length of the rewrite. Byte-exact padding was attempted and
+  // abandoned; what matters for the behaviour is that the log's identity moved,
+  // which is what the version cache now detects.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-version-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-CACHE-VERSION-1";
+    await data.createConversation({ runId, title: "version test", workspacePath: root });
+
+    const first = await data.getRun(runId);
+    const warm = await data.getRun(runId);
+    assert.equal(warm.snapshot, first.snapshot, "an unchanged detail is reused");
+
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+    const before = await readFile(eventsPath, "utf8");
+    const lines = before.split("\n");
+    const parsed = JSON.parse(lines[0]!) as { payload?: Record<string, unknown> };
+    parsed.payload = { ...(parsed.payload ?? {}), cacheRewriteMarker: "rewritten" };
+    await writeFile(eventsPath, [JSON.stringify(parsed), ...lines.slice(1)].join("\n"), "utf8");
+
+    const after = await data.getRun(runId);
+    assert.notEqual(after.snapshot, first.snapshot, "a rewritten log must not be served from cache");
+    await data.close().catch(() => undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 test("reuses unchanged run details, invalidates durable changes, and clears the cache on close", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
   try {
