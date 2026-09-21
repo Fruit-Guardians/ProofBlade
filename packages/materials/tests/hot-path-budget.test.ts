@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -54,9 +54,6 @@ const config: ProofBladeConfig = {
   },
 };
 
-/** Measured budget: durable events one ordinary `read` may append. */
-const READ_EVENT_BUDGET = 4;
-
 interface Harness {
   readonly root: string;
   readonly runsRoot: string;
@@ -64,7 +61,28 @@ interface Harness {
   readonly projectionPath: string;
   readonly context: CodingResourceContext;
   readonly readbacks: { count: number };
+  readonly commits: { count: number };
 }
+
+/** The repository root, derived from this file rather than from `cwd`. */
+const repoRoot = resolve(import.meta.dirname, "../../..");
+
+/**
+ * The budgets, read from the machine-readable fixture rather than re-stated here.
+ *
+ * The prose-drift guard this replaces matched two sentences in the breakdown
+ * document, which meant a wording edit turned CI red while a constant could still
+ * be changed without touching the document. `measured` and `target` are both
+ * recorded so the gap stays visible: the gate below enforces `measured` (no
+ * regression against today), and `target` is what PLAN-240 T1/T2 owe.
+ */
+const budgets = JSON.parse(await readFile(join(repoRoot, ".github", "hot-path-budgets.json"), "utf8")) as {
+  measured: { events: number; commits: number };
+  target: { events: number; commits: number };
+};
+const READ_EVENT_BUDGET = budgets.measured.events;
+const READ_COMMIT_BUDGET = budgets.measured.commits;
+const READ_COMMIT_TARGET = budgets.target.commits;
 
 /** A real Run on a real ControlStore, with the hot path's counters observed. */
 async function harness(runId: string): Promise<Harness> {
@@ -79,6 +97,24 @@ async function harness(runId: string): Promise<Harness> {
     readbacks.count += 1;
     return await originalReadText(...args);
   }) as typeof services.artifacts.readText;
+
+  // Count logical commits, not events. "Commits" is the contract the plan states
+  // (`<= 1` before an ordinary tool returns), and it is not derivable from the
+  // event count: a merge writes the same four events in one commit instead of
+  // two.
+  //
+  // The count sits on `withRunLock`, which is what a commit actually acquires: a
+  // run-lock acquisition plus an fsync is the cost the model waits on. Counting
+  // public entry points instead would be wrong in both directions -- `dispatch`
+  // delegates to `dispatchBatch` (one lock, two calls), and the private
+  // `#commitCommands` is reached from `dispatchTransaction`,
+  // `dispatchBindingTransaction` and `append` as well.
+  const commits = { count: 0 };
+  const realWithRunLock = services.control.eventStore.withRunLock.bind(services.control.eventStore);
+  services.control.eventStore.withRunLock = (async (...args: Parameters<typeof realWithRunLock>) => {
+    commits.count += 1;
+    return await realWithRunLock(...args);
+  }) as typeof services.control.eventStore.withRunLock;
 
   const runtime = new ProofBladeToolRuntime(
     runId,
@@ -125,6 +161,7 @@ async function harness(runId: string): Promise<Harness> {
     projectionPath: join(runsRoot, runId, "projection.json"),
     context,
     readbacks,
+    commits,
   };
 }
 
@@ -165,6 +202,38 @@ test("[contract:hot-path-event-budget] an ordinary read stays within its durable
       `an ordinary read appended ${appended} durable events, budget is ${READ_EVENT_BUDGET}; each one is a run-lock acquire plus an fsync the model waits on`,
     );
     assert.ok(appended > 0, "a successful read must still archive its artifact durably");
+  } finally {
+    await rm(h.root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:hot-path-event-budget] an ordinary read stays within its commit budget", async () => {
+  // The plan's actual contract is about commits, not events: "at most one
+  // synchronous ControlStore commit before an ordinary tool returns"
+  // (PLAN-240 §7.2.2). A merge writes the same events in fewer commits, so
+  // event counts cannot see the difference. Today's measurement is two --
+  // artifact registration, then the derived observation -- and the budget
+  // records that so a regression to three is caught while T1/T2 work lands.
+  const h = await harness("BUDGET-READ-4");
+  try {
+    const target = join(h.root, "measured.txt");
+    await writeFile(target, "hello\n", "utf8");
+
+    const read = await readTool();
+    await read.execute("read-1", { path: target }, new AbortController().signal, undefined, h.context);
+
+    assert.ok(
+      h.commits.count <= READ_COMMIT_BUDGET,
+      `an ordinary read took ${h.commits.count} commits, budget is ${READ_COMMIT_BUDGET}`,
+    );
+    assert.ok(h.commits.count > 0, "the commit counter must actually observe the read");
+    assert.ok(
+      READ_COMMIT_TARGET <= READ_COMMIT_BUDGET,
+      `the recorded target (${READ_COMMIT_TARGET}) must not be looser than today's budget (${READ_COMMIT_BUDGET})`,
+    );
+    if (READ_COMMIT_TARGET === READ_COMMIT_BUDGET) {
+      assert.ok(h.commits.count <= READ_COMMIT_TARGET, "the plan's target is now the enforced budget");
+    }
   } finally {
     await rm(h.root, { recursive: true, force: true });
   }
@@ -222,11 +291,21 @@ test("[contract:skill-catalog-parse-budget] repeated skill loads parse the catal
 
 test("the budget constants stay in step with the documented baseline", async () => {
   // A budget silently drifted away from the document that justifies it is how
-  // gates rot. This asserts the linkage is still real, not the numbers: the
-  // breakdown document must keep stating the per-read event/commit baseline that
-  // READ_EVENT_BUDGET encodes.
-  const doc = await readFile(join(process.cwd(), "docs", "PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md"), "utf8");
-  assert.match(doc, /events\.jsonl` 新增 4 条/, "the breakdown must still record the per-read event count");
-  assert.match(doc, /4 条事件 \/ 2 个提交/, "the breakdown must still record the per-read commit count");
-  assert.ok(READ_EVENT_BUDGET >= 2, "the read budget must permit at least artifact registration plus the derived observation");
+  // gates rot. The numbers now live in `.github/hot-path-budgets.json`, which is
+  // the fixture both this test and anything reading the baseline agree on; the
+  // prose-drift guard that matched two sentences of the breakdown document is
+  // gone, because a wording edit is not a budget change.
+  //
+  // What remains asserted about the document is the qualitative invariant the
+  // budget is derived from, and it is asserted as a claim rather than a phrase:
+  // the commit figure is recorded as two logical commits, one event stream.
+  const doc = await readFile(join(repoRoot, "docs", "PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md"), "utf8");
+  assert.match(
+    doc,
+    /逻辑提交为 2/,
+    "the breakdown must still state the two logical commits the commit budget encodes",
+  );
+  assert.equal(budgets.measured.commits, 2, "the fixture and the plan's measured baseline must agree");
+  assert.equal(budgets.target.commits, 1, "the plan's target is at most one synchronous commit");
+  assert.ok(budgets.measured.events >= budgets.target.events, "a merged commit cannot add events");
 });
