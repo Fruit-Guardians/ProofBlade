@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, utimes } from "node:fs/promises";
+import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ControlStore } from "../src/control/control-store.js";
@@ -90,11 +90,68 @@ test("[contract:projection-hint-currency] the hint withholds a projection that i
 
     const hinted = await control.loadProjectionHint("CURRENCY-2");
     const snapshot = await control.snapshot("CURRENCY-2");
-
-    // Either it is withheld, or it is genuinely current. What must never happen
-    // is a returned projection whose lastSeq trails the log.
-    if (hinted) assert.equal(hinted.lastSeq, snapshot.lastSeq, "a served hint must not trail the event log");
     assert.ok(snapshot.lastSeq > 1, "the log must actually have moved for this test to mean anything");
+
+    // Unconditional: the 40 events were appended with `persistProjection: false`,
+    // so the projection on disk really is behind and nothing may serve it. The
+    // earlier version of this only asserted `hinted.lastSeq === snapshot.lastSeq`
+    // when a hint came back, which passes when the tail read fails for an
+    // unrelated reason — the case where withholding is required but absence of a
+    // hint would hide a regression.
+    assert.equal(hinted, undefined, "a projection behind the log must be withheld");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:projection-hint-currency] the hint refuses a log whose last record has no terminator", async () => {
+  // `#loadEvents()` counts a record only once its terminating newline is
+  // durable, so `lastEventSeq` must apply the same rule. Without it, a log whose
+  // newest record is still in flight can report the *previous* record's seq, and
+  // a projection sealed at that seq compares equal and gets served as current.
+  const { root, control, eventsPath } = await run("CURRENCY-6");
+  try {
+    const before = await control.snapshot("CURRENCY-6");
+    assert.ok(await control.loadProjectionHint("CURRENCY-6"), "the baseline projection must be servable");
+
+    const { appendFile } = await import("node:fs/promises");
+    await appendFile(eventsPath, JSON.stringify({ schemaVersion: 1, seq: before.lastSeq + 1, torn: true }), "utf8");
+
+    assert.equal(await control.loadProjectionHint("CURRENCY-6"), undefined, "an unterminated final record is not committed");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:projection-hint-currency] the hint refuses an empty log rather than calling it current", async () => {
+  // An empty log is the shape left behind by a crash, a partial copy or a
+  // restore. A sealed projection describing N events must not be served against
+  // a log with none of them. The contract is asserted rather than one particular
+  // guard: zero bytes are also rejected by the bounded read and by the terminator
+  // rule, so removing any single one of them keeps this green and no mutation
+  // pins an individual line.
+  const { root, control, eventsPath } = await run("CURRENCY-7");
+  try {
+    assert.ok(await control.loadProjectionHint("CURRENCY-7"), "the baseline projection must be servable");
+    await writeFile(eventsPath, "", "utf8");
+
+    assert.equal(await control.loadProjectionHint("CURRENCY-7"), undefined, "no records means currency cannot be confirmed");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:projection-hint-currency] the hint refuses a final record larger than its read window", async () => {
+  // The tail window is 64 KiB. A final record bigger than that contains no
+  // newline inside the window, so there is no committed record to read: the
+  // answer is "unknown", not "the previous record".
+  const { root, control, eventsPath } = await run("CURRENCY-8");
+  try {
+    await deferred(control, "CURRENCY-8", 5);
+    const { appendFile } = await import("node:fs/promises");
+    await appendFile(eventsPath, `{"schemaVersion":1,"seq":9999,"padding":"${"p".repeat(80_000)}"}\n`, "utf8");
+
+    assert.equal(await control.loadProjectionHint("CURRENCY-8"), undefined, "a tail bigger than the window is unknown, not stale");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

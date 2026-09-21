@@ -531,15 +531,32 @@ export class JsonlControlStore {
 
 
   /**
-   * The `seq` of the newest event in the log, or `undefined` when it cannot be
-   * determined.
+   * Read one byte range, or `undefined` when the read cannot be trusted.
    *
-   * Reads a bounded tail rather than the whole file: the last record fits in the
-   * final chunk for any realistic event, and this must stay cheaper than parsing
-   * the stream, which is the whole point of the fast hint path. `undefined`
-   * means "unknown", and callers must treat that as "cannot confirm currency"
-   * rather than as "current".
+   * A short read leaves the tail of the `Buffer.alloc` zero-filled, and a
+   * concurrent truncate is exactly the scenario these bounded reads exist to
+   * survive. Those zero bytes make every line fail to parse, which reads as
+   * "no records" instead of "unknown" — the wrong answer in the direction that
+   * lets a stale projection through. `bytesRead` is therefore checked, and a
+   * short or empty read fails closed.
+   *
+   * @param path - absolute file path.
+   * @param offset - byte offset to start at.
+   * @param length - number of bytes to read.
+   * @returns the bytes read, or `undefined` when they cannot be trusted.
    */
+  private async readBounded(path: string, offset: number, length: number): Promise<Buffer | undefined> {
+    const handle = await open(path, "r");
+    try {
+      const buffer = Buffer.alloc(length);
+      const result = await handle.read(buffer, 0, length, offset);
+      if (result.bytesRead !== length) return undefined;
+      return buffer;
+    } finally {
+      await handle.close().catch(() => undefined);
+    }
+  }
+
   /**
    * The first committed event, from a bounded read of the file head.
    *
@@ -555,23 +572,19 @@ export class JsonlControlStore {
       const stats = await stat(path);
       if (stats.size === 0) return undefined;
       const length = Math.min(HEAD_BYTES, stats.size);
-      const handle = await open(path, "r");
-      try {
-        const buffer = Buffer.alloc(length);
-        await handle.read(buffer, 0, length, 0);
-        const content = buffer.toString("utf8");
-        const lines = content.split("\n");
-        const first = lines[0];
-        if (first === undefined || !first.trim()) return undefined;
-        // A record is committed only once its terminating newline is durable;
-        // when the head cut the first line short there is nothing to conclude.
-        if (lines.length === 1 && stats.size > length) return undefined;
-        return JSON.parse(first) as HarnessEvent;
-      } finally {
-        await handle.close();
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      const buffer = await this.readBounded(path, 0, length);
+      if (!buffer) return undefined;
+      const content = buffer.toString("utf8");
+      const lines = content.split("\n");
+      const first = lines[0];
+      if (first === undefined || !first.trim()) return undefined;
+      // A record is committed only once its terminating newline is durable; when
+      // the head cut the first line short there is nothing to conclude.
+      if (lines.length === 1 && stats.size > length) return undefined;
+      return JSON.parse(first) as HarnessEvent;
+    } catch {
+      // A missing file, or a head that is not a complete record. Callers fall
+      // back to the full parse; neither case is worth propagating.
       return undefined;
     }
   }
@@ -585,48 +598,67 @@ export class JsonlControlStore {
       if (stats.size === 0) return undefined;
       const start = Math.max(0, stats.size - TAIL_BYTES);
       const length = stats.size - start;
-      const handle = await open(path, "r");
-      try {
-        const buffer = Buffer.alloc(length);
-        await handle.read(buffer, 0, length, start);
-        const lines = buffer.toString("utf8").split("\n").filter((line) => line.trim().length > 0);
-        // The first line of a non-zero offset chunk is almost certainly partial.
-        const candidates = start > 0 ? lines.slice(1) : lines;
-        for (let index = candidates.length - 1; index >= 0; index -= 1) {
-          try {
-            return JSON.parse(candidates[index]!) as HarnessEvent;
-          } catch {
-            // A torn or partial trailing line: keep walking back.
-          }
+      const buffer = await this.readBounded(path, start, length);
+      if (!buffer) return undefined;
+      const lines = buffer.toString("utf8").split("\n").filter((line) => line.trim().length > 0);
+      // The first line of a non-zero offset chunk is almost certainly partial.
+      const candidates = start > 0 ? lines.slice(1) : lines;
+      for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        try {
+          return JSON.parse(candidates[index]!) as HarnessEvent;
+        } catch {
+          // A torn or partial trailing line: keep walking back.
         }
-        return undefined;
-      } finally {
-        await handle.close();
       }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw error;
+      return undefined;
+    } catch {
+      return undefined;
     }
   }
 
+  /**
+   * The `seq` of the newest committed event, or `undefined` when it cannot be
+   * determined.
+   *
+   * Reads a bounded tail rather than the whole file: the last record fits in the
+   * final chunk for any realistic event, and this must stay cheaper than parsing
+   * the stream, which is the whole point of the fast hint path. `undefined`
+   * means "unknown", and callers must treat that as "cannot confirm currency"
+   * rather than as "current".
+   *
+   * "Committed" follows `#loadEvents()`, which counts a record only once its
+   * terminating newline is durable. Applied from the tail that means the final
+   * newline-split element is always discarded, so an in-flight record is never
+   * reported as the newest one — see the comment on `candidates` below. A
+   * projection sealed at the previous seq would otherwise compare equal and be
+   * served as current.
+   */
   private async lastEventSeq(runId: string): Promise<number | undefined> {
     const TAIL_BYTES = 64 * 1024;
-    let handle;
     try {
       const path = this.runPath(runId);
       const stats = await stat(path);
       if (stats.size === 0) return undefined;
       const start = Math.max(0, stats.size - TAIL_BYTES);
       const length = stats.size - start;
-      handle = await open(path, "r");
-      const buffer = Buffer.alloc(length);
-      await handle.read(buffer, 0, length, start);
-      const lines = buffer.toString("utf8").split("\n").filter((line) => line.trim().length > 0);
-      // The first line of a non-zero offset chunk is almost certainly partial.
-      const candidates = start > 0 ? lines.slice(1) : lines;
+      const buffer = await this.readBounded(path, start, length);
+      if (!buffer) return undefined;
+      const lines = buffer.toString("utf8").split("\n");
+      // Dropping the final element is what enforces the terminator rule, and it
+      // is the whole reason this slices instead of filtering: when the file ends
+      // with a newline that element is the empty string, and when the newest
+      // record is still in flight it is the partial record itself. Either way it
+      // is not a committed record. An earlier version filtered blank lines
+      // instead and returned the record *before* the in-flight one, which is the
+      // dangerous answer -- a projection sealed at that seq would compare equal
+      // and be served. `start > 0` additionally drops the chunk's first line,
+      // which is partial whenever the window did not begin at a record boundary.
+      const candidates = start > 0 ? lines.slice(1, -1) : lines.slice(0, -1);
       for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        const line = candidates[index]!;
+        if (!line.trim()) continue;
         try {
-          const parsed = JSON.parse(candidates[index]!) as { seq?: unknown };
+          const parsed = JSON.parse(line) as { seq?: unknown };
           if (typeof parsed.seq === "number" && Number.isInteger(parsed.seq)) return parsed.seq;
         } catch {
           // A torn or partial trailing line: keep walking back.
@@ -635,8 +667,6 @@ export class JsonlControlStore {
       return undefined;
     } catch {
       return undefined;
-    } finally {
-      await handle?.close().catch(() => undefined);
     }
   }
 
