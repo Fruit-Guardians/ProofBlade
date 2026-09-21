@@ -202,24 +202,29 @@ test("a same-size rewrite is not hidden by the revision cache", async () => {
     assert.equal(cache.buildCount(), 2, "the snapshot must be rebuilt from the new bytes");
     assert.equal(after.skills.length, before.skills.length);
 
-    // Scope, and an open thread. The stronger assertion -- that the rebuilt
-    // snapshot carries a NEW skill contentHash -- still fails, and the cause is
-    // now localised but not fixed. What was measured while chasing it:
+    // Scope, and a closed dead end. The stronger assertion -- that the rebuilt
+    // snapshot carries a NEW skill contentHash -- still fails. What was
+    // established while chasing it:
     //
     //   * versionRevision() does report a new revision and the snapshot is
     //     genuinely rebuilt (asserted above)
     //   * ProofBladeSkillRegistry.cacheStats() showed parses=2, hits=0, so the
-    //     registry DID re-parse rather than serve its memo
-    //   * calling ProofBladeSkillRegistry.load() directly before and after the
-    //     rewrite returns the same contentHash, and resetCache() does not change
-    //     that
+    //     registry DID re-parse rather than serve its own memo, and resetCache()
+    //     does not change the outcome
+    //   * NodeExecutionEnv.readTextFile() does return the NEW bytes after this
+    //     rewrite -- checked directly, both on a reused env and a fresh one -- so
+    //     the execution environment is not caching the read
+    //   * the Pi skill loader itself holds no cache: it reads only through
+    //     env.readTextFile and returns per call
     //
-    // So the stale body originates below this registry, in the `loadSkills()`
-    // call it makes into @earendil-works/pi-agent-core, which is outside this
-    // repository. That dependency's own env only passes size/mtime through as
-    // metadata, so no key of its own was identified either. Left unresolved on
-    // purpose: guessing at a cause here would be worse than recording where the
-    // trail ends.
+    // So the stale content is not coming from the env read, and the loader has
+    // nothing to hold it, yet the re-parse still yields the old hash. That
+    // contradiction is unresolved. Ruling out the two obvious candidates is
+    // where this stopped, and it is recorded rather than papered over with a
+    // cause that was not established. Driving loadSkills() standalone to narrow
+    // it further is blocked from here: the vendored `ignore` dependency rejects
+    // the absolute paths the loader passes it unless the call goes through
+    // ProofBlade's own portableSkillEnv wrapper.
   } finally {
     await rm(root, { recursive: true, force: true });
   }
