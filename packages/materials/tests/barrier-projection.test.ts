@@ -116,32 +116,60 @@ test("a barrier is a no-op once the projection is current again", async () => { 
 });
 
 /**
- * NOT PINNED HERE, deliberately -- and the gap is larger than it first looked.
+ * What the cheap check does and does not buy, stated rather than faked.
  *
- * The barrier-cost fix moves `#projectionAlreadyCurrent()` ahead of
- * `loadProjection()`, which parses the whole event stream and re-hashes the
- * complete event prefix (13ms at 100 events, 328ms at 10,000).
+ * An earlier note here recorded that mutating `#projectionAlreadyCurrent()` to
+ * always report "not current" was caught by no test, and reasoned that the
+ * predicate might be unreachable. Measured, that is close to right:
+ * `flushProjection` reads the snapshot from the log immediately before asking the
+ * question, so between the last persisted projection and the barrier the stream
+ * has always moved. The hint's `lastSeq` therefore never matches, the predicate
+ * returns false from its first line, and the full `loadProjection()` -- parse the
+ * stream, re-hash the complete event prefix, 328ms at 10,000 events -- is never
+ * reached. The saving is the early exit.
  *
- * Three mutations were run against these tests, and NO test caught the third:
- *   * disable the memoised version cache      -> caught (version-cache.test.ts)
- *   * serve a rejected build from cache       -> caught (version-cache.test.ts)
- *   * make `#projectionAlreadyCurrent` always report "not current" -> NOT caught
+ * Two attempts to pin the pass branch failed and are recorded rather than
+ * deleted, because the failure is the finding: (1) counting calls to the public
+ * `ControlStore.loadProjection` never sees anything, because the predicate goes
+ * through `eventStore.loadProjection` directly; (2) making the pass branch
+ * unreachable changed no observable state, because when the hint disagrees the
+ * branch was already unreachable. Nothing assertable distinguishes it.
  *
- * The reason is not a weak assertion but an unreachable path: a deferred append
- * moves the stream past the projection, so by the time the barrier reaches that
- * check in deferred mode the answer is always "not current". Reachability was
- * not established, so the check may be dead in practice -- if so, the fix's real
- * saving comes from `loadProjection` being avoided on the absent/stale-hint
- * path, not from this predicate.
- *
- * Pinning it needs a hash-call or hashed-event counter on the barrier path (a
- * source instrument, not an assertion) plus a reachability case. Both belong in
- * their own change rather than being smuggled in here as a test that cannot
- * fail.
- *
- * What IS pinned: an already-current projection is not rewritten, and a stale
- * one is persisted.
- */
+ * The branch is kept anyway: it is what makes the answer correct rather than
+ * merely cheap, since without it a genuinely current projection would be
+ * rewritten on every barrier. The tests below pin what IS observable -- a
+ * tampered projection is never left trusted, and a current one is never
+ * reported as repaired.
+ */test("a barrier leaves a projection it cannot confirm to the full validation", async () => {
+  // The other side of the same coin: when the hint DOES agree, the full
+  // validation runs. That is what keeps the cheap check from becoming an
+  // authority of its own -- it decides whether to attempt the real check, never
+  // what the answer is.
+  //
+  // Reaching it needs the hint and the stream to agree while the run still has a
+  // deferred marker, which no public sequence produces (see the note above). The
+  // observable half is asserted instead: a barrier over a current projection
+  // leaves it current and rewrites nothing it can avoid.
+  const { root, runsRoot, control, projectionPath } = await run("BARRIER-7");
+  try {
+    await deferred(control, "BARRIER-7", 1);
+    await control.flushProjection("BARRIER-7");
+
+    const reader = new ControlStore(new JsonlControlStore(runsRoot), undefined, secret);
+    const snapshot = await reader.snapshot("BARRIER-7");
+    const settled = JSON.parse(await readFile(projectionPath, "utf8")) as { lastSeq?: number };
+    assert.equal(settled.lastSeq, snapshot.lastSeq, "the persisted projection must already match the stream");
+
+    // `reconcileProjection` is the public path that consults the full validation
+    // and leaves a current projection alone.
+    const outcome = await reader.reconcileProjection("BARRIER-7");
+    assert.equal(outcome.repaired, false, "a current projection must not be reported as repaired");
+    const after = JSON.parse(await readFile(projectionPath, "utf8")) as { lastSeq?: number };
+    assert.equal(after.lastSeq, snapshot.lastSeq);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("a barrier repairs a deleted projection rather than throwing", async () => {
   // The cheap check must fail closed: no projection file means "not current",

@@ -657,16 +657,27 @@ export class ControlStore {
    *
    * `loadProjection()` answers the same question but pays for it: it parses the
    * whole event stream and re-hashes the complete event prefix to revalidate the
-   * seal, which measured 13ms at 100 events and 328ms at 10,000. Almost always
-   * the answer is "not current" — that is what deferred mode means — so the
-   * expensive check is gated behind a cheap one.
+   * seal, which measured 13ms at 100 events and 328ms at 10,000.
    *
    * `loadProjectionHint()` authenticates the projection file itself (its own hash
-   * plus the small task-contract guard) without parsing events. If it does not
-   * return a projection for the same `lastSeq`, the full check cannot succeed
-   * either, because a matching prefix requires a matching `lastSeq`. Only when
-   * the cheap check says "maybe current" is the full event-prefix revalidation
-   * worth its cost, and that is exactly the case where it lets us skip a write.
+   * plus the small task-contract guard) without parsing events, and a hint that
+   * does not match `snapshot.lastSeq` settles the question: the answer is not
+   * current, because a matching prefix requires a matching `lastSeq`.
+   *
+   * The converse does not hold, and saying so precisely matters. A hint that DOES
+   * match `lastSeq` does not imply the full check passes: the two apply different
+   * guards (the hint's mtime pre-filter and the `run_started` task-contract check
+   * are not part of the prefix comparison), so the full check can still reject a
+   * matching hint. That direction is harmless -- it costs one extra projection
+   * write, never a stale projection served.
+   *
+   * Measured caveat, recorded because it bounds the benefit: the pass branch is
+   * not reachable from `flushProjection`, which reads its snapshot from the log
+   * immediately before calling this. The stream has always moved by then, so the
+   * first line returns false and `loadProjection()` is skipped -- that early exit
+   * is where the saving comes from. No test distinguishes the pass branch; see
+   * `barrier-projection.test.ts` for why, and for the two attempts that failed to
+   * pin it.
    */
   async #projectionAlreadyCurrent(runId: string, snapshot: RunSnapshot): Promise<boolean> {
     const hinted = await this.loadProjectionHint(runId).catch(() => undefined);
