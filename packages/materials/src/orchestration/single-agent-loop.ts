@@ -7,6 +7,7 @@ import type { AblationPolicyBinding } from "../runtime/coding-turn-projection.js
 import type { AppServices } from "../app/demo.js";
 import type { ExecutionMode, PrimaryFailureCategory, RunSnapshot, TaskContract } from "../domain/types.js";
 import { id, isTerminal, remainingRunDeadlineMs } from "../domain/utils.js";
+import { verificationBindsRule } from "../domain/phase-gate.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
 import { TaskResultVerifier } from "../verification/claim-verification.js";
@@ -616,12 +617,7 @@ function latestAcceptedVerification(snapshot: RunSnapshot, task: TaskContract) {
 
 /** A generic chat may record an unverified observation without opening a verifier gate. */
 function taskRequiresVerification(task: Pick<TaskContract, "verification">): boolean {
-  const verification = task.verification;
-  return verification.kind !== "reproduction"
-    || verification.required_reproductions > 0
-    || Boolean(verification.command?.trim())
-    || Boolean(verification.pwn)
-    || Boolean(verification.web);
+  return verificationBindsRule(task);
 }
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {

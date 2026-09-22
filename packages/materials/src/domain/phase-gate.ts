@@ -1,6 +1,25 @@
-import type { DomainPhase, Evidence, RunSnapshot } from "./types.js";
+import type { DomainPhase, Evidence, RunSnapshot, TaskContract } from "./types.js";
 
 export type PhaseGateStatus = "pass" | "blocked" | "stale";
+
+/**
+ * Whether the task contract itself asks for a verified result.
+ *
+ * One definition, used by the gate below and by the orchestrator's completion
+ * selection (`single-agent-loop.ts`). A plain chat is
+ * `{ kind: "reproduction", required_reproductions: 0 }` with no command, and
+ * nothing in the harness can accept a Completion for it -- so a gate that requires
+ * one is a gate that can never pass, which is worse than no gate: the model reads
+ * it as "keep verifying" and the run ends paused with its answer already written.
+ */
+export function verificationBindsRule(task: Pick<TaskContract, "verification">): boolean {
+  const verification = task.verification;
+  return verification.kind !== "reproduction"
+    || verification.required_reproductions > 0
+    || Boolean(verification.command?.trim())
+    || Boolean(verification.pwn)
+    || Boolean(verification.web);
+}
 
 export interface PhaseGateEvaluation {
   domainPhase: DomainPhase;
@@ -87,20 +106,35 @@ export function evaluatePhaseGate(snapshot: RunSnapshot, phase: DomainPhase = sn
     add("classified-experiment-result", experimentEvidence.length > 0, oldEvidence);
     addEvidence(...experimentEvidence);
   } else if (phase === "REPRODUCE") {
-    add("accepted-completion-candidate", acceptedCompletion !== undefined, Object.values(snapshot.completions).length > 0);
-    add("verifier-owned-reproduction", acceptedCompletionEvidence.length > 0, currentReproductionEvidence.length === 0 && oldEvidence);
-    addEvidence(...acceptedCompletionEvidence);
+    // A task that binds no verification rule cannot ever satisfy a reproduction
+    // gate. Reporting it as `blocked` is what pushed CHAT-1790093502899 into
+    // calling verify_result twice (the phase block in its prompt said
+    // `missing: ["accepted-completion-candidate", "verifier-owned-reproduction"]`),
+    // and the run then ended paused with the answer already written. For such a
+    // task the gate passes with nothing required: the model reports, and a
+    // reproduction happens only when the user asks for one. The requirements come
+    // back verbatim as soon as the task binds a rule (command, required
+    // reproductions, or a pwn/web verifier).
+    if (verificationBindsRule(snapshot.task)) {
+      add("accepted-completion-candidate", acceptedCompletion !== undefined, Object.values(snapshot.completions).length > 0);
+      add("verifier-owned-reproduction", acceptedCompletionEvidence.length > 0, currentReproductionEvidence.length === 0 && oldEvidence);
+      addEvidence(...acceptedCompletionEvidence);
+    }
   } else if (phase === "REPORT") {
-    add("accepted-completion", acceptedCompletion !== undefined, Object.values(snapshot.completions).length > 0);
-    add("completed-executor-work-item", acceptedCompletion !== undefined && hasCompletedWorkItem(snapshot, acceptedCompletion.id, acceptedCompletion.artifactId, acceptedCompletion.evidenceIds), Object.values(snapshot.workItems).length > 0);
-    addEvidence(...acceptedCompletionEvidence);
+    if (verificationBindsRule(snapshot.task)) {
+      add("accepted-completion", acceptedCompletion !== undefined, Object.values(snapshot.completions).length > 0);
+      add("completed-executor-work-item", acceptedCompletion !== undefined && hasCompletedWorkItem(snapshot, acceptedCompletion.id, acceptedCompletion.artifactId, acceptedCompletion.evidenceIds), Object.values(snapshot.workItems).length > 0);
+      addEvidence(...acceptedCompletionEvidence);
+    }
   } else if (phase === "SUBMIT") {
-    add("accepted-completion", acceptedCompletion !== undefined, Object.values(snapshot.completions).length > 0);
-    const platformSubmission = snapshot.task.verification.kind === "platform_submission";
-    const acceptedPlatformEffect = acceptedCompletionEvidence.some((evidence) => evidence.provenance.effect?.operation === "fixture_score" && snapshot.effects[evidence.provenance.effect.id]?.verification?.accepted === true);
-    add(platformSubmission ? "accepted-platform-verdict" : "accepted-reproduction-verdict", acceptedCompletion !== undefined && (platformSubmission ? acceptedPlatformEffect : acceptedCompletionEvidence.length > 0), acceptedCompletion !== undefined && oldEvidence);
-    add("completed-executor-work-item", acceptedCompletion !== undefined && hasCompletedWorkItem(snapshot, acceptedCompletion.id, acceptedCompletion.artifactId, acceptedCompletion.evidenceIds), Object.values(snapshot.workItems).length > 0);
-    addEvidence(...acceptedCompletionEvidence);
+    if (verificationBindsRule(snapshot.task)) {
+      add("accepted-completion", acceptedCompletion !== undefined, Object.values(snapshot.completions).length > 0);
+      const platformSubmission = snapshot.task.verification.kind === "platform_submission";
+      const acceptedPlatformEffect = acceptedCompletionEvidence.some((evidence) => evidence.provenance.effect?.operation === "fixture_score" && snapshot.effects[evidence.provenance.effect.id]?.verification?.accepted === true);
+      add(platformSubmission ? "accepted-platform-verdict" : "accepted-reproduction-verdict", acceptedCompletion !== undefined && (platformSubmission ? acceptedPlatformEffect : acceptedCompletionEvidence.length > 0), acceptedCompletion !== undefined && oldEvidence);
+      add("completed-executor-work-item", acceptedCompletion !== undefined && hasCompletedWorkItem(snapshot, acceptedCompletion.id, acceptedCompletion.artifactId, acceptedCompletion.evidenceIds), Object.values(snapshot.workItems).length > 0);
+      addEvidence(...acceptedCompletionEvidence);
+    }
   }
   const onlyStaleRequirements = missing.length > 0 && missing.every((label) => stale.includes(label));
   const status: PhaseGateStatus = missing.length === 0 ? "pass" : onlyStaleRequirements ? "stale" : "blocked";

@@ -49,7 +49,7 @@
     "src/domain/handoff.ts": "c8b05fccff8b0751c98aab3bd8ef5702a1c07fa85084e70b2a72436b4d88f88c",
     "src/domain/intent.ts": "68773dfc14034905acf9de2d19fe03fae8efebe6c8717d461a308d5784761c9c",
     "src/domain/phase-budget.ts": "b24231dc02e17149347cf84bc2fa6a1178eb27291f6725d56cf48e0091acd6ad",
-    "src/domain/phase-gate.ts": "59c58392000e8e8703f6c77933662b57f10fe54e6386574b717dd57307b952e6",
+    "src/domain/phase-gate.ts": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
     "src/domain/reasoning.ts": "8b963b8589782b26805e02dad008b06def6ed33b75d95a05fd6cb0005de2fec0",
     "src/domain/records.ts": "0959042f6f622d5a773c21e58c8f10917ec12f8d7fb73a347fc478283fe147b6",
     "src/domain/run-id.ts": "44bc23a8071c0b6e545b52c4718d13eef4c453741f0a05eee1b51a5befc1d5a5",
@@ -101,7 +101,7 @@
     "src/orchestration/run-coordinator.ts": "6d5eccd273b0263314155c82a25c6381a8ee6450c7b2d406be831ba537e794fb",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+    "src/orchestration/single-agent-loop.ts": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
     "src/pwn/analysis.ts": "ab4b1ad5964ddf9cddbef4f73cfc3146fd4c484b93cd61a6b41f2b9df84b158f",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "b67fc75908ae4c4ddaee4efd58731525dc0bcb1e741d53e94dba5aca137415c2",
@@ -1403,8 +1403,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 90,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 91,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -4320,8 +4320,24 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
-      "line": 22,
-      "moduleHash": "59c58392000e8e8703f6c77933662b57f10fe54e6386574b717dd57307b952e6",
+      "line": 41,
+      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
+      "testRefs": [
+        "packages/materials/tests/phase-gate.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::verificationBindsRule",
+      "name": "verificationBindsRule",
+      "kind": "function",
+      "signature": "(task: Pick<TaskContract, \"verification\">): boolean",
+      "summary": "Whether the task contract itself asks for a verified result.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/domain/phase-gate.ts",
+      "line": 15,
+      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
       "testRefs": [
         "packages/materials/tests/phase-gate.test.ts"
       ]
@@ -5450,8 +5466,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 590,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 591,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": [
         "packages/materials/tests/single-agent-loop.test.ts"
       ]
@@ -9836,8 +9852,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
-      "line": 5,
-      "moduleHash": "59c58392000e8e8703f6c77933662b57f10fe54e6386574b717dd57307b952e6",
+      "line": 24,
+      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
       "testRefs": []
     },
     {
@@ -13091,8 +13107,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 28,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 29,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": []
     },
     {
@@ -13105,8 +13121,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 55,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 56,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": []
     },
     {
@@ -13119,8 +13135,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 80,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 81,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": []
     },
     {
@@ -17902,6 +17918,7 @@
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -18009,6 +18026,7 @@
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
@@ -20663,6 +20681,7 @@
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -23714,6 +23733,7 @@
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -29691,8 +29711,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 99,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 100,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -33974,6 +33994,7 @@
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/evaluation.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
@@ -34271,6 +34292,7 @@
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/evaluation.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-responses-cache.test.ts",
@@ -34587,6 +34609,7 @@
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-hint-currency.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-api.test.ts",
@@ -38005,6 +38028,7 @@
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/deterministic-index.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -38300,6 +38324,7 @@
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -38749,6 +38774,7 @@
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -39219,6 +39245,7 @@
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -41369,7 +41396,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
       "line": 3,
-      "moduleHash": "59c58392000e8e8703f6c77933662b57f10fe54e6386574b717dd57307b952e6",
+      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
       "testRefs": []
     },
     {
@@ -42728,8 +42755,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 53,
-      "moduleHash": "ca84375b4358ec9517c300595a3ae494796e5aee7e580f6d9b118c6a8b8830de",
+      "line": 54,
+      "moduleHash": "1b4f887d33d5da4fc927d8eb8a04950d5504af407bc9a3c5c6a926a66a73b4bb",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",
