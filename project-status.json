@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-22T19:35:00+08:00",
+  "updatedAt": "2026-09-22T23:35:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2246,6 +2246,31 @@
         "CI：PR #246 两次成功——run 35718719759（4m11s，合并提交 0f297c6）与 run 35719345324（3m34s，N9 提交 3c8ca54）。这是 §7.6-1「修复从未在 CI 上跑过」的关闭证据；此前 gh run list --branch fix/review-blockers 为空",
         "仍未处理并在索引文档中列明：§7.6-5 的 #245（他人 PR，未改其代码）与 #223/#230/#231/#235/#240/#241 的部分 Minor；22 个 PR 的 head 仍指向修复前提交。所有 PR 一律未合并，main 未动",
         "对 UPDATE-20260922-001 里那组 NTFS 数字的更正：那里把「40 次连续写入产生 18 次 ctimeMs 前进」当成常数，重测表明**次数不稳定**（连同评审侧共 7 次运行落在 9–31 之间，本次复测三次为 18/26/23），稳定的是量级（最小正增量 0.31–0.91ms、每次运行都有 12 个以上不同小数部分；同长度改写 + 还原整秒 mtime 使 ctimeMs 前进 1.0–2.5ms，size 与 ino 不变）。apps/gui/src/debug-data.ts 的注释已按这个口径改写：次数不引用为常数，量级与「捕获它的是 ctimeMs、不是 ino」保留"
+      ]
+    },
+    {
+      "id": "UPDATE-20260922-003",
+      "occurredAt": "2026-09-22T23:35:00+08:00",
+      "summary": "第五轮评审的收尾与落地：让 scripts 全量参与类型检查（去掉三个无理由的排除，修掉它们各自藏着的真实类型错误），删掉预算门禁里唯一「改文档会让门禁变红」的字面断言，并按所有者授权把集成分支以 PR #246 落地到 main、把其余已覆盖的 PR 关闭为 superseded。",
+      "branch": "fix/review-blockers",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "tsconfig.scripts.json 不再排除任何文件（评审 §3.2-1）。三个排除项各自藏着一个真实类型错误，全部修掉而不是写理由绕过：①browser-runtime-playwright-host.ts 在 `BrowserContextPort | BrowserVerifierContextHandle` 联合上直接调用 goto/close（4 处），新增 requireContextPort() 收窄并在拿到 durable handle 时抛出具名错误——这个 host 是进程内 host，本来就只能驱动 port；②pwn-docker-fault-matrix.ts 的 ProofBladeConfig 字面量缺 7 个 provider 字段，改为带注释的显式断言（保持最小字面量而不是补全成看起来可用的 profile），并把可变的 created 句柄换成不可变别名 live，使 assert.rejects 闭包里的收窄成立（15 行）；③session-runtime-combined-host.ts 只差 .ts 扩展名导入，开启 allowImportingTsExtensions",
+        "hot-path-budget.test.ts 删掉硬编码的 `/逻辑提交为 2/`（评审 §3.2-2）：同一测试里已经有一条由 fixture 构造的正则 `逻辑提交为 ${budgets.measured.commits}`，它覆盖同一件事且在 T2 落地（数值变 1）时仍然正确。删掉的是字面量而不是覆盖：变异验证把拆分文档里的数字改成 3，该用例转红",
+        "#245（Pwn 利用构造工具，另一位作者的 PR）按所有者指示未做任何改动，§3.1 的 1 条 Major 与 13 条 Minor 留在该 PR 与其作者处；本次没有向该分支推送，也没有再提交评论",
+        "落地（所有者授权「可以把我们已经完成的合并到 main」）：本记录随本分支以 PR #246（fix/review-blockers → main，含 #222–#243 全部提交与五轮评审的全部修复）一并进入 main；#222–#244 与 #227 在其后关闭为 superseded，各自留一条说明指向 #246 与其覆盖关系；#245 保持打开等待作者。合并方式与 CI 结果记录见 validation",
+        "评审 §3.3 的两条不再需要所有者二次决策的结论已按评审建议执行：(a) 以 #246 一次性落地，#222–#243 关闭为 superseded；(b) #227 与 #246 的双重承载以 #246 为准（#227 的内容完全包含在 #246 的提交历史里，且 #246 的版本已把配置项改为值键）"
+      ],
+      "validation": [
+        "类型检查：`npx tsc -p tsconfig.scripts.json` exit 0（排除项为零），`npx tsc -b` exit 0；改动前这三个文件在检查下分别报 4 个联合类型错误、2 个配置/收窄错误、1 个 .ts 扩展名错误",
+        "变异验证（本轮的删除是否有损覆盖）：把拆分文档里的「逻辑提交为 2」改成「逻辑提交为 3」→ hot-path-budget.test.ts `not ok 6`；`git checkout` 还原后 6/6 通过",
+        "定向套件：hot-path-budget 6/6",
+        "门禁：check:components、check:change-contracts、check:project-reports（--base origin/main）、api:index:check 全绿",
+        "CI：修复提交推送到 fix/review-blockers 后 PR #246 的 CI 通过；main 收到合并提交后 push 事件触发的 CI 通过（运行号见 PR/分支页）",
+        "边界：本轮未复核评审 §3.1 所列 #245 的任何条目（按指示不碰他人 PR）；也未逐个更新 #222–#243 的 head——它们以 superseded 关闭，内容由 #246 承载"
       ]
     }
   ],

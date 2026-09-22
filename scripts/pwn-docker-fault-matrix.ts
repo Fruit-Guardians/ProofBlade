@@ -27,12 +27,21 @@ const dockerCommand = process.env.PROOFBLADE_PWN_DOCKER_EXECUTABLE?.trim() || "d
 const reportPath = process.env.PROOFBLADE_PWN_FAULT_MATRIX_REPORT?.trim();
 const faultPoints = ["after_external_started", "after_intent", "after_external_confirmed", "after_control_commit", "after_finalize"] as const;
 
-const config: ProofBladeConfig = {
+/**
+ * Only the fields this script's code path reads.
+ *
+ * The matrix drives Docker and a durable Pwn session; it never creates a model
+ * lane, so `modelProfiles.executor` carries the one setting `createRun` touches
+ * and nothing else. It is cast rather than completed with placeholder provider
+ * settings, because a fully populated literal would look like a working profile
+ * and invite someone to run a real lane against it.
+ */
+const config = {
   schemaVersion: 1,
   runtime: { piVersion: "0.83.0" },
   storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
   modelProfiles: { executor: { thinkingLevel: "off" } },
-};
+} as unknown as ProofBladeConfig;
 
 async function main(): Promise<void> {
   if (!image) {
@@ -118,14 +127,15 @@ async function runCase(root: string, containerName: string, faultPoint: (typeof 
   const supervisor = new DurablePwnSessionSupervisor(supervisorOptions);
   let created: { sessionId: string; externalId: string; stateHash: string } | undefined;
   try {
-    created = await supervisor.create(request, requestKey);
+    const live = await supervisor.create(request, requestKey);
+    created = live;
     const resourceInput = {
-      id: `session:${created.sessionId}`,
+      id: `session:${live.sessionId}`,
       kind: "pwn-session" as const,
       runId,
       generation: 0,
       ownerLane: "executor" as const,
-      externalId: created.externalId,
+      externalId: live.externalId,
       requestKey,
     };
     const coordinator = new BindingTransactionCoordinator(control, externalResources);
@@ -134,19 +144,19 @@ async function runCase(root: string, containerName: string, faultPoint: (typeof 
     });
 
     if (faultPoint === "after_external_started") {
-      await assert.rejects(() => faulting.prepare({ sessionId: created!.sessionId, resource: resourceInput }), /injected Docker fault: after_external_started/);
+      await assert.rejects(() => faulting.prepare({ sessionId: live.sessionId, resource: resourceInput }), /injected Docker fault: after_external_started/);
       assert.deepEqual(await coordinator.intents(runId), []);
-      assert.equal(await supervisor.release(created.externalId, request, "Docker matrix cleanup"), true);
+      assert.equal(await supervisor.release(live.externalId, request, "Docker matrix cleanup"), true);
       created = undefined;
       return;
     }
 
-    let intent = await coordinator.prepare({ sessionId: created.sessionId, resource: resourceInput });
+    let intent = await coordinator.prepare({ sessionId: live.sessionId, resource: resourceInput });
     if (faultPoint === "after_intent") {
-      await assert.rejects(() => faulting.prepare({ sessionId: created.sessionId, resource: resourceInput }), /injected Docker fault: after_intent/);
+      await assert.rejects(() => faulting.prepare({ sessionId: live.sessionId, resource: resourceInput }), /injected Docker fault: after_intent/);
       assert.equal((await coordinator.intents(runId)).length, 1);
       assert.deepEqual(await coordinator.recover(runId, 0), { repaired: [], bound: [], releaseCandidates: [intent.bindingTxnId], manual: [] });
-      assert.equal(await supervisor.release(created.externalId, request, "Docker matrix cleanup"), true);
+      assert.equal(await supervisor.release(live.externalId, request, "Docker matrix cleanup"), true);
       created = undefined;
       return;
     }
@@ -157,30 +167,30 @@ async function runCase(root: string, containerName: string, faultPoint: (typeof 
       intent = await coordinator.get(intent.bindingTxnId) as typeof intent;
       assert.equal(intent.state, "EXTERNAL_CONFIRMED");
       assert.deepEqual(await coordinator.recover(runId, 0), { repaired: [], bound: [], releaseCandidates: [intent.bindingTxnId], manual: [] });
-      assert.equal(await supervisor.release(created.externalId, request, "Docker matrix cleanup"), true);
+      assert.equal(await supervisor.release(live.externalId, request, "Docker matrix cleanup"), true);
       created = undefined;
       return;
     }
 
     const session = {
-      id: created.sessionId,
+      id: live.sessionId,
       runId,
       kind: "pwn-local" as const,
       ownerLane: "executor" as const,
       generation: 0,
-      externalId: created.externalId,
+      externalId: live.externalId,
       requestKey,
     };
     if (faultPoint === "after_control_commit") {
       await assert.rejects(() => faulting.commitControl(intent, session), /injected Docker fault: after_control_commit/);
       const restarted = new DurablePwnSessionSupervisor(supervisorOptions);
       assert.deepEqual(await restarted.inspectByIdempotency(request, requestKey), { status: "PRESENT", created });
-      assert.equal(await restarted.adopt(created.externalId, request), true);
+      assert.equal(await restarted.adopt(live.externalId, request), true);
       const recovery = await coordinator.recover(runId, 0);
       assert.deepEqual(recovery, { repaired: [intent.bindingTxnId], bound: [], releaseCandidates: [], manual: [] });
       const bound = await externalResources.get(resourceInput.id);
       await assertRoundTrip(restarted, bound!, "matrix-control");
-      assert.equal(await restarted.release(created.externalId, request, "Docker matrix cleanup"), true);
+      assert.equal(await restarted.release(live.externalId, request, "Docker matrix cleanup"), true);
       created = undefined;
       return;
     }
@@ -190,11 +200,11 @@ async function runCase(root: string, containerName: string, faultPoint: (typeof 
     assert.deepEqual(await coordinator.recover(runId, 0), { repaired: [], bound: [intent.bindingTxnId], releaseCandidates: [], manual: [] });
     const restarted = new DurablePwnSessionSupervisor(supervisorOptions);
     assert.deepEqual(await restarted.inspectByIdempotency(request, requestKey), { status: "PRESENT", created });
-    assert.equal(await restarted.adopt(created.externalId, request), true);
+    assert.equal(await restarted.adopt(live.externalId, request), true);
     const bound = await externalResources.get(resourceInput.id);
-    assert.equal(bound?.controlSessionId, created.sessionId);
+    assert.equal(bound?.controlSessionId, live.sessionId);
     await assertRoundTrip(restarted, bound!, "matrix-finalize");
-    assert.equal(await restarted.release(created.externalId, request, "Docker matrix cleanup"), true);
+    assert.equal(await restarted.release(live.externalId, request, "Docker matrix cleanup"), true);
     created = undefined;
   } finally {
     if (created) await new DurablePwnSessionSupervisor(supervisorOptions).release(created.externalId, request, "Docker matrix cleanup").catch(() => undefined);

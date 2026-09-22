@@ -309,18 +309,18 @@ test("the budget constants stay in step with the documented baseline", async () 
   // prose-drift guard that matched two sentences of the breakdown document is
   // gone, because a wording edit is not a budget change.
   //
-  // What remains asserted about the document is the qualitative invariant the
-  // budget is derived from, and it is asserted as a claim rather than a phrase:
-  // the commit figure is recorded as two logical commits, one event stream.
+  // What remains asserted about the document is the invariant the budget is
+  // derived from, asserted against the fixture rather than as a literal: the
+  // commit figure the breakdown records must equal `budgets.measured.commits`.
+  //
+  // A hardcoded `/逻辑提交为 2/` used to sit here, and it was the one place in
+  // this file where editing the document turned the gate red -- the fifth review
+  // round filed it as a declared coupling. The fixture-derived regex below fails
+  // when the document and the fixture disagree, and keeps working when T2 lands
+  // and both values become 1. Hard-coding the number in the other direction
+  // (`measured.commits === 2`) is what would make closing T2 turn the gate red
+  // instead of tightening it.
   const doc = await readFile(join(repoRoot, "docs", "PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md"), "utf8");
-  assert.match(
-    doc,
-    /逻辑提交为 2/,
-    "the breakdown must still state the two logical commits the commit budget encodes",
-  );
-  // Only the relationship is asserted, not the absolute values: hard-coding
-  // `measured.commits === 2` is what made the documented path to closing T2
-  // (set it to 1) turn the gate red instead of tightening it.
   assert.equal(budgets.target.commits, 1, "the plan's target is at most one synchronous commit");
   assert.ok(budgets.measured.commits >= budgets.target.commits, "the measured baseline cannot be tighter than the target");
   assert.ok(budgets.measured.events >= budgets.target.events, "a merged commit cannot add events");
