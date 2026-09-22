@@ -790,6 +790,15 @@ async function filesystemVersion(root: string): Promise<string> {
  * any content change and cannot be set by an ordinary writer; `ino` separates a
  * replaced file from an in-place write. Both come from the `stat()` the caller
  * already performs, so this costs nothing extra.
+ *
+ * Scope of that guarantee, stated because it is what the key actually rests on:
+ * `ctimeMs` comes from the system clock, so an in-place rewrite that lands in the
+ * same clock tick as the previous change can carry the same value. On NTFS that
+ * tick is 100ns in principle and about 15.6ms in practice. `ino` still separates a
+ * replaced file and `size` still catches most edits, so the remaining window is
+ * "same size, same tick, same inode" rather than "any same-size edit". A caller
+ * that needs more than that must hash the bytes; `runtime/version.ts` does, which
+ * is why its revision is a content digest rather than a metadata key.
  */
 function runDetailEventsVersion(eventsStat: Stats): string {
   return `${eventsStat.ino}\0${eventsStat.size}\0${eventsStat.mtimeMs}\0${eventsStat.ctimeMs}`;
