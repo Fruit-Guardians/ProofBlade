@@ -164,16 +164,34 @@ test("[contract:projection-hint-currency] the hint refuses an empty log rather t
 });
 
 test("[contract:projection-hint-currency] the hint refuses a final record larger than its read window", async () => {
-  // The tail window is 64 KiB. A final record bigger than that contains no
-  // newline inside the window, so there is no committed record to read: the
-  // answer is "unknown", not "the previous record".
-  const { root, control, eventsPath } = await run("CURRENCY-8");
+  // The tail window is 64 KiB, and a final record bigger than that contains no
+  // newline inside the window: no committed record can be read, so the answer is
+  // "unknown" rather than "current" or "the previous record".
+  //
+  // Two details make this assert the window rule instead of something else:
+  //
+  // - the mtimes are equalized after the append. Otherwise the appended record
+  //   moves the log's mtime past the projection's and the cheap pre-filter answers
+  //   `undefined` first, so the assertion holds whether or not the window rule
+  //   works -- the same defect the fourth review round found in CURRENCY-6.
+  // - the oversized record carries the seq the projection is sealed at, on
+  //   purpose. With a fresh seq the currency comparison would refuse it even if
+  //   the record had been read, so the test could not tell a bounded read from an
+  //   unbounded one. Mutation-verified: making `lastEventSeq` read the whole file
+  //   finds this record, matches the projection's own seq, and serves the hint,
+  //   which fails the assertion below.
+  const { root, control, eventsPath, projectionPath } = await run("CURRENCY-8");
   try {
+    const baseline = await control.loadProjectionHint("CURRENCY-8");
+    assert.ok(baseline, "the baseline projection must be servable");
     await deferred(control, "CURRENCY-8", 5);
     const { appendFile } = await import("node:fs/promises");
-    await appendFile(eventsPath, `{"schemaVersion":1,"seq":9999,"padding":"${"p".repeat(80_000)}"}\n`, "utf8");
+    await appendFile(eventsPath, `{"schemaVersion":1,"seq":${baseline.lastSeq},"padding":"${"p".repeat(80_000)}"}\n`, "utf8");
+    const equal = Math.floor(Date.now() / 1000);
+    await utimes(projectionPath, equal, equal);
+    await utimes(eventsPath, equal, equal);
 
-    assert.equal(await control.loadProjectionHint("CURRENCY-8"), undefined, "a tail bigger than the window is unknown, not stale");
+    assert.equal(await control.loadProjectionHint("CURRENCY-8"), undefined, "a tail bigger than the window is unknown, not current");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

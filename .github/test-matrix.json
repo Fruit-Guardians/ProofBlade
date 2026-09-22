@@ -47,7 +47,12 @@
         "packages/materials/src/context/**",
         "packages/materials/src/recovery/**",
         "packages/materials/src/observability/**",
-        "packages/materials/src/effects/**"
+        "packages/materials/src/effects/**",
+        "packages/materials/src/knowledge/**",
+        "packages/materials/src/skills/**",
+        "packages/materials/src/tools/**",
+        "packages/materials/src/verification/**",
+        "packages/materials/src/competition/**"
       ],
       "testGlobs": [
         "packages/materials/tests/coding-resources.test.ts",
