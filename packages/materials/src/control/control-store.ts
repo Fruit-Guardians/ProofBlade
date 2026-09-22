@@ -781,12 +781,16 @@ export class ControlStore {
     // replay agree after a historical event is rewritten in place".
     const events = await this.eventStore.events(runId);
     const streamLastSeq = events.at(-1)?.seq ?? 0;
+    // `snapshot` is undefined by construction at this point -- the block below is
+    // the only one that can assign it before the replay fallback -- so this
+    // condition is exactly "the snapshot cache missed". It used to carry a
+    // `snapshot === undefined` conjunct that could never be false.
     let snapshot: RunSnapshot | undefined;
     // A cache revision mismatch means another process (or an operator) changed
     // durable state. Do not assume that change was append-only.
     const durableStateChanged = cached !== undefined;
     if (durableStateChanged) this.snapshotCache.delete(runId);
-    if (!durableStateChanged && snapshot === undefined) {
+    if (!durableStateChanged) {
       const persisted = await this.eventStore.loadProjection(runId, {
         events,
         authoritySecret: this.#authoritySecret,
