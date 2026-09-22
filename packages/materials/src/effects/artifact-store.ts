@@ -58,11 +58,29 @@ export class ArtifactStore {
     try {
       await this.controlStore.dispatch(runId, { type: "artifact", generation: write.artifact.generation, artifact: write.artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
     } catch (error) {
-      // Registration is what makes the file Evidence provenance. If it fails the
-      // staged file is an orphan: no event references it, so nothing can find it
-      // again and no reaper knows it exists. Remove it rather than leaving bytes
-      // on disk that no audit trail accounts for, then let the caller decide.
-      await this.discardStaged(runId, write.artifact);
+      // A failed dispatch does not mean the registration failed, and deleting the
+      // bytes on that assumption is worse than the orphan this cleanup exists to
+      // prevent. `#commitCommands` appends the events to the log and only then
+      // writes the projection, so a `saveProjection` failure (ENOSPC, an
+      // antivirus or indexer holding the file, a permissions error on the
+      // projection directory) throws *after* `artifact_registered` is durable.
+      // Removing the file there leaves a durable event pointing at bytes that no
+      // longer exist: `readText` and `verify()` fail, the Evidence provenance
+      // chain breaks, and replay and projection both name a missing file.
+      //
+      // So the log decides. Both outcomes are safe: `discardStaged` is
+      // `force: true` and tolerates a missing path, so calling it when the
+      // artifact is absent is idempotent.
+      //
+      // The check is best-effort, and it fails towards keeping the bytes: a
+      // leftover file is recoverable, a deleted one is not.
+      let registered = true;
+      try {
+        registered = (await this.controlStore.snapshot(runId)).artifacts[write.artifact.id] !== undefined;
+      } catch {
+        registered = true;
+      }
+      if (!registered) await this.discardStaged(runId, write.artifact);
       throw error;
     }
     return { artifact: (await this.controlStore.snapshot(runId)).artifacts[write.artifact.id] ?? write.artifact, storedText: write.storedText };

@@ -191,6 +191,50 @@ test("a dispatch failure leaves no orphan artifact file behind", async () => {
   }
 });
 
+test("a durable registration survives a projection failure", async () => {
+  // The orphan cleanup must not become a data-loss bug. `#commitCommands`
+  // appends the events to the log and only then writes the projection, so a
+  // `saveProjection` failure throws *after* `artifact_registered` is durable.
+  // Deleting the file on that path leaves a durable event pointing at bytes that
+  // no longer exist -- worse than the orphan the cleanup prevents.
+  //
+  // `saveProjection` is made to fail while the append succeeds, which is exactly
+  // the ordering the review described.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-d2-projfail-"));
+  const runId = "D2-PROJFAIL-1";
+  try {
+    const services = createServices(root, config);
+    await services.control.createRun(runId, { ...demoTask(runId, root, config), mode: "coding_assistant", target_kind: "unknown", verification: { kind: "reproduction", required_reproductions: 0 } });
+
+    // `withRunLock` builds a fresh writer whose `saveProjection` closes over the
+    // real implementation, so this is the seam that actually fails a projection
+    // write while leaving the append alone.
+    const realSave = services.control.eventStore.saveProjection.bind(services.control.eventStore);
+    services.control.eventStore.saveProjection = (async () => { throw new Error("projection write failed"); }) as typeof services.control.eventStore.saveProjection;
+    const realWithRunLock = services.control.eventStore.withRunLock.bind(services.control.eventStore);
+    services.control.eventStore.withRunLock = (async (runId: string, operation: (writer: { append: (events: never[], secret: string) => Promise<void>; saveProjection: (snapshot: never, secret: string) => Promise<void> }) => Promise<unknown>, options?: unknown) => await realWithRunLock(runId, async (writer) => await operation({
+      append: writer.append,
+      saveProjection: async () => { throw new Error("projection write failed"); },
+    }), options as never)) as typeof services.control.eventStore.withRunLock;
+
+    await assert.rejects(
+      services.artifacts.putTextWithContent(runId, "durably registered bytes\n", { filename: "keep.txt", sensitivity: "public" }),
+      /projection write failed/,
+    );
+
+    // The append already happened, so the artifact exists and its bytes must too.
+    const snapshot = await services.control.snapshot(runId);
+    const registered = Object.values(snapshot.artifacts).find((artifact) => artifact.path.endsWith("keep.txt"));
+    assert.ok(registered, "the artifact event is durable, so the Run must know the artifact");
+    const stored = await services.artifacts.readText(runId, registered);
+    assert.equal(stored, "durably registered bytes\n", "the registered artifact's bytes must not have been discarded");
+
+    services.control.eventStore.saveProjection = realSave;
+  } finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test("a healthy archival still reports an artifact id and no diagnostics", async () => {
   const { result, diagnostics } = await readOnce("D2-OK-1", "important contents\n", false);
 
