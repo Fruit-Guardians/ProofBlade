@@ -49,11 +49,16 @@ const REF: ContainerRef = {
 class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private pending = new Map<string, string>();
   private count = 0;
+  private readonly failingSessions = new Set<string>();
   public lastWriteBytes: Uint8Array | undefined;
-  public constructor(private readonly flag: string, private readonly flagPath: string, private readonly exitOnWrite = false) {}
+  public constructor(private readonly flag: string, private readonly flagPath: string, private readonly exitOnWrite = false, failOnSessionNumbers: number[] = []) {
+    this.failOnSessionNumbers = new Set(failOnSessionNumbers);
+  }
+  private readonly failOnSessionNumbers: Set<number>;
   public async openSession(ref: ContainerRef): Promise<ContainerSessionHandle> {
     const sessionId = `dxs-${++this.count}`;
     this.pending.set(sessionId, "");
+    if (this.failOnSessionNumbers.has(this.count)) this.failingSessions.add(sessionId);
     return { sessionId, ref };
   }
   public async sessionWrite(handle: ContainerSessionHandle, data: string | Uint8Array): Promise<ContainerSessionResult> {
@@ -73,7 +78,8 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private drain(sessionId: string): ContainerSessionResult {
     const buffered = this.pending.get(sessionId) ?? "";
     this.pending.set(sessionId, "");
-    return { delta: buffered, waitReason: buffered ? "idle" : "timeout", exited: this.exitOnWrite, exitCode: this.exitOnWrite ? 0 : null, truncated: false };
+    const exited = this.exitOnWrite || this.failingSessions.has(sessionId);
+    return { delta: buffered, waitReason: buffered ? "idle" : "timeout", exited, exitCode: exited ? 0 : null, truncated: false };
   }
 }
 
@@ -116,6 +122,35 @@ test("pwn tools fail closed with a clear message when no container is attached",
       return true;
     },
   );
+});
+
+test("pwn_workflow is a read-only current-generation view and never touches a live tube", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-workflow-tool-"));
+  try {
+    const runId = "PWN-WORKFLOW-TOOL";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    let openCalls = 0;
+    const runtime = {
+      async openSession(): Promise<never> {
+        openCalls += 1;
+        throw new Error("pwn_workflow must not open a session");
+      },
+    } as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => ({ ...REF, runId, generation: 0 }), "executor", undefined, undefined, undefined, undefined, control);
+    const before = await control.snapshot(runId);
+    const result = await toolByName("pwn_workflow").execute!("t-workflow", {}, new AbortController().signal, () => {}, contextWith(handler));
+    const details = result.details as { generation: number; status: string; current: { recordIds: Record<string, string[]> } };
+    assert.equal(result.isError, false);
+    assert.equal(details.generation, 0);
+    assert.equal(details.status, "recon");
+    assert.deepEqual(details.current.recordIds, { binaryProfiles: [], protocolTranscripts: [], primitives: [], crashes: [], leaks: [], bases: [], exploitStages: [] });
+    assert.equal(openCalls, 0);
+    assert.equal((await control.snapshot(runId)).lastSeq, before.lastSeq);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("pwn_open explains how to repair a missing remote endpoint", async () => {
@@ -376,6 +411,80 @@ test("trusted Pwn reproduction binds clean-process verdicts to a Completion", as
       { name: "shell_probe", ok: true },
       { name: "flag_extract", ok: true },
     ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("multi-reproduction failure persists the verifier's final attempt verdict", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-trusted-multi-failure-"));
+  try {
+    const runId = "PWN-TRUSTED-MULTI-FAILURE";
+    const services = createServices(root, config);
+    const task = {
+      ...demoTask(runId, root, config),
+      target_kind: "pwn" as const,
+      target: "REMOTE:tube",
+      verification: {
+        kind: "reproduction" as const,
+        command: "proofblade-pwn-verifier-policy",
+        required_reproductions: 2,
+        pwn: REPRODUCTION_POLICY,
+      },
+      scope: { allowed_hosts: ["1.2.3.4"], allowed_ports: [1337], external_network: true, allowed_workspace: root },
+    };
+    await services.control.createRun(runId, task);
+    // The first verifier-owned session succeeds. The second exits while the
+    // trigger is sent, so its final verdict is failed even though the first
+    // execution's stage list is entirely successful.
+    const runtime = new EchoTubeRuntime("flag{first-only}", "/flag", false, [2]) as unknown as ContainerRuntimePort;
+    const ref = { ...REF, runId, generation: 0 };
+    const verifierRegistry = new SessionRegistry(runId, runtime, services.control);
+    const claims = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const trusted = new PwnReproductionVerifier(services.control, services.artifacts, {
+      prepareReplay: (input) => claims.prepareReplay(input),
+      startReplay: (effectId, sessionId, externalId) => claims.startReplay(effectId, sessionId, externalId),
+      finishReplay: (effectId, result) => claims.finishReplay(effectId, result),
+      executeEffect: async (input, signal) => await claims.executePwnReproductionEffect(input, signal),
+      recordEvidence: async (_id, evidence) => await claims.recordVerifierEvidence(evidence),
+      finalize: async (_id, completionId, accepted, evidenceIds) => await claims.finalizePwnReproduction(completionId, accepted, evidenceIds),
+    }, verifierRegistry, () => ref, REPRODUCTION_POLICY);
+    const handler = new PwnToolHandler(
+      runId,
+      new SessionRegistry(runId, runtime, services.control),
+      new PwnReproducer(services.control),
+      () => ref,
+      "executor",
+      { allowedHosts: ["1.2.3.4"], allowedPorts: [1337] },
+      REPRODUCTION_POLICY,
+      undefined,
+      services.artifacts,
+      services.control,
+      trusted,
+    );
+    const recon = await services.artifacts.putText(runId, "stack overflow candidate", { filename: "recon.txt" });
+    await handler.recordPrimitive({ primitive: "stack buffer overflow with direct ret2win control", confidence: 0.8, artifactIds: [recon.id] });
+
+    const outcome = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(outcome.reproduced, false);
+    assert.equal(outcome.flag, undefined);
+    assert.deepEqual(outcome.stages.map(({ name, ok }) => ({ name, ok })), [
+      { name: "trigger", ok: true },
+      { name: "shell_probe", ok: true },
+      { name: "flag_extract", ok: true },
+    ], "the returned stages are from the first successful execution");
+
+    const snapshot = await services.control.snapshot(runId);
+    const stages = Object.values(snapshot.domainRecords).filter((record) => record.kind === "pwn_exploit_stage");
+    assert.equal(stages.length, 3);
+    assert.ok(stages.every((stage) => stage.status === "passed"));
+    assert.ok(stages.every((stage) => stage.attemptStatus === "failed"), "every persisted stage carries the final multi-attempt verdict");
+    assert.equal(snapshot.completions[outcome.completionId!]?.status, "REJECTED");
+
+    const workflow = await handler.workflow();
+    assert.equal(workflow.lastAttempt?.status, "failed");
+    assert.equal(workflow.retryBlocked, true);
+    assert.equal(workflow.status, "experiment");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

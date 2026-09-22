@@ -41,7 +41,7 @@ import { join, resolve } from "node:path";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "daa68256d0cbdb25d9bf99f26162e9ef6da23198df8b19a7672819baca309eb2";
+const CODING_TOOL_CONTRACT_HASH = "c7784c019d3541f30e65db1cb38d7c83bc2f76a8172290300b3a7be0c174b9e3";
 
 test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
   assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
@@ -49,7 +49,7 @@ test("TaskResultVerifier is the canonical verifier and keeps the legacy class as
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_workflow", "pwn_cyclic", "pwn_crash_analyze", "pwn_record_leak", "pwn_derive_base", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => tool.name === "verify_claim"), false);
   assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((tool) => tool.name === "submit_flag"), false);
