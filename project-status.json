@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T00:40:00+08:00",
+  "updatedAt": "2026-09-23T01:05:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2297,6 +2297,27 @@
         "定向套件：coding-resources / claim-verification-recovery / verification-recovery / debug-data / tool-presentation 共 102 用例、fail 0（--test-concurrency=1）。另注：并发跑时 coding-resources 的 shell_background 用例曾失败一次，单文件重跑通过，属既有的负载相关抖动，与本次改动无关",
         "门禁：api:index 重新生成后 check 通过；check:components / check:change-contracts / check:project-reports（--base origin/main）通过；test:ci-gates 43/43",
         "缓存问题（所有者同轮提出，只做测量未改代码）：该运行 29 次请求总体命中 87.4%，三次低命中（22%/40%/33%）的成因不是前缀小，而是上下文维护在**已发送过的消息上原地改写**（#253 把 message[10] 从 5045 收到 820 tokens、#343/#359 两次改写 message[19] 25870→24275→677），每次都紧跟一次 checkpoint_created；DeepSeek 的前缀缓存只能复用到改动点，其后约 32k tokens 按新输入计费。其余请求 93–100%"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-002",
+      "occurredAt": "2026-09-23T01:05:00+08:00",
+      "summary": "按所有者指示实现「先输出，当用户要求复现再复现」：未绑定 verifier 规则的对话不再被 REPRODUCE/REPORT/SUBMIT 相位门禁判为 blocked（该 block 就写在模型提示里，是它反复调用 verify_result 的直接原因）。",
+      "branch": "fix/chat-claim-and-compaction-view",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "domain/phase-gate.ts 新增导出 verificationBindsRule(task)（kind 非 reproduction／required_reproductions>0／有 command／有 pwn／有 web 之一才算绑定规则），orchestration/single-agent-loop.ts 的 taskRequiresVerification 改为直接转发它——同一判据只有一份定义",
+        "REPRODUCE 的 accepted-completion-candidate 与 verifier-owned-reproduction、REPORT 的 accepted-completion 与 completed-executor-work-item、SUBMIT 的三条要求，现在只在 verificationBindsRule 为真时加入 required。未绑定规则的对话门禁直接 pass：模型输出结论即可，复现由用户提出时再做（verify_result 仍在，行为同 UPDATE-20260923-001 记录的 observation_only + policy 反馈）",
+        "证据：该运行提示里的 control_view.gate 正是 {status:blocked, missing:[accepted-completion-candidate, verifier-owned-reproduction]}，而任务契约 required_reproductions=0 且无 command——这条要求永远无法满足，只会把模型推去反复验证",
+        "测试：packages/materials/tests/phase-gate.test.ts 新增用例（无规则对话的 REPRODUCE/REPORT/SUBMIT 门禁 required 为空且 pass；demoTask 与「补一条 command」两种绑定形态仍要求 accepted completion）"
+      ],
+      "validation": [
+        "变异验证：把门禁条件改回恒真 → 新用例 not ok（恢复后 3/3 通过）",
+        "定向套件：phase-gate / coding-resources / single-agent-loop 共 67 用例 fail 0（--test-concurrency=1）；npx tsc -b exit 0",
+        "范围说明：本次不改「什么算已验证」的语义——没有让模型自证即 ACCEPT，也没有新增任务级命令绑定；只去掉了一个永远无法满足的门禁要求"
       ]
     }
   ],
