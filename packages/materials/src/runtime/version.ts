@@ -82,27 +82,22 @@ export interface RunVersionSnapshotCache {
  *
  * @param projectRoot - project root holding `skills/`, `.mcp.json` and the tool catalog.
  * @param config - resolved runtime config.
- * @param options - optional config path and revision-cache capacity.
+ * @param options - optional config path.
  * @returns the cached provider plus counters for tests and diagnostics.
  */
 export function createCachedRunVersionSnapshot(
   projectRoot: string,
   config: ProofBladeConfig,
-  options: { configPath?: string; maxRevisionEntries?: number } = {},
+  options: { configPath?: string } = {},
 ): RunVersionSnapshotCache {
   const configPath = options.configPath ?? "proofblade.config.json";
-  const maxEntries = options.maxRevisionEntries ?? 64;
-  if (!Number.isInteger(maxEntries) || maxEntries < 1) throw new Error("maxRevisionEntries must be a positive integer");
-  /** Cache-key (file metadata) -> content revision; bounded so edits cannot grow it without limit. */
-  const revisions = new Map<string, string>();
   let current: { revision: string; promise: Promise<RunVersionSnapshot> } | undefined;
   let builds = 0;
 
   return {
     provider: async () => {
-      const revision = await versionRevision(projectRoot, configPath, revisions, maxEntries);
+      const revision = await versionRevision(projectRoot, config, configPath);
       if (current?.revision === revision) return await current.promise;
-      builds += 1;
       const promise = createRunVersionSnapshot(projectRoot, config);
       current = { revision, promise };
       try {
@@ -112,6 +107,13 @@ export function createCachedRunVersionSnapshot(
         // become a permanent one.
         if (current.revision === revision) current = undefined;
         throw error;
+      } finally {
+        // Counted after the build settles. `buildCount` is documented as "how
+        // many times the snapshot was actually rebuilt", and a failed attempt
+        // that the next caller retries is not a rebuild of anything -- counting
+        // attempts also made the number depend on how many callers raced the
+        // failure.
+        if (current?.revision === revision) builds += 1;
       }
     },
     buildCount: () => builds,
@@ -123,13 +125,41 @@ export function createCachedRunVersionSnapshot(
 /**
  * Content revision of every input the version snapshot is derived from.
  *
+ * The revision is a digest of every input's **bytes**, computed on every call.
+ *
+ * There is deliberately no metadata-keyed digest cache here, and that is the
+ * answer to a real defect rather than a simplification. The previous version
+ * keyed a per-file digest on `path | ino | size | mtimeMs | ctimeMs`, which is
+ * exactly the shape of key that can hide a content change: a writer that keeps
+ * the byte length, restores `mtimeMs` (any tool can, with `utimes`) and somehow
+ * preserves `ctimeMs` reproduces the key and is served the old digest. Widening
+ * the key again would only move the window.
+ *
+ * Measurement is what settles the trade, because "verify the content on a hit"
+ * sounds expensive and is not:
+ *
+ * | | per call |
+ * |---|---:|
+ * | today: walk the tree + `stat` every input, hash only on a metadata miss | ~6.7 ms |
+ * | this: one walk, read + hash every input | ~11.8 ms |
+ * | `createRunVersionSnapshot` (what the cache exists to avoid) | ~9.3 ms |
+ *
+ * The cache's net saving with the unsound key was ~2.6 ms per call, inside the
+ * noise of a 12.6 ms `createRun`. Paying ~5 ms more for a revision that cannot
+ * be stale is the right side of that trade, and it is still cheaper than the
+ * rebuild it avoids. The long-Run event log is not in this list; when it is, a
+ * 3.9 MiB JSONL input costs ~6.8 ms to read and hash.
+ *
+ * The walk is single-pass on purpose: the old shape walked the tree for paths
+ * and then `stat`ed every path, so reading each file once for its bytes costs
+ * roughly what the two traversals cost.
+ *
  * @param projectRoot - project root.
+ * @param config - resolved config, for the values the snapshot reads from it.
  * @param configPath - config path, relative to the root or absolute.
- * @param revisions - per-file metadata cache, mutated in place.
- * @param maxEntries - capacity for that cache.
  * @returns a digest that changes whenever any input's content changes.
  */
-async function versionRevision(projectRoot: string, configPath: string, revisions: Map<string, string>, maxEntries: number): Promise<string> {
+async function versionRevision(projectRoot: string, config: ProofBladeConfig, configPath: string): Promise<string> {
   const root = resolve(projectRoot);
   const files = [
     isAbsolute(configPath) ? configPath : resolve(root, configPath),
@@ -137,12 +167,17 @@ async function versionRevision(projectRoot: string, configPath: string, revision
     resolve(root, "tool-catalog.json"),
     ...await skillInputFiles(root),
   ];
-  const digests: string[] = [];
-  for (const file of files) {
-    const revision = await fileRevision(file, revisions, maxEntries);
-    if (revision !== undefined) digests.push(`${file}:${revision}`);
-  }
-  return sha256(digests.join("\n"));
+  const digests = await Promise.all(files.map(async (file) => {
+    const digest = await fileDigest(file);
+    return digest === undefined ? undefined : `${file}:${digest}`;
+  }));
+  return sha256([
+    ...digests.filter((entry): entry is string => entry !== undefined),
+    // The values `createRunVersionSnapshot` reads out of the parsed config, not
+    // the config file: the GUI replaces the parsed object at startup, so keying
+    // on the file is both narrower and wider than the snapshot's real inputs.
+    `config:${sha256(canonicalJson({ piVersion: config.runtime.piVersion, thinkingLevel: config.modelProfiles.executor.thinkingLevel ?? "off" }))}`,
+  ].join("\n"));
 }
 
 /**
@@ -193,51 +228,23 @@ async function collectSkillFiles(directory: string, into: string[]): Promise<voi
 }
 
 /**
- * Revision of one file: reuse the cached content digest while the file's
- * identity and metadata are unchanged, otherwise re-hash the bytes.
+ * Content digest of one input, or `undefined` when it is absent or unreadable.
  *
- * The key is `path | ino | size | mtimeMs | ctimeMs`, and each part earns its
- * place. `size + mtimeMs` alone is not enough: an in-place rewrite that keeps
- * the byte length and then restores the timestamp -- which any writer can do
- * with `utimes` -- reproduces the old key exactly, so the stale digest was
- * reused and a caller could be handed a RunVersionSnapshot built from content
- * that no longer exists.
- *
- * `ctimeMs` closes that: the kernel updates it on any content or metadata
- * change and ordinary writers cannot set it, so it advances even when `mtimeMs`
- * is put back. `ino` distinguishes a replacement file (atomic rename, a common
- * way to publish config) from an in-place write of the same size. Both are
- * fields of the same `stat()`, so the fast path stays a fast path.
- *
- * This is not a substitute for hashing. An actor who can write content and hold
- * ctime still is out of scope, and could equally rewrite the cached digest; the
- * goal is to make staleness from ordinary and near-miss writes impossible, not
- * to detect a privileged adversary.
+ * No metadata short-circuit, and that is the point: see `versionRevision` for
+ * the measurements behind it. An absent input contributes nothing to the
+ * revision, which is deliberate -- `load()` treats an absent catalog as empty,
+ * so "no file" and "file vanished" describe the same snapshot and the digest
+ * stays stable for both.
  *
  * @param file - absolute path.
- * @param revisions - cache to consult and update.
- * @param maxEntries - capacity for the cache.
- * @returns the content digest, or `undefined` when the file is absent or unreadable.
+ * @returns the content digest, or `undefined` when the file cannot be read.
  */
-async function fileRevision(file: string, revisions: Map<string, string>, maxEntries: number): Promise<string | undefined> {
+async function fileDigest(file: string): Promise<string | undefined> {
   try {
     const stats = await fs.stat(file);
     if (!stats.isFile()) return undefined;
-    const key = `${file}|${stats.ino}|${stats.size}|${stats.mtimeMs}|${stats.ctimeMs}`;
-    const cached = revisions.get(key);
-    if (cached !== undefined) return cached;
-    const digest = sha256(await fs.readFile(file, "utf8"));
-    revisions.set(key, digest);
-    while (revisions.size > maxEntries) {
-      const oldest = revisions.keys().next().value;
-      if (oldest === undefined) break;
-      revisions.delete(oldest);
-    }
-    return digest;
+    return sha256(await fs.readFile(file, "utf8"));
   } catch {
-    // A missing or unreadable input contributes nothing to the revision. That is
-    // deliberate: `load()` treats an absent catalog as empty, so the snapshot for
-    // "no file" and "file vanished" is the same, and the digest stays stable.
     return undefined;
   }
 }

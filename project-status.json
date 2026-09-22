@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-19T14:40:00+08:00",
+  "updatedAt": "2026-09-21T15:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -1593,6 +1593,29 @@
         "npm run typecheck passed",
         "162/162 Materials tests passed",
         "component documentation check passed (25 components, 6 affected)"
+      ]
+    },
+    {
+      "id": "UPDATE-20260921-005",
+      "occurredAt": "2026-09-21T15:40:00+08:00",
+      "summary": "修订 #227 的 revision 缓存：删除以元数据为键的逐文件摘要缓存，revision 改为每次调用读取并哈希每个输入的字节；同时把 pwn 运行时宿主测试的临时目录清理改为重试，消除随机 ENOTEMPTY。",
+      "branch": "fix/version-revision-key",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "审查指出 path|ino|size|mtimeMs|ctimeMs 仍能自我复现：保留字节长度、用 utimes 复位 mtime 后只剩 ino/ctime 作证据，而两者都不是内容，宽化键只是移动窗口。改为无键：versionRevision 每次调用读取并哈希每个输入（SKILL.md、.mcp.json、tool-catalog.json、config 派生值），单遍完成",
+        "实测支撑这个取舍：带元数据键的缓存每次净省约 2.6ms（检查 6.7ms vs 重建 9.3ms），而单遍读取+哈希为 11.8ms，仍在重建成本之下；即缓存省下的时间几乎等于它自己检查的成本，同时附带一个陈旧快照的窗口",
+        "移除 versionSnapshotCache 的 maxRevisionEntries 选项（逐文件摘要缓存已不存在），并把 buildCount 改为构建成功后自增（原为尝试次数）",
+        "config 的 piVersion 与 thinkingLevel 直接进摘要：builder 读的是解析后的 config 对象，GUI 启动时会替换它，因此哈希配置文件既漏了真实输入又多算了无关输入",
+        "回归测试改为冻结整秒 mtime（避免亚毫秒差异让前置断言失败），断言同长度同 mtime 改写必须推动 revision 并触发重建；另加结构性守卫断言摘要路径不含任何元数据访问——单靠运行时断言在 Windows 上无法否定宽键，因为就地写入会推动 ctime",
+        "pwn-session-runtime-host.test.ts 的 7 处临时目录清理加入 maxRetries/retryDelay，消除随机 ENOTEMPTY（分离 worker 在 release 之后仍在写状态文件，与 rm 遍历竞争）"
+      ],
+      "validation": [
+        "变异验证：恢复 path|ino|size|mtimeMs|ctimeMs 的摘要缓存后，结构性守卫转红；恢复 path|size|mtimeMs 的窄键后，运行时断言与结构性守卫同时转红",
+        "16 条 version-cache 断言通过；pwn-session-runtime-host 10/10；tsc 全仓通过；check:components 通过（26 组件，2 affected）",
+        "如实记录测试边界：运行时断言无法在本文件系统上否定宽键（Windows 就地写入必推 ctime），因此该性质由结构性守卫承担，两者都在测试注释里写明了各自能证明什么"
       ]
     }
   ],

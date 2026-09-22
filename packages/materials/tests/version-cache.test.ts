@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createCachedRunVersionSnapshot, createRunVersionSnapshot, skillInputFiles } from "../src/runtime/version.js";
 
@@ -163,69 +163,71 @@ test("rewriting a file with identical bytes does not count as a change", async (
   }
 });
 
-test("a same-size rewrite is not hidden by the revision cache", async () => {
-  // Review finding: a `size + mtimeMs` key reproduces itself when a file is
-  // rewritten in place at the same byte length and the timestamp is put back, so
-  // the stale content digest was reused and a caller could be handed a
-  // RunVersionSnapshot built from content that no longer exists. The key now also
-  // carries the inode and ctime.
+test("a same-size, same-mtime rewrite is not hidden by the revision", async () => {
+  // Review finding on this change, and the reason the per-file digest cache is
+  // gone rather than widened: any metadata-keyed digest cache can reproduce
+  // itself. A writer that keeps the byte length and restores `mtimeMs` (any tool
+  // can, with `utimes`) leaves only `ino` and `ctimeMs` as evidence, and neither
+  // is part of the content.
   //
-  // Honest scope -- read this before trusting the test as a gate. It asserts the
-  // observable outcome (a same-size rewrite must move the revision and rebuild)
-  // and it does NOT isolate ino/ctime as the cause. Mutation-checked: reverting
-  // the key to `size + mtimeMs` leaves this test green on this filesystem,
-  // because `writeFile` cannot be given a bit-identical mtime back (sub-ms
-  // precision survives `utimes`), so the changed mtime alone moves the revision.
-  //
-  // The ino/ctime change is therefore reasoned, not gated: ctime advances on any
-  // content change and ordinary writers cannot set it, unlike mtime. A test that
-  // actually fails without it needs a filesystem or an injection point where the
-  // cache key inputs can be held still, which this suite does not have.
+  // The file is now read and hashed on every call, so this does not depend on
+  // being able to freeze the clock: the revision is a function of the bytes.
   const root = await project();
   try {
     const skillPath = join(root, "skills", "alpha", "SKILL.md");
     const first = "---\nname: alpha\ndescription: aaaa\n---\n\nbody\n";
     const second = "---\nname: alpha\ndescription: bbbb\n---\n\nbody\n";
     assert.equal(Buffer.byteLength(first), Buffer.byteLength(second), "the two bodies must be the same length");
+    // A whole-second timestamp, set explicitly. Restoring whatever timestamp the
+    // write itself produced compares against the filesystem's rounding, so a
+    // sub-millisecond difference would fail the setup assertion for a reason
+    // that has nothing to do with the cache key.
+    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
     await writeFile(skillPath, first, "utf8");
+    await utimes(skillPath, frozen, frozen);
 
     const cache = createCachedRunVersionSnapshot(root, config);
     const before = await cache.provider();
     const revisionBefore = cache.revision();
+    const beforeStat = await stat(skillPath);
 
+    assert.notEqual(first, second, "the bytes must actually differ");
     await writeFile(skillPath, second, "utf8");
-    const original = await stat(skillPath);
-    await utimes(skillPath, original.atime, new Date(Math.floor(original.mtimeMs / 1000) * 1000));
+    await utimes(skillPath, frozen, frozen);
+    const afterStat = await stat(skillPath);
+    assert.equal(afterStat.size, beforeStat.size, "the rewrite must keep the byte length");
+    assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs, "the rewrite must keep the modification time exactly, or this test proves nothing");
 
     const after = await cache.provider();
-    assert.notEqual(cache.revision(), revisionBefore, "same-size different bytes must change the revision");
+    assert.notEqual(cache.revision(), revisionBefore, "same-size, same-mtime different bytes must change the revision");
     assert.equal(cache.buildCount(), 2, "the snapshot must be rebuilt from the new bytes");
     assert.equal(after.skills.length, before.skills.length);
-
-    // Open lead, sharpened -- this is where the trail currently ends.
-    //
-    // Asserting that the rebuilt snapshot carries a NEW skill contentHash fails
-    // HERE, and the failure is specific to this path:
-    //
-    //   * calling ProofBladeSkillRegistry.load(root) directly, before and after
-    //     the same rewrite, DOES return a new contentHash (60e06da2 -> e21688fe
-    //     in a standalone probe) with cacheStats() reporting parses=2, hits=0
-    //   * through this snapshot, the revision moves and the snapshot is rebuilt,
-    //     yet contentHash comes back identical
-    //
-    // So the registry is not stale on its own; something about how the snapshot
-    // reaches it is. The snapshot's `skills` entries carry only name and
-    // contentHash -- no path -- so which file it actually read could not be
-    // confirmed from here, and that is where this stopped.
-    //
-    // Two candidates were ruled out and are recorded so the next attempt need
-    // not redo them: NodeExecutionEnv.readTextFile() returns the new bytes after
-    // this rewrite (reused and fresh env alike, checked directly), and the
-    // vendored Pi skill loader holds no cache of its own -- it reads only through
-    // env.readTextFile and returns per call.
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("the revision never consults file metadata", async () => {
+  // The structural half of the same finding. Why both halves are needed, stated
+  // plainly because one of them is weaker than it looks:
+  //
+  // - the runtime assertion above is portable, and it fails for the *narrow* key
+  //   (`path|size|mtimeMs`) that the review reported: with the timestamp frozen
+  //   the key reproduces itself and the old digest is served. Mutation-checked.
+  // - it does NOT fail for the wide key (`path|ino|size|mtimeMs|ctimeMs`) on this
+  //   filesystem, because a Windows in-place `writeFile` moves `ctimeMs` and no
+  //   ordinary writer can put that back. So "widening the key passes the test"
+  //   would be true while the hole the review describes is still open.
+  //
+  // This half closes that: a digest that short-circuits on metadata is visible in
+  // the source, so `readFile` must be reached unconditionally and no metadata
+  // access may appear in the digest path. Mutating in either key shape fails it.
+  const source = await readFile(join(import.meta.dirname, "../src/runtime/version.ts"), "utf8");
+  const helper = source.slice(source.indexOf("async function fileDigest("), source.indexOf("async function canonicalOrResolved("));
+  assert.ok(helper.length > 0, "fileDigest must exist");
+  assert.match(helper, /readFile\(/, "the per-file digest must read the bytes");
+  assert.doesNotMatch(helper, /stats\.(ino|mtimeMs|ctimeMs|size)/, "the digest must not depend on metadata");
+  assert.doesNotMatch(source, /revisions\.get\(/, "there must be no metadata-keyed digest cache");
 });
 
 test("invalidate() forces the next call to rebuild", async () => {
@@ -290,13 +292,20 @@ test("the cached provider returns the same value an uncached build would", async
   }
 });
 
-test("the revision cache is bounded and still correct after eviction", async () => {
+test("a changed skill still rebuilds after many intervening snapshots", async () => {
+  // What the removed `maxRevisionEntries` option used to cover: the cache is
+  // bounded, so correctness must not depend on it still holding a previous
+  // entry. The bound is gone (there is no per-file digest cache any more), and
+  // this keeps the property that mattered -- a change is never missed because
+  // something was evicted, or because other roots were loaded in between.
   const root = await project();
   try {
-    // Capacity 1 forces constant eviction; correctness must not depend on the
-    // metadata cache still holding a previous entry.
-    const cache = createCachedRunVersionSnapshot(root, config, { maxRevisionEntries: 1 });
+    const cache = createCachedRunVersionSnapshot(root, config);
     const first = await cache.provider();
+    for (const other of [await project(), await project()]) {
+      await cache.provider();
+      await rm(other, { recursive: true, force: true });
+    }
     await writeFile(join(root, "skills", "alpha", "SKILL.md"), "---\nname: alpha\ndescription: changed\n---\n\nbody\n", "utf8");
     const second = await cache.provider();
 
@@ -307,8 +316,23 @@ test("the revision cache is bounded and still correct after eviction", async () 
   }
 });
 
-test("the cache rejects a capacity that cannot hold one revision", () => {
-  assert.throws(() => createCachedRunVersionSnapshot(resolve("."), config, { maxRevisionEntries: 0 }), /positive integer/);
+test("an absent config file is not an input to the revision", async () => {
+  // `configPath` still names a file for the revision, and a missing one must
+  // contribute nothing rather than make the digest undefined: a project without
+  // `proofblade.config.json` (every test root) must still get a stable revision,
+  // or the cache would rebuild on every call.
+  const root = await project();
+  try {
+    await rm(join(root, "proofblade.config.json"), { force: true });
+    const cache = createCachedRunVersionSnapshot(root, config);
+    await cache.provider();
+    await cache.provider();
+    await cache.provider();
+    assert.equal(cache.buildCount(), 1, "a missing config file must not defeat the cache");
+    assert.ok(cache.revision(), "the revision must still be computed");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("the revision covers every skill root the registry loads, recursively", async () => {
