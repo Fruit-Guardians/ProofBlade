@@ -103,12 +103,14 @@ async function harness(runId: string): Promise<Harness> {
   // event count: a merge writes the same four events in one commit instead of
   // two.
   //
-  // The count sits on `withRunLock`, which is what a commit actually acquires: a
-  // run-lock acquisition plus an fsync is the cost the model waits on. Counting
-  // public entry points instead would be wrong in both directions -- `dispatch`
-  // delegates to `dispatchBatch` (one lock, two calls), and the private
-  // `#commitCommands` is reached from `dispatchTransaction`,
-  // `dispatchBindingTransaction` and `append` as well.
+  // The counter sits on `withRunLock` because that is the only seam that observes
+  // every write path in one place -- `dispatch` delegates to `dispatchBatch`,
+  // and `#commitCommands` is reached from `dispatchTransaction`,
+  // `dispatchBindingTransaction` and `append` as well. It is a **proxy**, not a
+  // commit counter: `flushProjection`, `reconcileProjection` and the legacy
+  // migration also take the lock. None of them runs on this path, and the test
+  // asserts the exact count rather than a ceiling, so an extra acquisition from
+  // anywhere shows up as a failure instead of being absorbed by slack.
   const commits = { count: 0 };
   const realWithRunLock = services.control.eventStore.withRunLock.bind(services.control.eventStore);
   services.control.eventStore.withRunLock = (async (...args: Parameters<typeof realWithRunLock>) => {
@@ -207,13 +209,18 @@ test("[contract:hot-path-event-budget] an ordinary read stays within its durable
   }
 });
 
-test("[contract:hot-path-event-budget] an ordinary read stays within its commit budget", async () => {
-  // The plan's actual contract is about commits, not events: "at most one
-  // synchronous ControlStore commit before an ordinary tool returns"
-  // (PLAN-240 §7.2.2). A merge writes the same events in fewer commits, so
-  // event counts cannot see the difference. Today's measurement is two --
-  // artifact registration, then the derived observation -- and the budget
-  // records that so a regression to three is caught while T1/T2 work lands.
+test("[contract:hot-path-commit-budget] an ordinary read stays within its commit budget", async () => {
+  // The plan's contract is about commits, not events: "at most one synchronous
+  // ControlStore commit before an ordinary tool returns" (PLAN-240 §7.2.2). A
+  // merge writes the same events in fewer commits, so event counts cannot see the
+  // difference.
+  //
+  // The budget enforces where the code is (two: artifact registration, then the
+  // derived observation) rather than where the plan wants it (one). That gap is a
+  // decision, and this test states it instead of leaving an unreachable branch
+  // that looked like it would close automatically: nothing tightens on its own,
+  // `budgets.measured.commits` is what the budget reads, and the difference is
+  // asserted below so that closing T2 is a visible edit rather than a silent one.
   const h = await harness("BUDGET-READ-4");
   try {
     const target = join(h.root, "measured.txt");
@@ -222,18 +229,24 @@ test("[contract:hot-path-event-budget] an ordinary read stays within its commit 
     const read = await readTool();
     await read.execute("read-1", { path: target }, new AbortController().signal, undefined, h.context);
 
+    assert.ok(h.commits.count > 0, "the commit counter must actually observe the read");
     assert.ok(
       h.commits.count <= READ_COMMIT_BUDGET,
       `an ordinary read took ${h.commits.count} commits, budget is ${READ_COMMIT_BUDGET}`,
     );
-    assert.ok(h.commits.count > 0, "the commit counter must actually observe the read");
-    assert.ok(
-      READ_COMMIT_TARGET <= READ_COMMIT_BUDGET,
-      `the recorded target (${READ_COMMIT_TARGET}) must not be looser than today's budget (${READ_COMMIT_BUDGET})`,
+    // Stated as the open gap it is. When T2 lands, `budgets.measured.commits`
+    // becomes 1, this assertion fails, and the failure is the reminder to set
+    // `budgets.target.commits` to the same value and delete this line.
+    assert.equal(
+      READ_COMMIT_BUDGET - READ_COMMIT_TARGET,
+      1,
+      "today's budget is one commit above the plan's target (T2, reopen); if that changed, update the assertion with it",
     );
-    if (READ_COMMIT_TARGET === READ_COMMIT_BUDGET) {
-      assert.ok(h.commits.count <= READ_COMMIT_TARGET, "the plan's target is now the enforced budget");
-    }
+    assert.equal(
+      h.commits.count,
+      READ_COMMIT_BUDGET,
+      "the measured read must be at the budget, not below it: a silent improvement means this gate is stale",
+    );
   } finally {
     await rm(h.root, { recursive: true, force: true });
   }
@@ -305,7 +318,15 @@ test("the budget constants stay in step with the documented baseline", async () 
     /逻辑提交为 2/,
     "the breakdown must still state the two logical commits the commit budget encodes",
   );
-  assert.equal(budgets.measured.commits, 2, "the fixture and the plan's measured baseline must agree");
+  // Only the relationship is asserted, not the absolute values: hard-coding
+  // `measured.commits === 2` is what made the documented path to closing T2
+  // (set it to 1) turn the gate red instead of tightening it.
   assert.equal(budgets.target.commits, 1, "the plan's target is at most one synchronous commit");
+  assert.ok(budgets.measured.commits >= budgets.target.commits, "the measured baseline cannot be tighter than the target");
   assert.ok(budgets.measured.events >= budgets.target.events, "a merged commit cannot add events");
+  assert.match(
+    doc,
+    new RegExp(`逻辑提交为 ${budgets.measured.commits}`),
+    "the breakdown's commit count and the fixture's measured value must be the same number",
+  );
 });

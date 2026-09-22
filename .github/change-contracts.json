@@ -23,11 +23,15 @@
         {
           "path": "packages/materials/src/skills/registry.ts",
           "patterns": ["skillTreeRevision", "skillRegistryCache", "read"]
+        },
+        {
+          "path": ".github/hot-path-budgets.json"
         }
       ],
       "testPaths": ["packages/materials/tests/"],
       "scenarios": [
         "contract:hot-path-event-budget",
+        "contract:hot-path-commit-budget",
         "contract:hot-path-projection-budget",
         "contract:hot-path-readback-budget",
         "contract:skill-catalog-parse-budget",
