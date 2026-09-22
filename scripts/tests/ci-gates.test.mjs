@@ -157,26 +157,33 @@ test("[contract:component-audit-time-fallback] resolves audit time from explicit
   assert.equal(resolveAuditTimestamp({ now }), "2026-08-08T10:00:00.000Z");
 });
 
-test("every script either typechecks or is listed as a known failure", () => {
+test("every script typechecks, with no exclusion left to hide breakage", () => {
   // `scripts/**` belonged to no TypeScript project, so `tsc -b` could not see it:
   // `npm run baseline:tools -- --json` shipped with a `ReferenceError` on a name
   // that exists only inside a function, and neither the build nor any test
   // reached that branch. `tsconfig.scripts.json` closes the class.
   //
-  // Three scripts do not typecheck today. They are excluded by name so the gate
-  // starts green, and this test keeps the exclusion list from being used to hide
-  // new breakage: a script added to it must be one of the three.
+  // Three scripts were excluded at first, and that list turned out to be hiding a
+  // real type error in each of them (four unchecked calls on a
+  // `BrowserContextPort | BrowserVerifierContextHandle` union, a `ProofBladeConfig`
+  // literal seven fields short, and a narrowing lost inside a closure). All three
+  // are fixed, so the list is empty and this test now pins it that way: an entry
+  // here means a script nobody typechecks, which is how the ReferenceError shipped
+  // in the first place. The `allowImportingTsExtensions` assertion is the other
+  // half -- two hosts import their sibling by path with an explicit `.ts`, and
+  // dropping the flag would force those files back onto the exclusion list.
   const config = JSON.parse(readFileSync(resolve(process.cwd(), "tsconfig.scripts.json"), "utf8"));
   assert.deepEqual(
-    [...config.exclude].sort(),
-    [
-      "scripts/browser-runtime-playwright-host.ts",
-      "scripts/pwn-docker-fault-matrix.ts",
-      "scripts/session-runtime-combined-host.ts",
-    ],
-    "a new entry in tsconfig.scripts.json's exclude list hides a real type error; fix the script instead",
+    config.exclude ?? [],
+    [],
+    "an entry in tsconfig.scripts.json's exclude list hides a real type error; fix the script instead",
   );
   assert.ok(config.include.includes("scripts/**/*.ts"), "the project must include the scripts it gates");
+  assert.equal(
+    config.compilerOptions?.allowImportingTsExtensions,
+    true,
+    "the path-launched hosts import their siblings with a .ts extension; without this flag they cannot be checked",
+  );
   const root = JSON.parse(readFileSync(resolve(process.cwd(), "tsconfig.json"), "utf8"));
   assert.ok(
     root.references.some((reference) => reference.path === "./tsconfig.scripts.json"),

@@ -1,25 +1,10 @@
 {
-  // Scripts are checked, not built: `tsc -b` visits this project through
-  // `tsconfig.json`, and `noEmit` is what makes a type error in `scripts/**` fail
-  // the build instead of shipping a broken probe.
-  //
-  // Nothing is excluded any more. Three files used to be
-  // (`browser-runtime-playwright-host.ts`, `pwn-docker-fault-matrix.ts`,
-  // `session-runtime-combined-host.ts`) without a stated reason, and the review
-  // filed that as a finding: the exclusion was hiding one real type error per
-  // file -- four unchecked calls on a `BrowserContextPort | BrowserVerifierContextHandle`
-  // union, a `ProofBladeConfig` literal missing every provider field, and a
-  // `possibly undefined` handle read inside a closure. All three are fixed, so the
-  // exclusion has nothing left to hide.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
     "declaration": false,
     "sourceMap": false,
     "types": ["node"],
-    // Two hosts import their sibling with an explicit `.ts` extension because
-    // they are launched by path (tsx resolves them directly). Permitted here
-    // rather than by rewriting the imports, which would break those launches.
     "allowImportingTsExtensions": true
   },
   "include": ["scripts/**/*.ts", "scripts/**/*.mts"]
