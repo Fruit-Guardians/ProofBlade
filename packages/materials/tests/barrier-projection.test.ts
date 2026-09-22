@@ -89,7 +89,8 @@ test("[contract:barrier-persists-deferred-projection] a barrier writes the proje
   }
 });
 
-test("a barrier is a no-op once the projection is current again", async () => {  const { root, control, projectionPath } = await run("BARRIER-2");
+test("a barrier is a no-op once the projection is current again", async () => {
+  const { root, control, projectionPath } = await run("BARRIER-2");
   try {
     await deferred(control, "BARRIER-2", 1);
     await control.flushProjection("BARRIER-2");
@@ -137,19 +138,19 @@ test("a barrier is a no-op once the projection is current again", async () => { 
  *
  * The branch is kept anyway: it is what makes the answer correct rather than
  * merely cheap, since without it a genuinely current projection would be
- * rewritten on every barrier. The tests below pin what IS observable -- a
- * tampered projection is never left trusted, and a current one is never
- * reported as repaired.
- */test("a barrier leaves a projection it cannot confirm to the full validation", async () => {
-  // The other side of the same coin: when the hint DOES agree, the full
-  // validation runs. That is what keeps the cheap check from becoming an
-  // authority of its own -- it decides whether to attempt the real check, never
-  // what the answer is.
+ * rewritten on every barrier.
+ */
+test("[contract:barrier-persists-deferred-projection] a reconcile over a current projection reports no repair", async () => {
+  // Named for what it asserts. It was called "a barrier leaves a projection it
+  // cannot confirm to the full validation", but the body runs `deferred` ->
+  // `flushProjection` -> `reconcileProjection` and asserts `repaired === false`:
+  // that is `reconcileProjection` (`control-store.ts`), a different public path
+  // from the barrier's cheap check, and the name told a reader it was covering
+  // the check.
   //
-  // Reaching it needs the hint and the stream to agree while the run still has a
-  // deferred marker, which no public sequence produces (see the note above). The
-  // observable half is asserted instead: a barrier over a current projection
-  // leaves it current and rewrites nothing it can avoid.
+  // What is observable here is the reconcile's answer over a projection that is
+  // already current, which is what keeps a current projection from being
+  // reported as repaired (and rewritten) on every startup.
   const { root, runsRoot, control, projectionPath } = await run("BARRIER-7");
   try {
     await deferred(control, "BARRIER-7", 1);
