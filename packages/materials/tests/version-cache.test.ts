@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ProofBladeConfig } from "../src/config.js";
@@ -193,71 +193,65 @@ test("rewriting a file with identical bytes does not count as a change", async (
   }
 });
 
-test("a same-size rewrite is not hidden by the revision cache", async () => {
-  // Review finding: a `size + mtimeMs` key reproduces itself when a file is
-  // rewritten in place at the same byte length and the timestamp is put back, so
-  // the stale content digest was reused and a caller could be handed a
-  // RunVersionSnapshot built from content that no longer exists. The key now also
-  // carries the inode and ctime.
+test("a same-size, same-mtime rewrite is not hidden by the revision", async () => {
+  // The revision is a digest of every input's bytes, so this does not depend on
+  // being able to freeze the clock: no metadata key exists to reproduce itself.
   //
-  // Honest scope -- read this before trusting the test as a gate. It asserts the
-  // observable outcome (a same-size rewrite must move the revision and rebuild)
-  // and it does NOT isolate ino/ctime as the cause. Mutation-checked: reverting
-  // the key to `size + mtimeMs` leaves this test green on this filesystem,
-  // because `writeFile` cannot be given a bit-identical mtime back (sub-ms
-  // precision survives `utimes`), so the changed mtime alone moves the revision.
-  //
-  // The ino/ctime change is therefore reasoned, not gated: ctime advances on any
-  // content change and ordinary writers cannot set it, unlike mtime. A test that
-  // actually fails without it needs a filesystem or an injection point where the
-  // cache key inputs can be held still, which this suite does not have.
+  // The mtime is frozen explicitly at a whole second. Restoring whatever
+  // timestamp the write produced would compare against the filesystem's
+  // rounding, and a sub-millisecond difference would fail the setup assertion for
+  // a reason that has nothing to do with the revision.
   const root = await project();
   try {
     const skillPath = join(root, "skills", "alpha", "SKILL.md");
     const first = "---\nname: alpha\ndescription: aaaa\n---\n\nbody\n";
     const second = "---\nname: alpha\ndescription: bbbb\n---\n\nbody\n";
     assert.equal(Buffer.byteLength(first), Buffer.byteLength(second), "the two bodies must be the same length");
+    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
     await writeFile(skillPath, first, "utf8");
+    await utimes(skillPath, frozen, frozen);
 
     const cache = createCachedRunVersionSnapshot(root, config);
     const before = await cache.provider();
     const revisionBefore = cache.revision();
+    const beforeStat = await stat(skillPath);
 
+    assert.notEqual(first, second, "the bytes must actually differ");
     await writeFile(skillPath, second, "utf8");
-    const original = await stat(skillPath);
-    await utimes(skillPath, original.atime, new Date(Math.floor(original.mtimeMs / 1000) * 1000));
+    await utimes(skillPath, frozen, frozen);
+    const afterStat = await stat(skillPath);
+    assert.equal(afterStat.size, beforeStat.size, "the rewrite must keep the byte length");
+    assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs, "the rewrite must keep the modification time exactly, or this test proves nothing");
 
     const after = await cache.provider();
-    assert.notEqual(cache.revision(), revisionBefore, "same-size different bytes must change the revision");
+    assert.notEqual(cache.revision(), revisionBefore, "same-size, same-mtime different bytes must change the revision");
     assert.equal(cache.buildCount(), 2, "the snapshot must be rebuilt from the new bytes");
     assert.equal(after.skills.length, before.skills.length);
-
-    // Open lead, sharpened -- this is where the trail currently ends.
-    //
-    // Asserting that the rebuilt snapshot carries a NEW skill contentHash fails
-    // HERE, and the failure is specific to this path:
-    //
-    //   * calling ProofBladeSkillRegistry.load(root) directly, before and after
-    //     the same rewrite, DOES return a new contentHash (60e06da2 -> e21688fe
-    //     in a standalone probe) with cacheStats() reporting parses=2, hits=0
-    //   * through this snapshot, the revision moves and the snapshot is rebuilt,
-    //     yet contentHash comes back identical
-    //
-    // So the registry is not stale on its own; something about how the snapshot
-    // reaches it is. The snapshot's `skills` entries carry only name and
-    // contentHash -- no path -- so which file it actually read could not be
-    // confirmed from here, and that is where this stopped.
-    //
-    // Two candidates were ruled out and are recorded so the next attempt need
-    // not redo them: NodeExecutionEnv.readTextFile() returns the new bytes after
-    // this rewrite (reused and fresh env alike, checked directly), and the
-    // vendored Pi skill loader holds no cache of its own -- it reads only through
-    // env.readTextFile and returns per call.
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
+test("the revision never consults file metadata", async () => {
+  // The structural half, and the part a filesystem cannot make vacuous. Why both
+  // halves are needed, stated plainly because one of them is weaker than it looks:
+  //
+  // - the runtime assertion above fails for the *narrow* key
+  //   (`path|size|mtimeMs`) that the first review round reported.
+  // - it does NOT fail for the wide key (`path|ino|size|mtimeMs|ctimeMs`) on this
+  //   filesystem, because a Windows in-place write moves `ctimeMs` and no ordinary
+  //   writer can put that back. "Widening the key passes the test" would be true
+  //   while the hole is still open, which is exactly what the third round found.
+  //
+  // So the digest path must reach `readFile` and must not touch metadata. Mutating
+  // in either key shape fails this.
+  const source = await readFile(join(import.meta.dirname, "../src/runtime/version.ts"), "utf8");
+  const helper = source.slice(source.indexOf("async function fileDigest("), source.indexOf("async function canonicalOrResolved("));
+  assert.ok(helper.length > 0, "fileDigest must exist");
+  assert.match(helper, /readFile\(/, "the per-file digest must read the bytes");
+  assert.doesNotMatch(helper, /stats\.(ino|mtimeMs|ctimeMs|size)/, "the digest must not depend on metadata");
+  assert.doesNotMatch(source, /revisions\.get\(/, "there must be no metadata-keyed digest cache");
+});
 test("invalidate() forces the next call to rebuild", async () => {
   const root = await project();
   try {

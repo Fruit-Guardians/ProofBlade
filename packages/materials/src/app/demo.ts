@@ -80,6 +80,11 @@ export interface CreateServicesOptions {
    * reads from the parsed `config`, not on the config file, so a path would have
    * invited exactly the mismatch it used to cause.
    */
+  /**
+   * Vestigial since the revision became an unconditional content digest: it used
+   * to size a per-file metadata cache that no longer exists. Kept so callers do
+   * not break, validated so a caller passing 0 still learns it is meaningless.
+   */
   versionSnapshotOptions?: { maxRevisionEntries?: number };
 }
 
