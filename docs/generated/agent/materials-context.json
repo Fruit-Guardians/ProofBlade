@@ -3,7 +3,7 @@
   "package": "@proofblade/materials",
   "sourceRoot": "packages/materials",
   "moduleHashes": {
-    "src/app/demo.ts": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+    "src/app/demo.ts": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
     "src/app/fixture-task.ts": "77d62e1e632887c1a01251a6ac595050d61cee52cb1eb7977087ba6d01351c9e",
     "src/capabilities/backend.ts": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
     "src/capabilities/binary.ts": "fbeaff814f7a7c5802f72018fbbc0c9f13264d5ae9eb53a5ccb7345bc1c87c6f",
@@ -140,13 +140,13 @@
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
-    "src/runtime/version.ts": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+    "src/runtime/version.ts": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
     "src/sandbox/fixture.ts": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
     "src/security/approval-policy.ts": "1f9d442218afddf3547d7bd481fc4121394b2fb0ad7bba66d7ab1934d6876e5c",
-    "src/skills/registry.ts": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+    "src/skills/registry.ts": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
     "src/storage/control-authority.ts": "8add37c36f821514cf985b4c9c96722351314ae4ffc516efd91d617a8c787647",
     "src/storage/jsonl-store.ts": "ffae9805439ff7a72473bff57dd3e6bc36dc1b3f2f9d34240a81fe4ae879359d",
     "src/storage/spill-store.ts": "be10856f0ca4e4ef962033559921dbce390efca16d0b55b683013954031c0a51",
@@ -1847,7 +1847,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 37,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/artifact-readback.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -3111,7 +3111,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 14,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": []
     },
     {
@@ -3125,7 +3125,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 17,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": []
     },
     {
@@ -3139,7 +3139,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 13,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": []
     },
     {
@@ -3153,7 +3153,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 16,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": []
     },
     {
@@ -3167,7 +3167,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 15,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": []
     },
     {
@@ -3227,8 +3227,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 86,
-      "moduleHash": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+      "line": 91,
+      "moduleHash": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
@@ -3284,8 +3284,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 137,
-      "moduleHash": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+      "line": 142,
+      "moduleHash": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
@@ -3346,8 +3346,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
-      "line": 158,
-      "moduleHash": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+      "line": 163,
+      "moduleHash": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/demo.test.ts"
@@ -6858,7 +6858,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 88,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ]
@@ -6874,7 +6874,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 26,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ]
@@ -6898,8 +6898,8 @@
       ],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
-      "line": 184,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "line": 180,
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ]
@@ -7047,8 +7047,8 @@
       ],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 310,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "line": 319,
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/skill-registry-cache.test.ts"
       ]
@@ -7625,7 +7625,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
       "line": 18,
-      "moduleHash": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+      "moduleHash": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts"
@@ -7642,7 +7642,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/app/demo.ts",
       "line": 56,
-      "moduleHash": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+      "moduleHash": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
       "testRefs": []
     },
     {
@@ -14585,7 +14585,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/version.ts",
       "line": 54,
-      "moduleHash": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+      "moduleHash": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
       "testRefs": []
     },
     {
@@ -14798,7 +14798,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 31,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": []
     },
     {
@@ -14812,7 +14812,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 16,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": []
     },
     {
@@ -14826,7 +14826,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 23,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/knowledge-read-bounds.test.ts"
       ]
@@ -16760,8 +16760,7 @@
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-native.test.ts",
-        "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/tool-catalog.test.ts"
       ]
     },
     {
@@ -17784,6 +17783,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -20865,6 +20865,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -21342,6 +21343,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -23370,7 +23372,6 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
     },
@@ -27950,6 +27951,7 @@
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -34126,7 +34128,8 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
-        "packages/materials/tests/session-registry.test.ts"
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ]
     },
     {
@@ -34688,7 +34691,6 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/update-evaluation-gates.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
     },
@@ -34911,12 +34913,11 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 50,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ]
     },
     {
@@ -34929,8 +34930,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 183,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "line": 192,
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -34954,8 +34955,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 187,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "line": 196,
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -34972,8 +34973,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 177,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "line": 186,
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -35028,7 +35029,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 71,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -35104,8 +35105,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 203,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "line": 212,
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
@@ -35123,8 +35124,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
-      "line": 199,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "line": 208,
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/skill-registry-cache.test.ts"
       ]
@@ -35140,7 +35141,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/skills/registry.ts",
       "line": 55,
-      "moduleHash": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+      "moduleHash": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/skill-registry-cache.test.ts"
@@ -36262,8 +36263,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {
@@ -38751,8 +38751,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {

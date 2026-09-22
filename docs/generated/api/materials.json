@@ -4,7 +4,7 @@
   "packageId": "materials",
   "sourceRoot": "packages/materials",
   "moduleHashes": {
-    "src/app/demo.ts": "52011f465dd450f379b56c6a6702abbd7458af14ff33332d594f6e6fe961a346",
+    "src/app/demo.ts": "5e6715b35439d6c6f48327c25b451746886baebabab31f98e3a7cd11a58e5171",
     "src/app/fixture-task.ts": "77d62e1e632887c1a01251a6ac595050d61cee52cb1eb7977087ba6d01351c9e",
     "src/capabilities/backend.ts": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
     "src/capabilities/binary.ts": "fbeaff814f7a7c5802f72018fbbc0c9f13264d5ae9eb53a5ccb7345bc1c87c6f",
@@ -141,13 +141,13 @@
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
     "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
-    "src/runtime/version.ts": "ec3a78084e850be5dfafdfd2bee1547a3c8801aadab207d9cdf2fe92504163bb",
+    "src/runtime/version.ts": "1bbfb1e7ca04335eee64116aa7fbb0d1abbcde67164a4a261571087e2724052b",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
     "src/sandbox/fixture.ts": "3676dbcbd882072a3c9a46467ea7c6ff9aba781cbe7987a0287c608ce617d336",
     "src/security/approval-policy.ts": "1f9d442218afddf3547d7bd481fc4121394b2fb0ad7bba66d7ab1934d6876e5c",
-    "src/skills/registry.ts": "8802ebf9a4115450b4c9aaeff9552a379a11fdd8e554992c931ce03060545b22",
+    "src/skills/registry.ts": "a83c943d5c50a647564162f2e8ad442eb7cfcf97c133dc044f4de322156b3b34",
     "src/storage/control-authority.ts": "8add37c36f821514cf985b4c9c96722351314ae4ffc516efd91d617a8c787647",
     "src/storage/jsonl-store.ts": "ffae9805439ff7a72473bff57dd3e6bc36dc1b3f2f9d34240a81fe4ae879359d",
     "src/storage/spill-store.ts": "be10856f0ca4e4ef962033559921dbce390efca16d0b55b683013954031c0a51",
@@ -5168,7 +5168,7 @@
       "visibility": "public",
       "module": "src/app/demo.ts",
       "exportPath": "@proofblade/materials",
-      "line": 86,
+      "line": 91,
       "signature": "(root: string, config: ProofBladeConfig, options?: CreateServicesOptions | import(\"../effects/effect-journal.js\").EffectFaultInjector): AppServices",
       "summary": "Inferred summary: create services operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -5244,7 +5244,7 @@
       "visibility": "public",
       "module": "src/app/demo.ts",
       "exportPath": "@proofblade/materials",
-      "line": 137,
+      "line": 142,
       "signature": "(runId: string, root: string, config: ProofBladeConfig): TaskContract",
       "summary": "Inferred summary: demo task operation used to validate input or state.",
       "summarySource": "inferred",
@@ -5325,7 +5325,7 @@
       "visibility": "public",
       "module": "src/app/demo.ts",
       "exportPath": "@proofblade/materials",
-      "line": 158,
+      "line": 163,
       "signature": "(root: string, runId: string, config: ProofBladeConfig): Promise<{ runId: string; flag: string; }>",
       "summary": "Inferred summary: run demo operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -11025,7 +11025,7 @@
       "testRefs": [
         "packages/materials/tests/version-cache.test.ts"
       ],
-      "structureHash": "7fe223f74543bb1a9ad424af1a170b754aae07a5672dacff2eaf803ceeaaeae8"
+      "structureHash": "52d57d5f809f51ca89c378e0dbb0b50dcbf801898e9474af08e12888f1945626"
     },
     {
       "id": "@proofblade/materials::function::createRunVersionSnapshot",
@@ -11063,7 +11063,7 @@
       "visibility": "public",
       "module": "src/runtime/version.ts",
       "exportPath": "@proofblade/materials",
-      "line": 184,
+      "line": 180,
       "signature": "(root: string): Promise<string[]>",
       "summary": "Every file the version snapshot's skill catalog is derived from.",
       "summarySource": "tsdoc",
@@ -11266,7 +11266,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 310,
+      "line": 319,
       "signature": "(roots: readonly string[]): Promise<string[]>",
       "summary": "Every file the skill loaders derive their result from.",
       "summarySource": "tsdoc",
@@ -11292,7 +11292,7 @@
       "testRefs": [
         "packages/materials/tests/skill-registry-cache.test.ts"
       ],
-      "structureHash": "a955be63f56a3af4c147adc07ef0244921b72fd72864e2215b6a378081f59ec8"
+      "structureHash": "02d1b7440c2956d7799c0eecce428549ce5c8ced99681b896c8d6ffe68f41e22"
     },
     {
       "id": "@proofblade/materials::function::makeEvent",
@@ -25735,8 +25735,7 @@
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-native.test.ts",
-        "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/tool-catalog.test.ts"
       ],
       "structureHash": "9462179a20a9b229016544efff9c1fbccdade5dca399101ff46bffb1576c82ed",
       "parentId": "@proofblade/materials::class::CapabilityBackendResolver"
@@ -27101,6 +27100,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -30958,6 +30958,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -31586,6 +31587,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -34542,7 +34544,6 @@
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/verification-recovery.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
       "structureHash": "8c1b240486ffca40ca05f5f810e9ba7b539691df83fb3df4ff8b8bae81f730e6",
@@ -40310,6 +40311,7 @@
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -48508,7 +48510,8 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
-        "packages/materials/tests/session-registry.test.ts"
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ],
       "structureHash": "8cfa4a2430d86c35b5db371c3b694d434cf96fcf5b386a0da6d46f608d6eb332",
       "parentId": "@proofblade/materials::class::Scope"
@@ -49208,7 +49211,6 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/telemetry-lazy-payload.test.ts",
         "packages/materials/tests/update-evaluation-gates.test.ts",
-        "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ],
       "structureHash": "03a29db2ef415ac91850c98f7f67225def2c6013f20ac3f23336245939337e31",
@@ -49481,8 +49483,7 @@
       "testRefs": [
         "packages/materials/tests/hot-path-budget.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
-        "packages/materials/tests/skill-registry-cache.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/skill-registry-cache.test.ts"
       ],
       "structureHash": "ad9b068917c31dfcf1af1d1fc7777228b7a2a16a2d21dee3f5962a8c251c029e",
       "parentId": "@proofblade/materials::class::ProofBladeSkillRegistry"
@@ -49494,7 +49495,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 183,
+      "line": 192,
       "signature": "(): string",
       "summary": "Inferred summary: catalog hash operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49530,7 +49531,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 187,
+      "line": 196,
       "signature": "(): RuntimeResourceSnapshot",
       "summary": "Inferred summary: context snapshot operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49559,7 +49560,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 177,
+      "line": 186,
       "signature": "(options?: { includeDisabled?: boolean; }): SkillCatalogEntry[]",
       "summary": "Inferred summary: list operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49703,7 +49704,7 @@
         "packages/materials/tests/version-cache.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
-      "structureHash": "d36551611ccd8c07f8fca9dd8dc00bed9695c514ee746b817f6d01c4a9084dcc",
+      "structureHash": "a8b245a68a45c31b0338aca823981f58b984e1e1408e406709c407e9b37f69a1",
       "parentId": "@proofblade/materials::class::ProofBladeSkillRegistry"
     },
     {
@@ -49713,7 +49714,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 203,
+      "line": 212,
       "signature": "(name: string, maxChars?: number): LoadedSkillContent",
       "summary": "Inferred summary: load for model operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49743,7 +49744,7 @@
       "visibility": "public",
       "module": "src/skills/registry.ts",
       "exportPath": "@proofblade/materials",
-      "line": 199,
+      "line": 208,
       "signature": "(): Skill[]",
       "summary": "Inferred summary: pi skills operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -51303,8 +51304,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ],
       "structureHash": "fcfe82e4f9ec02888f0896663c615ac5219813d39e404e446ae0c9ea59bbaeda",
       "parentId": "@proofblade/materials::class::ProofBladeToolCatalogRegistry"
@@ -55065,8 +55065,7 @@
         "packages/materials/tests/security-tool-profile.test.ts",
         "packages/materials/tests/session-runtime-composition.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts",
-        "packages/materials/tests/version-cache.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ],
       "structureHash": "b37586d3354ee3dc2fdb0694c5483c452ae488e2cd7bf27084583928443427a1",
       "parentId": "@proofblade/materials::class::HttpBrowserVerifierFactory"
