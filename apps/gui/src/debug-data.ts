@@ -107,7 +107,7 @@ export class DebugDataService {
   private readonly taskRuns = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
-  private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
+  private readonly runListCache = new Map<string, { eventsVersion: string; item: RunListItem }>();
   private readonly runDetailLoads = new Map<string, Promise<RunDetail>>();
   private readonly runDetailCache = new BoundedLruCache<string, {
     /** `runDetailEventsVersion()` of the log this detail was built from. */
@@ -223,8 +223,14 @@ export class DebugDataService {
       .map(async (entry): Promise<RunListItem | undefined> => {
         try {
           const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
+          // Same reasoning as the detail cache: `mtimeMs` alone lets a same-size,
+          // timestamp-restored rewrite serve a stale list item, and the list is the
+          // view that is on screen most of the time. `runDetailEventsVersion` is the
+          // identity both caches use, so there is one definition of "the log changed"
+          // rather than two.
+          const eventsVersion = runDetailEventsVersion(eventsStat);
           const cached = this.runListCache.get(entry.name);
-          if (cached?.mtimeMs === eventsStat.mtimeMs) return { ...cached.item, active: this.active.get(entry.name) };
+          if (cached?.eventsVersion === eventsVersion) return { ...cached.item, active: this.active.get(entry.name) };
           const snapshot = await this.runListSnapshot(entry.name, eventsStat, entries.length > 64);
           const item: RunListItem = {
             runId: snapshot.runId,
@@ -243,7 +249,7 @@ export class DebugDataService {
             },
             active: this.active.get(snapshot.runId),
           };
-          this.runListCache.set(entry.name, { mtimeMs: eventsStat.mtimeMs, item });
+          this.runListCache.set(entry.name, { eventsVersion, item });
           return item;
         } catch {
           return undefined;
@@ -496,15 +502,25 @@ export class DebugDataService {
     if (this.active.has(runId) || this.activeLanes.has(runId)) throw new Error("运行中的对话不能删除，请先暂停");
     const snapshot = await this.services.control.snapshot(runId);
     if (runKind(snapshot.task) !== "chat") throw new Error("只能删除普通对话，Fixture Run 请保留用于复盘");
-    await rm(join(this.services.runsRoot, runId), { recursive: true, force: false });
-    // A conversation with attachments owns a staged workspace beside the runs
-    // root. Deleting the Run without it leaked the staged copy of every
-    // attachment -- up to the per-task byte caps -- with nothing left pointing at
-    // it. `force: true` because a conversation that never staged has no
-    // directory here, and that is not an error.
-    await rm(taskWorkspaceDir(this.services.runsRoot, runId), { recursive: true, force: true });
-    this.runListCache.delete(runId);
-    this.runDetailCache.delete(runId);
+    // Cache invalidation belongs in `finally`, not at the end of the straight line
+    // it used to sit in. `rm` on Windows fails with EPERM/EBUSY rather than ENOENT
+    // when something still holds the directory, and on that failure the Run was
+    // already gone while both caches still described it: the sidebar kept listing a
+    // conversation that no longer existed and opening it failed, until restart. A
+    // stale cache outlives the reported error, so the caches are cleared either way
+    // and the error still propagates.
+    try {
+      await rm(join(this.services.runsRoot, runId), { recursive: true, force: false, maxRetries: 20, retryDelay: 250 });
+      // A conversation with attachments owns a staged workspace beside the runs
+      // root. Deleting the Run without it leaked the staged copy of every
+      // attachment -- up to the per-task byte caps -- with nothing left pointing at
+      // it. `force: true` because a conversation that never staged has no
+      // directory here, and that is not an error.
+      await rm(taskWorkspaceDir(this.services.runsRoot, runId), { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } finally {
+      this.runListCache.delete(runId);
+      this.runDetailCache.delete(runId);
+    }
   }
 
   public async createTaskFromTemplate(input: { runId: string; templateId: string; objective: string }): Promise<RunSnapshot> {

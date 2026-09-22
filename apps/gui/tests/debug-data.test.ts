@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, sep } from "node:path";
 import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
@@ -472,6 +472,7 @@ test("a rewritten event log is not served from the RunDetail cache", async () =>
     assert.equal(warm.snapshot, first.snapshot, "an unchanged detail is reused");
 
     const eventsPath = join(root, "runs", runId, "events.jsonl");
+    const beforeStat = await stat(eventsPath);
     const before = await readFile(eventsPath, "utf8");
     const lines = before.split("\n");
     const parsed = JSON.parse(lines[0]!) as { payload?: Record<string, unknown> };
@@ -485,6 +486,67 @@ test("a rewritten event log is not served from the RunDetail cache", async () =>
     await rm(root, { recursive: true, force: true });
   }
 });
+test("a rewritten event log is not served from the run-list cache either", async () => {
+  // m8 from the third review round. The detail cache was fixed to identify the log
+  // by inode/size/mtime/ctime, but the *list* cache beside it still matched on
+  // `mtimeMs` alone -- and the sidebar list is the view that is on screen most of
+  // the time. Both now use `runDetailEventsVersion`, so there is one definition of
+  // "the log changed" rather than two that can drift.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-list-version-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const services = (data as unknown as { services: { control: { loadProjectionHint: (...args: never[]) => Promise<unknown> } } }).services;
+    const runId = "CHAT-LIST-VERSION-1";
+    await data.createConversation({ runId, title: "list version test", workspacePath: root });
+
+    const first = await data.listRuns();
+    assert.equal(first.length, 1);
+    const warm = await data.listRuns();
+    assert.deepEqual(warm[0], first[0], "an unchanged list item is reused");
+
+    // The observable half is a build counter, not an object identity: a cache hit
+    // returns a spread copy, so identity differs either way and an identity check
+    // passes with or without the fix. `runListSnapshot` is the per-item rebuild
+    // and its first act is a projection-hint read, which is a public method on the
+    // control store -- so counting that read counts rebuilds.
+    let builds = 0;
+    const realHint = services.control.loadProjectionHint.bind(services.control);
+    services.control.loadProjectionHint = (async (...args: Parameters<typeof realHint>) => {
+      builds += 1;
+      return await realHint(...args);
+    }) as typeof services.control.loadProjectionHint;
+
+    await data.listRuns();
+    assert.equal(builds, 0, "an unchanged list must be served from the cache without rebuilding");
+
+    // Rewrite the log in place at the same byte length. The canonical serialization
+    // sorts keys, so `"generation":0` is followed by `"id":` in the envelope; the
+    // substitution is anchored on a substring long enough to be unique rather than
+    // on the field name alone.
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+    const beforeStat = await stat(eventsPath);
+    const before = await readFile(eventsPath, "utf8");
+    const marker = '"generation":0,"id"';
+    assert.equal(before.split(marker).length - 1, 1, "the marker must be unique in the log for a length-preserving rewrite");
+    const rewritten = before.replace(marker, '"generation":9,"id"');
+    assert.equal(Buffer.byteLength(rewritten), Buffer.byteLength(before), "the rewrite must keep the byte length");
+    assert.notEqual(rewritten, before, "the bytes must actually differ");
+    await writeFile(eventsPath, rewritten, "utf8");
+    // Put the original timestamps back so this measures the key and not the clock.
+    await utimes(eventsPath, beforeStat.atime, beforeStat.mtime);
+    // Millisecond granularity, because `utimes` cannot express the sub-millisecond
+    // part `stat` reports. The cache key carries the same rounded value on both
+    // sides, so the equality the test depends on is the millisecond one.
+    assert.equal(Math.floor((await stat(eventsPath)).mtimeMs), Math.floor(beforeStat.mtimeMs), "the rewrite must keep the modification time");
+
+    await data.listRuns();
+    assert.ok(builds > 0, "a rewritten log must not be served from the list cache");
+    await data.close().catch(() => undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("reuses unchanged run details, invalidates durable changes, and clears the cache on close", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
   try {
