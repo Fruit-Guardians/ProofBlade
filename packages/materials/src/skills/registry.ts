@@ -318,11 +318,21 @@ async function skillTreeRevision(roots: readonly string[]): Promise<string> {
  */
 export async function collectSkillFiles(roots: readonly string[]): Promise<string[]> {
   const entries: string[] = [];
-  for (const [index, root] of roots.entries()) await walkSkillRoot(root, index === 0, entries);
+  // One `visited` set for the whole walk, not one per root: a link cycle can be
+  // rooted anywhere, and two roots may reach the same real directory.
+  const visited = new Set<string>();
+  for (const [index, root] of roots.entries()) await walkSkillRoot(root, index === 0, entries, visited);
   return entries.sort();
 }
 
-async function walkSkillRoot(directory: string, isFirstRoot: boolean, into: string[]): Promise<void> {
+async function walkSkillRoot(directory: string, isFirstRoot: boolean, into: string[], visited: Set<string>): Promise<void> {
+  // Key the guard on the resolved real path, so a link to an ancestor is the same
+  // directory as its target. `realpath` is only needed for entries that can be
+  // links; a plain directory's path is already canonical enough for this purpose
+  // because the walk reaches it by exactly one name.
+  const key = await canonicalOrResolved(directory);
+  if (visited.has(key)) return;
+  visited.add(key);
   let listing: Dirent[];
   try {
     listing = await readdir(directory, { withFileTypes: true });
@@ -332,28 +342,38 @@ async function walkSkillRoot(directory: string, isFirstRoot: boolean, into: stri
     return;
   }
   for (const entry of listing) {
+    const path = resolve(directory, entry.name);
+    // Type from the `Dirent` where it is reliable, which is most entries: a
+    // `stat` per entry costs one syscall per file, and the vendored root has
+    // ~150 of them, on a walk that runs for every lane creation and every
+    // version-survey call. Only a symlink needs resolving, because `Dirent`
+    // reports the link rather than its target.
+    const kind = entry.isSymbolicLink() ? await statKind(path) : entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other";
     if (isSkillInput(entry.name, isFirstRoot)) {
-      const path = resolve(directory, entry.name);
-      try {
-        const stats = await stat(path);
-        if (stats.isFile()) into.push(`${path}\u0000${stats.ino}\u0000${stats.size}\u0000${stats.mtimeMs}\u0000${stats.ctimeMs}`);
-        else if (stats.isDirectory()) await walkSkillRoot(path, isFirstRoot, into);
-      } catch {
-        // Raced with a deletion, or a broken symlink; the next load recomputes.
+      if (kind === "file") {
+        const stats = await stat(path).catch(() => undefined);
+        if (stats) into.push(`${path}\u0000${stats.ino}\u0000${stats.size}\u0000${stats.mtimeMs}\u0000${stats.ctimeMs}`);
+      } else if (kind === "directory") {
+        await walkSkillRoot(path, isFirstRoot, into, visited);
       }
       continue;
     }
-    // Hidden entries and `node_modules` are pruned before the ignore-file test so
+    // Hidden entries and `node_modules` are pruned after the ignore-file test so
     // a rule file is still collected: it is an input to the walk even though it
     // is never descended into.
     if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-    const path = resolve(directory, entry.name);
-    try {
-      const stats = await stat(path);
-      if (stats.isDirectory()) await walkSkillRoot(path, isFirstRoot, into);
-    } catch {
-      continue;
-    }
+    if (kind === "directory") await walkSkillRoot(path, isFirstRoot, into, visited);
+  }
+}
+
+/** What a path points at, following links; `other` for anything not file/dir. */
+async function statKind(path: string): Promise<"file" | "directory" | "other"> {
+  try {
+    const stats = await stat(path);
+    return stats.isFile() ? "file" : stats.isDirectory() ? "directory" : "other";
+  } catch {
+    // Raced with a deletion, or a broken link; the next load recomputes.
+    return "other";
   }
 }
 

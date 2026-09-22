@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ProofBladeSkillRegistry, collectSkillFiles } from "../src/skills/registry.js";
@@ -320,6 +321,41 @@ test("a load that throws does not poison the single-flight entry", async () => {
   }
 });
 
+test("a link cycle in a skill root terminates and counts each file once", async () => {
+  // m9 from the third review round. Following directory symlinks is deliberate
+  // -- the loader recurses by entry kind, so the walker has to as well -- but
+  // without a visited set a link back to an ancestor recurses to the path-length
+  // limit once per level, pushing the same `SKILL.md` repeatedly. The old walker
+  // skipped these entries (`Dirent.isDirectory()` is false for a link), so this
+  // is a risk the symlink-following change introduced.
+  //
+  // A Windows junction is what is available without elevation, and it is the same
+  // shape of hazard: `readdir` reports it as a symbolic link and `stat` follows it
+  // to a directory.
+  const root = await project();
+  try {
+    const loop = join(root, "skills", "loop");
+    try {
+      execFileSync("cmd", ["/c", "mklink", "/J", loop, root], { stdio: "ignore" });
+    } catch {
+      return; // No junction support on this host; the property is untestable here.
+    }
+
+    const entries = await collectSkillFiles([join(root, "skills")]);
+    const paths = entries.map((entry) => entry.split("\u0000")[0]!);
+    assert.equal(
+      paths.filter((path) => path.endsWith("SKILL.md")).length,
+      1,
+      "a cycle must not make the walker push the same file once per level",
+    );
+    assert.deepEqual([...new Set(paths)], paths, "no path may be collected twice");
+  } finally {
+    // The junction has to go before the tree it points into, or `rm` recurses
+    // through it.
+    await rm(join(root, "skills", "loop"), { recursive: true, force: true }).catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
 test("resetCache clears both the memo and the counters", async () => {
   const root = await project();
   try {
