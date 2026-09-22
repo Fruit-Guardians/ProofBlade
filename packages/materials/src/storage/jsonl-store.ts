@@ -600,12 +600,18 @@ export class JsonlControlStore {
       const length = stats.size - start;
       const buffer = await this.readBounded(path, start, length);
       if (!buffer) return undefined;
-      const lines = buffer.toString("utf8").split("\n").filter((line) => line.trim().length > 0);
-      // The first line of a non-zero offset chunk is almost certainly partial.
-      const candidates = start > 0 ? lines.slice(1) : lines;
+      // Same framing rule as `lastEventSeq`: the final newline-split element is
+      // discarded, so an in-flight record is never returned as the newest one.
+      // The two must agree -- they answer the same question about the same file,
+      // and this one guards the legacy-migration fast path, which decides between
+      // `anchored` and `read_only` on it.
+      const lines = buffer.toString("utf8").split("\n");
+      const candidates = start > 0 ? lines.slice(1, -1) : lines.slice(0, -1);
       for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        const line = candidates[index]!;
+        if (!line.trim()) continue;
         try {
-          return JSON.parse(candidates[index]!) as HarnessEvent;
+          return JSON.parse(line) as HarnessEvent;
         } catch {
           // A torn or partial trailing line: keep walking back.
         }

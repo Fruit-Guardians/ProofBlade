@@ -123,6 +123,51 @@ test("legacy migration repairs an unterminated event tail before appending its a
   }
 });
 
+test("a migrated stream with an in-flight record after it still takes the authoritative path", async () => {
+  // The legacy fast path in `migrateLegacyRun` decides "this Run needs no
+  // migration" from two bounded reads, and it must never answer that for a stream
+  // carrying a `run_authority_migrated` event: the migration event IS an anchor,
+  // and a conflicting one has to reach `authorityAnchor()`, which throws on
+  // conflict, instead of being decided by the first `run_started` alone.
+  //
+  // The tail read is what could hide it. `lastEvent` and `lastEventSeq` answer the
+  // same question about the same file, so they must apply the same "committed"
+  // rule: an unterminated final record is not a record. When `lastEvent` was the
+  // only one that parsed unterminated tails, it returned this in-flight
+  // `run_started` -- not the migration event -- and the fast path concluded
+  // "anchored" without ever seeing the migration event.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-authority-inflight-"));
+  const state = join(root, "host-private-state");
+  try {
+    const runId = "ANCHORED-WITH-INFLIGHT-TAIL";
+    const task = demoTask(runId, root, config);
+    const runDir = join(root, "runs", runId);
+    await mkdir(runDir, { recursive: true });
+    await writeFile(join(runDir, "task.json"), `${canonicalJson(task)}\n`, "utf8");
+    const anchorA = "a".repeat(64);
+    const anchorB = "b".repeat(64);
+    const started = makeEvent(runId, 1, "run_started", "orchestrator", "main", { generation: 0, authorityHash: anchorA });
+    const migrated = makeEvent(runId, 2, "run_authority_migrated", "orchestrator", "main", { generation: 0, authorityHash: anchorB });
+    const inFlight = makeEvent(runId, 3, "run_started", "orchestrator", "main", { generation: 0, authorityHash: anchorB });
+    // Committed records terminate with a newline; the last one deliberately does
+    // not, which is what an interrupted append leaves behind.
+    await writeFile(join(runDir, "events.jsonl"), `${canonicalJson(started)}\n${canonicalJson(migrated)}\n${canonicalJson(inFlight)}`, "utf8");
+
+    const services = createServices(root, config, { authorityStateDirectory: state });
+    // Asserted at `migrateLegacyRun` rather than through `snapshot()`, because
+    // `ControlStore` runs the migration best-effort: it swallows the conflict and
+    // the read proceeds. The decision this guards is the migration's own answer,
+    // so that is where the assertion belongs.
+    await assert.rejects(
+      () => services.control.eventStore.migrateLegacyRun(runId, "c".repeat(64)),
+      /conflicting authority anchors/,
+      "the fast path decided the run was already anchored instead of reading it",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("failed legacy migration remains replayable but read-only", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-authority-readonly-"));
   const state = join(root, "host-private-state");

@@ -178,13 +178,20 @@ test("the fast path is not engaged by an unsealed legacy projection", async () =
 });
 
 test("snapshot and replay agree after a historical event is rewritten in place", async () => {
-  // The reason the seal records the log's byte size. The event log is
-  // append-only, so a matching size proves the file is the one the prefix hash
-  // was computed over -- no historical byte changed and no tail was added. That
-  // is what stops this tamper: rewriting an event while preserving the file
-  // length and the trailing seq leaves a projection that still authenticates,
-  // so a length-blind reader would serve the state as of the seal while
-  // replay() folds the rewritten events. Both must return the same state.
+  // This is the tamper that killed the `loadProjectionHint` shortcut, and the
+  // reason is NOT a byte-size witness -- the seal has none.
+  // `projectionSealPayload()` carries `{ schemaVersion, runId, lastSeq,
+  // snapshotHash, eventPrefixHash }`; the log revision that includes a size is an
+  // in-memory identity, not part of the seal. An earlier version of this comment
+  // claimed "the seal records the log's byte size", which would have made the
+  // test look like it passed for the wrong reason.
+  //
+  // It passes for the right one: rewriting an event while preserving the file
+  // length and the trailing seq leaves a projection that still authenticates
+  // against the hint's checks, so a hint-based reader would serve the state as of
+  // the seal while `replay()` folds the rewritten events. The authoritative path
+  // re-hashes the parsed prefix, rejects the stale projection, and both paths
+  // return the same state.
   const root = await mkdtemp(join(tmpdir(), "proofblade-readbound-6-"));
   try {
     const runsRoot = join(root, config.storage.runsDir);

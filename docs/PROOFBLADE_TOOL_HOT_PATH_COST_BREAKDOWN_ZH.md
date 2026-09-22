@@ -1,12 +1,12 @@
 # 工具热路径成本分解与 T1 write-behind 队列设计（PLAN-240 表项 T1）
 
-> 文档版本：1.1.0
-> 编写日期：2026-09-19（2026-09-21 复核修订：§2.2 的 12ms 改为推导值标注、§2.5/§2.6 重开 T2、§2.6 的「只有延后可行」撤销）
+> 文档版本：1.1.1
+> 编写日期：2026-09-19（2026-09-21 复核修订：§2.2 的 12ms 改为推导值标注、§2.5/§2.6 重开 T2、§2.6 的「只有延后可行」撤销；2026-09-22 数字口径入口更正为三个）
 > 文档性质：**成本分解实测 + 设计提案，部分已实施**（§2.5 的 T2 复核已由 `packages/materials/tests/dispatch-transaction-batch.test.ts` 实证）
 > 父文档：`docs/PROOFBLADE_GUI_PERFORMANCE_OPTIMIZATION_PLAN_ZH.md` §5.6.3、表项 T1
 > ProofBlade 基线：`156ec17`
 >
-> **数字口径**：本文所有毫秒值来自**单机**测量（Windows / i9-14900HX / Node 22），除明确标注「n≥20」者外，`p95` 在 n=8 时**就是最大值**（nearest-rank）。凡未经入库 harness 产生的数字都标了来源；`scripts/tool-hot-path-real-run-baseline.ts` 与 `scripts/tool-hot-path-long-run-baseline.ts` 是仅有的两个可复现入口。
+> **数字口径**：本文所有毫秒值来自**单机**测量（Windows / i9-14900HX / Node 22），除明确标注「n≥20」者外，`p95` 在 n=8 时**就是最大值**（nearest-rank）。凡未经入库 harness 产生的数字都标了来源。可复现入口是**三个**（`package.json` 的 `baseline:tools` / `baseline:tools:real` / `baseline:tools:longrun`，分别对应 `scripts/tool-hot-path-baseline.ts`、`scripts/tool-hot-path-real-run-baseline.ts`、`scripts/tool-hot-path-long-run-baseline.ts`）。本文早期版本写「仅有的两个」，漏了 provider-free 的那个。
 
 ## 1. 为什么要单独成文
 
