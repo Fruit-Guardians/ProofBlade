@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-21T14:00:00+08:00",
+  "updatedAt": "2026-09-22T21:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2148,6 +2148,47 @@
         "如实记录的两次失败尝试：#projectionAlreadyCurrent 的通过分支既无法用公共 API 计数（predicate 走 eventStore.loadProjection），也无法用行为区分（hint 不符时该分支本就不可达）；为空日志守卫做变异时，删掉三处守卫中的任意一处仍为绿，因为零字节同时被有界读与终止符规则拒绝",
         "full build + test:staged（fast/slow/integration 三段）通过；check:components（26 组件）/ check:change-contracts（11 契约）/ check:project-reports / api:index:check / check:changed-tests / test:ci-gates 通过",
         "PR #245 属于另一位作者（codex/pwn-exploit-builders，base 396a916，不在本栈内），未改其代码；审查发现以评论形式提交到该 PR（含 baseRecordId 未绑定镜像、fastbinIndex 守卫 <7 丢掉 index 7、readBytes 无上限等），并说明我的验证边界是只读代码核对"
+      ]
+    },
+    {
+      "id": "UPDATE-20260922-001",
+      "occurredAt": "2026-09-22T21:00:00+08:00",
+      "summary": "落实新审查报告（§7.7/§7.8/§7.9）的第三、四轮条目：M1/M2/N1/N2/N3 五条 Major 与 m3-m13/N4-N9/R1-R3 中的大部分，含两处封印错误注释与 §7.4-4 的报表取舍、§7.5 的 inode/ctime 结论。",
+      "branch": "fix/review-blockers",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "M1：putTextWithContent 的孤儿清理会删掉已 durable 注册的 artifact。#commitCommands 先 append 后写投影，saveProjection 失败时 artifact_registered 已落盘，删文件会留下指向不存在字节的 durable 事件。改为由日志裁决（artifact 在 snapshot 里就保留），检查失败时倾向保留",
+        "M2：npm run verify 在全新克隆上必红（不含 reports:project 却含 check:project-reports，而 docs/project 已不跟踪）。已前置；并用完整 verify 从无 docs/project 的工作树跑通验证",
+        "N1：baseline:tools --json 抛 ReferenceError（改名只落两行）。根因是 scripts/** 不属于任何 TS project；新增 tsconfig.scripts.json 并挂进根 project，加两条 CI 门禁（排除清单必须恰为三个已知失败脚本；--json 分支形状）",
+        "N2：提交预算门禁实际锁的是 measured（2）而非 target（1），收紧分支永不执行，而按提交信息去改 measured 会撞同文件的硬编码断言。改为显式断言差距恰为 1，且实测值必须正好在预算上",
+        "N3：计划文档以已删除的投影命中计数器作为验证证据；改为记录该探针已还原、无可复现 harness；修掉失效行号、可复现入口数量改三个、计划补数字口径头",
+        "N4/N5：withRunLock 是提交的代理而非计数器（注释已改，断言改为精确计数）；提交用例改用独立的 contract:hot-path-commit-budget 并登记，hot-path-budgets.json 成为触发器",
+        "N6：删除整套验收计数器（无任何生产生产者，基线表那一列 0 是在宣称没人做过的测量）；容量改回默认；total 类型补 n/min/max；改掉自相矛盾的注释",
+        "N7：evaluator 的 flush 使 replayParity 部分自我实现且失败被吞；改为把屏障失败记入 case 结果的 projectionBarrierFailure，并写明该信号因此变弱",
+        "N8：control-store 里描述不存在清理的孤儿注释已删；deferredProjectionRuns 的界按其真实机制重述（以延后写入结尾且被放弃的 Run 会留到进程结束）",
+        "N9：把错误结论就地替换而非追加更正",
+        "m3：lastEvent 与 lastEventSeq 对同一文件给出不同 tail（前者仍解析未终结尾行），而 lastEvent 守着 legacy migration 的 anchored/read_only 判断。已统一，并构造分叉场景（冲突锚 + 未终结记录）做回归",
+        "m4：CURRENCY-6 期望的是旧规则，且被 mtime 预筛挡住、根本没调用 lastEventSeq。实测中和 mtime 后 hint 应被服务（正确行为），已重写为断言服务且 lastSeq 等于最后一个已提交序号",
+        "m6：用例名与断言不符（跑的是 reconcileProjection 不是屏障廉价检查），已改名并拆开粘连注释",
+        "R1：本分支仍留着元数据键摘要缓存，且测试无门禁（恢复宽键 16 条全绿）。已把内容摘要与两条测试一并移入（同长度同 mtime 改写 + 结构性守卫），宽键变异现在转红",
+        "R3：memo 存的是解析前的 revision，目录在解析中变化会存入早于其内容的 revision；改为解析后重新采样",
+        "m9：walker 跟随目录符号链接但没有 visited 集合，指回上层的链接会递归到路径长度上限（旧实现跳过链接，属本次引入）。已加按 realpath 的守卫（变异验证：去掉后新用例 3 秒转红，用 Windows junction 建真实环路），并把逐条 stat 改为优先用 Dirent 判型",
+        "m10：later-root 的直系 *.md 会产出 invalid_metadata 诊断并进入 registry.diagnostics（CLI 会打印），却不在 revision 里；walker 改为每个根都收 *.md（注册表仍丢弃对应 skill，只放宽输入集合）",
+        "m7：deleteConversation 的缓存失效未置于 finally（rm 在 Windows 上可能抛 EPERM/EBUSY，Run 已删而缓存仍在）；两个 rm 也补了重试",
+        "m8：runListCache 仍只按 mtimeMs，而旁边的 runDetailCache 已改为 ino/size/mtime/ctime；两者统一用 runDetailEventsVersion",
+        "m11：skills/COMPONENT.md 的 revision 描述与 debug-data.ts 的 ctime 作用域说明改为与代码一致",
+        "§7.4-1：两处「封印记录日志字节大小」的注释不存在该机制（projectionSealPayload 无 size 字段），已改为说明测试通过是因为权威路径重算真实前缀哈希",
+        "§7.4-4：报表字节校验已循环化（不跟踪 + CI 先生成后校验则必然通过）。取舍记录：保持不跟踪（重新跟踪会恢复 11 个冲突），并把渲染器的实际职责移入 test:ci-gates（确定性 + 四个文档 + ledger 内容进报表），使渲染器回归仍有门禁",
+        "§7.5：inode/ctime 在 Windows/NTFS 上的结论已实测——40 次连续写入产生 18 次 ctimeMs 前进，最小正增量 0.44ms，40 个样本中 19 个具有不同小数部分（亚毫秒精度存在）；同长度改写并还原 mtime 使 ctimeMs 前进 1.1ms、ino 不变。该结论替换了原先凭记忆写的 15.6ms 刻度"
+      ],
+      "validation": [
+        "变异验证：无条件删除 staged 文件→注册存活用例转红；lastEventSeq 回旧规则→CURRENCY-6 转红；lastEvent 回旧切片→迁移用例转红；walker 去掉 visited→环路用例 3 秒转红；later-root 排除 md→对应用例转红；运行列表缓存忽略版本→新用例转红；恢复宽元数据键→结构性守卫转红；--json 形状回退→CI 门禁转红；排除清单塞入新脚本→CI 门禁转红",
+        "如实记录的失败尝试与自身错误：R3 的两条测试都不具区分力（同尺寸目录因路径进 revision 必然不同；钩子不触发则两种顺序恒等），故不加测试并把理由写进提交信息；m8 的用例最初用对象身份与渲染值断言，两者在修复与 bug 下都通过，改为统计 loadProjectionHint 调用（重建的第一步）；该用例随后以约 1/6 的概率失败，原因是 utimes 无法设置 stat 报告出的亚毫秒部分，改为整秒冻结后 8/8 通过",
+        "tsc -b 与 tsc -p tsconfig.scripts.json 干净；fast 1047/1047、slow 25/25、integration 92/92（4 项为环境跳过）；check:components / check:change-contracts / check:project-reports / api:index:check / check:changed-tests / test:ci-gates 通过",
+        "修复只推到 fix/review-blockers（非任何 PR 的 head，CI 仍不会运行）；perf/version-snapshot-cache 保持在 53b6e9b 且其 CI 为绿。审查 §7.6-1 的硬阻塞（把修复分支变成 PR 或更新 PR head）仍未处理，需要用户决定"
       ]
     }
   ],
