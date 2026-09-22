@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.29",
+  "version": "0.10.30",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-09-21T15:30:00.000Z",
+  "updatedAt": "2026-09-21T15:50:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 26,
-    "securityAuditCount": 26,
-    "lastBugAuditAt": "2026-09-21T15:30:00.000Z",
-    "lastSecurityAuditAt": "2026-09-21T15:30:00.000Z",
-    "sourceHash": "d468675e473a1e8e3427d6ca1cd06a9f17409f4d5449bb8b17c28894a239db39",
+    "bugAuditCount": 27,
+    "securityAuditCount": 27,
+    "lastBugAuditAt": "2026-09-21T15:50:00.000Z",
+    "lastSecurityAuditAt": "2026-09-21T15:50:00.000Z",
+    "sourceHash": "41cc4de597ee5f31d72005bafdec6cce542d2d8b8a3b0231dc7429a6ffc50936",
     "result": "passed"
   }
 }

@@ -391,7 +391,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 957,
+          "line": 960,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -420,7 +420,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 961,
+          "line": 964,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {

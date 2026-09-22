@@ -14,6 +14,7 @@
 | UPDATE-20260919-003 | 2026-09-19T13:30:00+08:00 | PLAN-240 | docs/perf-plan-revision-2 | 本条记录所在提交 |
 | UPDATE-20260919-002 | 2026-09-19T13:10:00+08:00 | PLAN-240 | feat/tool-hot-path-timing | 本条记录所在提交 |
 | UPDATE-20260919-001 | 2026-09-19T12:40:00+08:00 | PLAN-240 | fix/gui-runtime-shape-assertion | 本条记录所在提交 |
+| UPDATE-20260916-001 | 2026-09-16T00:00:00+08:00 | PLAN-220 | codex/pwn-generation-isolation | 本条记录所在提交 |
 | UPDATE-20260912-001 | 2026-09-12T13:45:00+08:00 | PLAN-230 | codex/fix-chat-1789026563795 | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -81,9 +82,8 @@
 
 ### 验证
 
-- [x] 变异验证：恢复 path|ino|size|mtimeMs|ctimeMs 的摘要缓存后，结构性守卫转红；恢复 path|size|mtimeMs 的窄键后，运行时断言与结构性守卫同时转红
-- [x] 16 条 version-cache 断言通过；pwn-session-runtime-host 10/10；tsc 全仓通过；check:components 通过（26 组件，2 affected）
-- [x] 如实记录测试边界：运行时断言无法在本文件系统上否定宽键（Windows 就地写入必推 ctime），因此该性质由结构性守卫承担，两者都在测试注释里写明了各自能证明什么
+- [x] Pwn analysis, Pwn layer, Pwn tools, Pwn coding tools, and coding resource targeted tests passed
+- [x] Generation isolation regression passed
 
 ## UPDATE-20260919-006
 
@@ -214,6 +214,24 @@
 - [x] npm run build:gui-deps passed
 - [x] node --import tsx --test apps/gui/tests/runtime-shape.test.ts: 8/8 passed
 - [x] installed-build contract assertion passed against the refreshed materials dist
+
+## UPDATE-20260916-001
+
+时间：2026-09-16T00:00:00+08:00
+
+摘要：隔离 Pwn leak 与 base 推导的 fixture generation，避免 reset 后重新绑定历史地址事实。
+
+### 变更
+
+- 自动 Pwn leak ID 将当前 fixture generation 纳入稳定哈希，相同源字节在新 generation 产生新记录。
+- pwn_derive_base 校验源 leak 的 runId 和 generation，并拒绝将旧 leak 与当前 Artifact/Evidence 重新绑定。
+- EvidenceGraph 拒绝显式复用旧 generation 的 leak reasoning node，同时保留同 generation 幂等复用。
+- 新增 reset 后旧 leak 失败、新 leak 成功、自动 ID 变化和旧 reasoning ID 拒绝的回归测试。
+
+### 验证
+
+- [x] Pwn analysis, Pwn layer, Pwn tools, Pwn coding tools, and coding resource targeted tests passed
+- [x] Generation isolation regression passed
 
 ## UPDATE-20260912-001
 

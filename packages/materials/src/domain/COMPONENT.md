@@ -4,15 +4,15 @@
 {
   "id": "materials-domain",
   "name": "Domain Contracts",
-  "version": "0.3.6",
+  "version": "0.3.8",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-09-11T10:22:43.000Z",
   "qualityAudit": {
-    "bugAuditCount": 5,
-    "securityAuditCount": 5,
-    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
-    "sourceHash": "aace3d7bf7dd85d7fd86f66a4073debf76b9aff3ff22aa81a45df2ca170b0c70",
+    "bugAuditCount": 7,
+    "securityAuditCount": 7,
+    "lastBugAuditAt": "2026-09-11T10:22:43.000Z",
+    "lastSecurityAuditAt": "2026-09-11T10:22:43.000Z",
+    "sourceHash": "1ac8fb1a586181920300571b8a1c3ca6899441095b89cbc5bff433e187179d96",
     "result": "passed"
   }
 }
