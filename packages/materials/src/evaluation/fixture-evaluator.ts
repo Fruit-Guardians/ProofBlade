@@ -217,6 +217,8 @@ export class FixtureEvaluationRunner {
     let evidenceLinkedFacts = 0;
     let factEvidenceCoverage = 0;
     let failureCategory: EvaluationFailureCategory | undefined;
+    /** Set when the pre-comparison projection barrier could not be forced. */
+    let projectionBarrierFailure: string | undefined;
     try {
       // The hot path defers `projection.json` (every Artifact write, every
       // checkpoint, every recorded experiment), so the file legitimately trails
@@ -225,7 +227,18 @@ export class FixtureEvaluationRunner {
       // failure. `flushProjection` is a no-op when nothing is deferred, which is
       // what makes this safe on the crash paths too: there it simply leaves a
       // lagging projection lagging.
-      await services.control.flushProjection(runId).catch(() => undefined);
+      //
+      // Forcing the barrier is what makes `replayParity` a weaker signal than it
+      // reads as: the evaluator repairs the condition it then measures, so "the run
+      // did not keep its projection in sync" can no longer be reported. The outcome
+      // is recorded rather than discarded, so a reader can tell the cases apart --
+      // the flush ran, or it failed and parity was then judged against a projection
+      // this run did not confirm. `.catch(() => undefined)` conflated them.
+      try {
+        await services.control.flushProjection(runId);
+      } catch (error) {
+        projectionBarrierFailure = error instanceof Error ? error.message : String(error);
+      }
       const snapshot = await services.control.snapshot(runId);
       const replayed = await services.control.replay(runId);
       const persisted = await services.control.loadProjection(runId);
@@ -285,6 +298,10 @@ export class FixtureEvaluationRunner {
       factEvidenceCoverage,
       ...(failureCategory ? { failureCategory } : {}),
       ...(error ? { error } : {}),
+      // Recorded, not swallowed: `replayParity` was forced current before it was
+      // measured, so a failed barrier means the comparison below ran against a
+      // projection this evaluator could not confirm.
+      ...(projectionBarrierFailure ? { projectionBarrierFailure } : {}),
     };
   }
 }
