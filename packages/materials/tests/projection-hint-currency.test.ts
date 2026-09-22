@@ -104,20 +104,42 @@ test("[contract:projection-hint-currency] the hint withholds a projection that i
   }
 });
 
-test("[contract:projection-hint-currency] the hint refuses a log whose last record has no terminator", async () => {
-  // `#loadEvents()` counts a record only once its terminating newline is
-  // durable, so `lastEventSeq` must apply the same rule. Without it, a log whose
-  // newest record is still in flight can report the *previous* record's seq, and
-  // a projection sealed at that seq compares equal and gets served as current.
-  const { root, control, eventsPath } = await run("CURRENCY-6");
+test("[contract:projection-hint-currency] an unterminated final record is not counted as committed", async () => {
+  // `#loadEvents()` counts a record only once its terminating newline is durable,
+  // so `lastEventSeq` must apply the same rule. Without it, a log whose newest
+  // record is still in flight reports the *previous* record's seq -- and here the
+  // projection IS sealed at that seq, so the wrong reading and the right reading
+  // differ in what they say about the file, not just in whether they serve it.
+  //
+  // The mtime pre-filter has to be neutralised first, and that is not optional.
+  // Appending moves the log's mtime past the projection's, so on a first attempt
+  // the hint is withheld for a reason that has nothing to do with the terminator
+  // rule; an earlier version of this case asserted `undefined` and would have
+  // passed under the old rule too. Measured: with the mtimes equalised the hint
+  // IS served, at the last committed seq, which is the correct answer for a
+  // projection covering every committed event.
+  const { root, control, eventsPath, projectionPath } = await run("CURRENCY-6");
   try {
     const before = await control.snapshot("CURRENCY-6");
     assert.ok(await control.loadProjectionHint("CURRENCY-6"), "the baseline projection must be servable");
 
     const { appendFile } = await import("node:fs/promises");
     await appendFile(eventsPath, JSON.stringify({ schemaVersion: 1, seq: before.lastSeq + 1, torn: true }), "utf8");
+    // Remove the mtime pre-filter from the question, the same way CURRENCY-3 does.
+    const second = Math.floor(Date.now() / 1000);
+    await utimes(projectionPath, second, second);
+    await utimes(eventsPath, second, second);
 
-    assert.equal(await control.loadProjectionHint("CURRENCY-6"), undefined, "an unterminated final record is not committed");
+    const hinted = await control.loadProjectionHint("CURRENCY-6");
+    assert.ok(hinted, "a projection covering the last committed event is still current");
+    assert.equal(
+      hinted.lastSeq,
+      before.lastSeq,
+      "the in-flight record must not be counted: the projection is current at the last COMMITTED seq",
+    );
+    // And the record really is still in flight, so the assertion above is not
+    // vacuous: the authoritative parse also stops at the last committed record.
+    assert.equal((await control.events("CURRENCY-6")).length, before.lastSeq);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
