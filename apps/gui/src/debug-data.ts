@@ -713,17 +713,27 @@ export class DebugDataService {
         const session = await repo.open(item);
         const [entries, branch, stats] = await Promise.all([session.getEntries(), session.getBranch(), session.getSessionStats()]);
         const assistantTurns = assistantTurnsFromEntries(entries);
+        // Conversation history renders the whole session file, NOT the context
+        // branch. `getBranch()` is `getPathToRootOrCompaction`, so as soon as a
+        // turn ends with a Pi compaction the branch is that one compaction entry
+        // and the chat panel renders nothing -- while every message is still on
+        // disk. Measured on CHAT-1790093502899: 69 entries, a 1-entry branch, 0
+        // messages from the branch and 30 from the entries. The branch remains
+        // available as `branchEntryIds` for the context view; "what did the
+        // conversation say" is a different question from "what is in the model's
+        // context", and answering it with the pruned view loses the history.
+        const history = entries;
         return {
           id: item.id,
           createdAt: item.createdAt,
           path: item.path,
           metadata: item.metadata,
           stats,
-          usage: usageFromMessages(conversationMessagesFromEntries(branch, events)),
+          usage: usageFromMessages(conversationMessagesFromEntries(history, events)),
           entries,
           branchEntryIds: branch.map((entry) => entry.id),
           assistantTurns,
-          messages: conversationMessagesFromEntries(branch, events),
+          messages: conversationMessagesFromEntries(history, events),
           toolCalls: correlateToolCalls(entries, events, snapshot, assistantTurns),
         };
       }));

@@ -637,6 +637,77 @@ test("[contract:evidence-inspect-forest-max-chars] generic result verification r
   }
 });
 
+test("a chat with no task-bound verifier rule says why verify_result cannot pass", async () => {
+  // CHAT-1790093502899, the run the reviewer inspected: a plain chat whose task is
+  // `{ kind: "reproduction", required_reproductions: 0 }` with no command. The
+  // model called verify_result, the harness really did reproduce the candidate,
+  // and the tool answered `verified: false` with nothing else -- so the model
+  // retried with a different command. Retrying cannot help: acceptance needs a
+  // task-owned rule. Two things are pinned here: the policy feedback that says so,
+  // and the rule message that names the "candidate on its own line" requirement
+  // when a command prints the candidate with a prefix (the first attempt printed
+  // `FLAG             : <candidate>` and was rejected with "did not contain the
+  // exact candidate", which was false and unactionable).
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-chat-claim-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "CODING-CHAT-CLAIM";
+  const chatTask = demoTask(runId, dir, config);
+  chatTask.mode = "coding_assistant";
+  chatTask.scope.allowed_workspace = dir;
+  chatTask.verification.required_reproductions = 0;
+  chatTask.verification.command = undefined;
+  assert.equal(chatTask.verification.command, undefined, "this fixture must stay a chat with no verifier rule");
+  await services.control.createRun(runId, chatTask);
+  const candidate = "PB{chat_claim_candidate}";
+  await writeFile(join(dir, "solve.mjs"), `process.stdout.write('FLAG             : ${candidate}\\n');\n`, "utf8");
+  await writeFile(join(dir, "flag-only.mjs"), `process.stdout.write('${candidate}\\n');\n`, "utf8");
+  const env = new NodeExecutionEnv({ cwd: dir });
+  const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+  const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
+  const context = {
+    env,
+    skills: {},
+    mcp: {},
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+    claimVerifier: verifier,
+    evidenceGraph,
+  } as unknown as CodingResourceContext;
+  try {
+    const prefixed = await executeTool("verify_result", { result: candidate, command: "node solve.mjs" }, context);
+    assert.equal(prefixed.isError, true);
+    const prefixedText = JSON.stringify(prefixed.details);
+    assert.match(prefixedText, /own line/, "the failure must name the rule the output broke");
+    assert.doesNotMatch(prefixedText, /did not contain the exact candidate/, "the candidate was present; saying otherwise is what misled the run");
+    assert.match(prefixedText, /FLAG/, "the message must show what the command actually printed");
+
+    const reproduced = await executeTool("verify_result", { result: candidate, command: "node flag-only.mjs" }, context);
+    const details = reproduced.details as { verified?: boolean; completionId?: string; evidenceId?: string; verifierFeedback?: { stage?: string; retryable?: boolean; reason?: string } };
+    assert.equal(details.verified, false, "a chat records an observation; it cannot accept a Completion");
+    assert.ok(details.completionId && details.evidenceId, "the observation is still recorded durably");
+    assert.equal(details.verifierFeedback?.stage, "policy");
+    assert.equal(details.verifierFeedback?.retryable, false, "retrying verify_result cannot change the outcome, and the tool must say so");
+    assert.match(String(details.verifierFeedback?.reason), /no verification rule/);
+
+    const snapshot = await services.control.snapshot(runId);
+    const completions = Object.values(snapshot.completions);
+    assert.ok(completions.length > 0, "the proposal is still durable");
+    assert.equal(completions.filter((completion) => completion.status === "ACCEPTED").length, 0);
+    assert.equal((await verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`)).status, "unverified");
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test("coding bash is blocked after the durable evidence curation threshold", async () => {
   const root = resolve(import.meta.dirname, "../../..", "tmp");
   await mkdir(root, { recursive: true });

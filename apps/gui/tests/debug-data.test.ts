@@ -564,6 +564,52 @@ test("a rewritten event log is not served from the run-list cache either", async
   }
 });
 
+test("renders the conversation from the full session, not the post-compaction context branch", async () => {
+  // CHAT-1790093502899, the run the reviewer inspected: its last Pi entry was a
+  // `compaction`, and the chat panel rendered the *context* branch. `getBranch()`
+  // is `getPathToRootOrCompaction`, so that branch was the single compaction entry
+  // and the panel went blank -- after the flag had been printed -- while all 69
+  // entries were still on disk (measured: 0 messages from the branch, 30 from the
+  // entries). History and model context are different questions; this pins the
+  // history answer and keeps the context branch available as `branchEntryIds`.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-compaction-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-COMPACTION-1";
+    await data.createConversation({ runId, title: "compaction test", workspacePath: root });
+    const sessionDir = join(root, "runs", runId, "pi-sessions", "--workspace--");
+    await mkdir(sessionDir, { recursive: true });
+    const stamp = "2026-09-22T16:12:27.317Z";
+    const lines = [
+      { type: "session", version: 3, id: `${runId}-chat`, timestamp: stamp, cwd: root, metadata: { runId, lane: "main", purpose: "chat" } },
+      { type: "message", id: "m1", parentId: null, timestamp: stamp, message: { role: "user", content: [{ type: "text", text: "where is the flag" }] } },
+      { type: "message", id: "m2", parentId: "m1", timestamp: stamp, message: { role: "assistant", content: [{ type: "text", text: "here it is" }] } },
+      // `retainedTail` is what makes Pi's storage stop the branch walk at the
+      // compaction (`getPathToRootOrCompaction` breaks there). Without it the walk
+      // continues to the root and the fixture would not reproduce the blank panel
+      // at all -- which is exactly how the first version of this test passed while
+      // asserting nothing.
+      { type: "compaction", id: "m3", parentId: "m2", timestamp: stamp, summary: "compacted", firstKeptEntryId: "m2", retainedTail: ["m2"] },
+    ];
+    await writeFile(join(sessionDir, `${runId}-chat.jsonl`), `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`, "utf8");
+
+    const detail = await data.getRun(runId);
+    const session = detail.sessions.find((item) => item.id === `${runId}-chat`);
+    assert.ok(session, "the session must be discovered");
+    assert.equal(session.entries.length, 3, "the session header is not an entry");
+    assert.deepEqual(session.branchEntryIds, ["m3"], "the context branch really is just the trailing compaction");
+    assert.deepEqual(
+      session.messages.map((message) => message.role),
+      ["user", "assistant"],
+      "the conversation must survive a trailing compaction",
+    );
+    assert.match(String(session.messages[0]?.text), /where is the flag/);
+    await data.close().catch(() => undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
+});
+
 test("reuses unchanged run details, invalidates durable changes, and clears the cache on close", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
   try {
