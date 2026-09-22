@@ -9,6 +9,7 @@ import { componentTransitionErrors } from "../component-transition-lib.mjs";
 import { changeContractErrors } from "../change-contract-lib.mjs";
 import { requiresProjectStatus } from "../project-report-change-lib.mjs";
 import { selectTestCommands } from "../check-changed-tests.mjs";
+import { PROJECT_REPORT_FILES, loadProjectStatus, renderProjectReports } from "../project-report-lib.mjs";
 
 test("[contract:unchanged-source-no-reaudit] rejects audit churn without a source change", () => {
   const previous = metadata({ version: "1.2.3", updatedAt: "2026-08-07T10:00:00+08:00", count: 4, hash: "a".repeat(64) });
@@ -197,6 +198,41 @@ test("the provider-free baseline script can emit JSON", () => {
   );
 });
 
+test("the project reports are deterministic and carry the ledger's content", () => {
+  // The byte-comparison gate over `docs/project/*.md` no longer has teeth: those
+  // files are untracked and CI generates them immediately before checking them, so
+  // `check:project-reports` is guaranteed to pass and a renderer regression is
+  // invisible. Re-tracking them is what produced the merge conflicts this removed,
+  // so the resolution is to test the generator here -- the job that gate was doing
+  // -- and to state the tradeoff rather than keep a gate that cannot fail.
+  const files = renderProjectReports(process.cwd());
+  assert.deepEqual([...files.keys()].sort(), Object.values(PROJECT_REPORT_FILES).sort());
+  for (const [path, text] of files) {
+    assert.ok(text.length > 0, `${path} must not be empty`);
+    assert.match(text, /\S/, `${path} must contain non-whitespace`);
+  }
+
+  // Deterministic: the same ledger renders the same bytes, which is what lets the
+  // reports stay untracked and still be reproducible in CI.
+  const again = renderProjectReports(process.cwd());
+  assert.deepEqual(again, files, "rendering must be a pure function of project-status.json");
+
+  // And the content is the ledger's, not a stub: every plan, update and completion
+  // id has to appear in the report that lists it.
+  const status = loadProjectStatus(process.cwd());
+  const plan = files.get(PROJECT_REPORT_FILES.plan);
+  const updates = files.get(PROJECT_REPORT_FILES.updates);
+  const completions = files.get(PROJECT_REPORT_FILES.completions);
+  for (const item of status.plans) {
+    assert.ok(plan.includes(item.id), `PLAN.md must list ${item.id}`);
+  }
+  for (const update of status.updates) {
+    assert.ok(updates.includes(update.id), `UPDATE_LOG.md must list ${update.id}`);
+  }
+  for (const completion of status.completions ?? []) {
+    assert.ok(completions.includes(completion.id), `COMPLETION_REPORT.md must list ${completion.id}`);
+  }
+});
 function metadata({ version, updatedAt, count, hash }) {
   return {
     version,
