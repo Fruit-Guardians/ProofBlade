@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.ts", "scripts/**/*.mts"],
+  "exclude": [
+    "scripts/browser-runtime-playwright-host.ts",
+    "scripts/pwn-docker-fault-matrix.ts",
+    "scripts/session-runtime-combined-host.ts"
+  ]
+}

@@ -51,28 +51,6 @@ export type ToolTimingStage = (typeof TOOL_TIMING_STAGES)[number];
  */
 const UNINSTRUMENTED_PHASE_BOUNDARIES: ReadonlySet<string> = new Set(["executionEnd_subscribersEnd"]);
 
-/**
- * Acceptance-relevant counters for a single tool call.
- *
- * These are counts rather than durations: they do not depend on machine load, so
- * CI can assert on them where a timing threshold would be flaky.
- */
-export interface ToolTimingCounters {
-  /** Synchronous ControlStore commits the call performed before returning. */
-  readonly controlCommits: number;
-  /** `fsync` calls the call performed on the event log. */
-  readonly eventFsyncs: number;
-  /** Projection rewrites the call performed. */
-  readonly projectionWrites: number;
-  /** Artifact files the call read back after writing them. */
-  readonly artifactReadbacks: number;
-  /** How many times the call hashed its content. */
-  readonly hashRuns: number;
-}
-
-/** Counter keys that a caller may increment while recording a sample. */
-export type ToolTimingCounter = keyof ToolTimingCounters;
-
 /** One recorded tool call. */
 export interface ToolTimingSample {
   /** Tool name as the model sees it. */
@@ -93,8 +71,6 @@ export interface ToolTimingSample {
   readonly phases: Readonly<Record<string, number>>;
   /** End-to-end duration from `scheduled` to the last recorded mark. */
   readonly totalMs: number;
-  /** Acceptance counters observed for this call. */
-  readonly counters: ToolTimingCounters;
 }
 
 /** Aggregated summary over the retained samples. */
@@ -106,11 +82,9 @@ export interface ToolTimingSummary {
   readonly count: number;
   readonly errorCount: number;
   /** Duration percentiles for the end-to-end span. */
-  readonly total: { readonly p50: number; readonly p95: number; readonly p99: number };
+  readonly total: ToolTimingPercentiles;
   /** Duration percentiles per phase, keyed by `<from>_<to>`. */
   readonly phases: Readonly<Record<string, { readonly p50: number; readonly p95: number; readonly p99: number }>>;
-  /** Sum of the acceptance counters over the retained samples. */
-  readonly counters: ToolTimingCounters;
 }
 
 /** Percentiles plus the sample count they were computed from. */
@@ -225,7 +199,7 @@ export class ToolTimingRecorder {
   /**
    * Start recording one tool call.
    *
-   * The returned handle keeps its own marks and counters, so concurrent calls
+   * The returned handle keeps its own marks, so concurrent calls
    * cannot interleave into one another's sample.
    *
    * @param tool - tool name as the model sees it.
@@ -295,8 +269,7 @@ export class ToolTimingRecorder {
         errorCount: samples.filter((sample) => sample.isError).length,
         total: describe(totals),
         phases,
-        counters: sumCounters(samples),
-      });
+        });
     }
     return { groups: summaries, dropped: this.#dropped, retained: this.#ring.length, capacity: this.#capacity };
   }
@@ -320,7 +293,6 @@ export class ToolTimingHandle {
   readonly #tool: string;
   readonly #label: string | undefined;
   readonly #marks: Partial<Record<ToolTimingStage, number>> = {};
-  #counters: Record<ToolTimingCounter, number> = { controlCommits: 0, eventFsyncs: 0, projectionWrites: 0, artifactReadbacks: 0, hashRuns: 0 };
   #finished = false;
 
   /**
@@ -343,16 +315,6 @@ export class ToolTimingHandle {
    */
   public mark(stage: ToolTimingStage): void {
     if (this.#marks[stage] === undefined) this.#marks[stage] = monotonicNow();
-  }
-
-  /**
-   * Increment an acceptance counter for this call.
-   *
-   * @param counter - which counter to increment.
-   * @param by - amount to add; defaults to 1.
-   */
-  public count(counter: ToolTimingCounter, by = 1): void {
-    this.#counters[counter] += by;
   }
 
   /**
@@ -390,16 +352,10 @@ export class ToolTimingHandle {
       marks: { ...this.#marks },
       phases,
       totalMs: round(last - scheduled),
-      counters: { ...this.#counters },
     });
   }
 }
 
-function sumCounters(samples: readonly ToolTimingSample[]): ToolTimingCounters {
-  const total: Record<ToolTimingCounter, number> = { controlCommits: 0, eventFsyncs: 0, projectionWrites: 0, artifactReadbacks: 0, hashRuns: 0 };
-  for (const sample of samples) for (const key of Object.keys(total) as ToolTimingCounter[]) total[key] += sample.counters[key];
-  return total;
-}
 
 /**
  * Wrap a tool so its execution is timed into `recorder`.
@@ -409,10 +365,12 @@ function sumCounters(samples: readonly ToolTimingSample[]): ToolTimingCounters {
  * receives no recorder it returns the original tool, so enabling timing is the
  * only difference between a measured and an unmeasured lane.
  *
- * Only the boundaries reachable from the tool wrapper are marked. The
- * agent-loop span `scheduled -> executionStart` is attributed by whoever owns
- * the dispatch, and `executionEnd -> toolResultEmitted` is marked by the Pi
- * result projection once that boundary is instrumented.
+ * Only the boundaries reachable from the tool wrapper are marked, and both marks
+ * of `scheduled -> executionStart` are taken inside it: that span is the
+ * wrapper's own entry cost plus the caller's `scheduled` mark, NOT agent-loop
+ * dispatch delay, which nothing here can observe. `executionEnd ->
+ * toolResultEmitted` is marked by the Pi result projection once that boundary is
+ * instrumented.
  *
  * @param tool - the tool to wrap.
  * @param recorder - destination for the samples.

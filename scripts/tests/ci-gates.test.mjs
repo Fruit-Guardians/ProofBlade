@@ -156,6 +156,47 @@ test("[contract:component-audit-time-fallback] resolves audit time from explicit
   assert.equal(resolveAuditTimestamp({ now }), "2026-08-08T10:00:00.000Z");
 });
 
+test("every script either typechecks or is listed as a known failure", () => {
+  // `scripts/**` belonged to no TypeScript project, so `tsc -b` could not see it:
+  // `npm run baseline:tools -- --json` shipped with a `ReferenceError` on a name
+  // that exists only inside a function, and neither the build nor any test
+  // reached that branch. `tsconfig.scripts.json` closes the class.
+  //
+  // Three scripts do not typecheck today. They are excluded by name so the gate
+  // starts green, and this test keeps the exclusion list from being used to hide
+  // new breakage: a script added to it must be one of the three.
+  const config = JSON.parse(readFileSync(resolve(process.cwd(), "tsconfig.scripts.json"), "utf8"));
+  assert.deepEqual(
+    [...config.exclude].sort(),
+    [
+      "scripts/browser-runtime-playwright-host.ts",
+      "scripts/pwn-docker-fault-matrix.ts",
+      "scripts/session-runtime-combined-host.ts",
+    ],
+    "a new entry in tsconfig.scripts.json's exclude list hides a real type error; fix the script instead",
+  );
+  assert.ok(config.include.includes("scripts/**/*.ts"), "the project must include the scripts it gates");
+  const root = JSON.parse(readFileSync(resolve(process.cwd(), "tsconfig.json"), "utf8"));
+  assert.ok(
+    root.references.some((reference) => reference.path === "./tsconfig.scripts.json"),
+    "the scripts project must be in the root build so `tsc -b` and `npm run build` typecheck it",
+  );
+});
+
+test("the provider-free baseline script can emit JSON", () => {
+  // The `--json` branch is the one no test or build reached; asserting the source
+  // shape keeps this cheap, and the CI step that runs the script exercises it for
+  // real. Both are needed: the shape check is what fails at review time.
+  const source = readFileSync(resolve(process.cwd(), "scripts", "tool-hot-path-baseline.ts"), "utf8");
+  const emitted = source.slice(source.indexOf("if (asJson)"), source.indexOf("} else {"));
+  assert.match(emitted, /JSON\.stringify\(/, "the --json branch must serialise something");
+  assert.doesNotMatch(
+    emitted,
+    /JSON\.stringify\(\{\s*iterations,\s*summaries\s*\}/,
+    "`summaries` only exists inside printReport; serialising it throws at runtime",
+  );
+});
+
 function metadata({ version, updatedAt, count, hash }) {
   return {
     version,

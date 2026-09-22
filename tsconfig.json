@@ -5,6 +5,7 @@
     { "path": "./packages/molecules" },
     { "path": "./packages/materials" },
     { "path": "./apps/cli" },
-    { "path": "./apps/gui" }
+    { "path": "./apps/gui" },
+    { "path": "./tsconfig.scripts.json" }
   ]
 }

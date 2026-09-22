@@ -106,7 +106,7 @@ try {
   const counters = { artifactReadbacks: 0 };
   instrumentArtifactStore(services.artifacts, counters);
 
-  const recorder = new ToolTimingRecorder(iterations * 4);
+  const recorder = new ToolTimingRecorder();
   const target = join(root, "measured.txt");
   await writeFile(target, `${"x".repeat(32 * 1024)}\n`, "utf8");
   const tiny = join(root, "tiny.txt");

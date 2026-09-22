@@ -125,18 +125,21 @@ test("clear drops samples and the drop count together", () => {
   assert.equal(recorder.droppedCount(), 0);
 });
 
-test("summarize groups by tool and sums the acceptance counters", () => {
+test("summarize groups by tool and counts what each group holds", () => {
+  // No counters here any more. The recorder used to expose `count(name)` and a
+  // `counters` column, and nothing in production ever called it, so the
+  // baseline's all-zero column read as "the hot path is clean" when it meant
+  // "nobody measured". The real-Run harness counts durable events, projection
+  // writes and read-backs at the source; this recorder times stages.
   const recorder = new ToolTimingRecorder();
   for (let index = 0; index < 4; index += 1) {
     const handle = recorder.begin("read");
     handle.mark("executionStart");
-    handle.count("artifactReadbacks", 2);
     handle.mark("executionEnd");
     handle.finish(index % 2 === 0);
   }
   const bash = recorder.begin("bash");
   bash.mark("executionStart");
-  bash.count("eventFsyncs");
   bash.finish();
 
   const summaries = recorder.summarize().groups;
@@ -146,11 +149,10 @@ test("summarize groups by tool and sums the acceptance counters", () => {
   assert.equal(read.tool, "read");
   assert.equal(read.count, 4);
   assert.equal(read.errorCount, 2);
-  assert.equal(read.counters.artifactReadbacks, 8);
-  assert.equal(read.counters.eventFsyncs, 0);
+  assert.equal(read.total.n, 4, "the group's percentile must carry the group's sample count");
   assert.ok(read.total.p50 <= read.total.p95);
   assert.ok(read.total.p95 <= read.total.p99);
-  assert.equal(summaries.find((summary) => summary.group === "bash")?.counters.eventFsyncs, 1);
+  assert.equal(summaries.find((summary) => summary.group === "bash")?.count, 1);
 });
 
 test("a label separates calls that share one tool name", () => {
@@ -295,7 +297,6 @@ test("recording performs no durable write", () => {
   for (let index = 0; index < 200; index += 1) {
     const handle = recorder.begin("read");
     handle.mark("executionStart");
-    handle.count("controlCommits");
     handle.mark("executionEnd");
     handle.finish();
   }
@@ -314,7 +315,6 @@ test("recording performs no durable write", () => {
     assert.equal(typeof value === "function", false, `sample.${key} must not be a function`);
     assert.ok(value === null || typeof value !== "object" || Object.getPrototypeOf(value) === Object.prototype || Array.isArray(value), `sample.${key} must be a primitive or a plain object`);
   }
-  assert.equal(recorder.summarize().groups[0]?.counters.controlCommits, 200);
 });
 
 test("the ring buffer evicts the oldest sample and reports what it dropped", () => {

@@ -44,7 +44,7 @@ try {
   await writeFile(small, "hello proofblade\n", "utf8");
   await writeFile(medium, `${"x".repeat(64 * 1024)}\n`, "utf8");
 
-  const recorder = new ToolTimingRecorder(iterations * 8);
+  const recorder = new ToolTimingRecorder();
   const tools = createCodingTools();
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
@@ -97,7 +97,7 @@ try {
 
   const report = recorder.summarize(cases.map((benchmark) => benchmark.name));
   if (asJson) {
-    process.stdout.write(`${JSON.stringify({ iterations, summaries }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ iterations, ...report }, null, 2)}\n`);
   } else {
     printReport(iterations, cases, report);
   }
@@ -148,27 +148,19 @@ function printReport(iterations: number, cases: readonly BenchmarkCase[], report
     ].join(" | ") + " |");
   }
   console.log("");
-  // The counter columns are all zero here, and the reason is not that the hot
-  // path is clean: nothing in this harness increments them. They exist on the
-  // handle for a producer to call, and a producer needs a ControlStore. Saying
-  // "must stay at zero" invited reading them as evidence, which they are not.
-  console.log("Counters: all zero, and that means \"nothing incremented them\" in this harness -- not");
-  console.log("\"the synchronous path is clean\". This harness has no ControlStore, so nothing can");
-  console.log("increment these; `scripts/tool-hot-path-real-run-baseline.ts` is where they carry data.");
-  console.log("");
-  console.log("| case | n | controlCommits | eventFsyncs | projectionWrites | artifactReadbacks | hashRuns |");
-  console.log("|---|---:|---:|---:|---:|---:|---:|");
-  for (const summary of summaries) {
-    console.log(`| ${summary.group} | ${summary.count} | ${summary.counters.controlCommits} | ${summary.counters.eventFsyncs} | ${summary.counters.projectionWrites} | ${summary.counters.artifactReadbacks} | ${summary.counters.hashRuns} |`);
-  }
-  console.log("");
   console.log(`Retained samples: ${report.retained} of capacity ${report.capacity}; dropped: ${report.dropped}.`);
   if (report.dropped > 0) console.log("WARNING: samples were evicted, so the percentiles above describe a suffix of the run, not all of it.");
   console.log("");
-  console.log("NOT measured here: ControlStore commit, `fsync`, projection rewrite, Artifact read-back and");
-  console.log("hash counts are counted (all zero above) rather than executed, because this harness has no");
-  console.log("ControlStore. The production gap those phases add is the subject of the next items (T1/T2),");
-  console.log("and must be measured against a real Run before §7.2.3 thresholds are set.");
+  // There used to be a counter table here, all zeros. The zeros did not mean the
+  // synchronous path was clean -- nothing in this harness or in production ever
+  // incremented those counters, so the table was a claim about a measurement
+  // nobody took. The counters are gone from the recorder for that reason;
+  // `scripts/tool-hot-path-real-run-baseline.ts` counts durable events,
+  // projection writes and artifact read-backs at the source, against a real
+  // ControlStore, which is where those numbers actually exist.
+  console.log("NOT measured here: this harness has no ControlStore, so it measures the tool body and the");
+  console.log("wrapper only. Durable events, projection writes and artifact read-backs are counted by");
+  console.log("`npm run baseline:tools:real`, against a real Run.");
 }
 
 function format(value: number | undefined): string {

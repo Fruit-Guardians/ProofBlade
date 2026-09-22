@@ -695,11 +695,14 @@ export class ControlStore {
    * deferred write is the most recent one. The other two removals are
    * `flushProjection` and `reconcileProjection`.
    *
-   * This was checked rather than assumed, because the review flagged the set as
-   * unbounded: adding a terminal-status cleanup inside `#withWrite` changed no
-   * observable state, and the reason is that `#recordProjectionMode` had already
-   * cleared the entry on the way through. The branch was removed rather than kept
-   * as reassurance. `barrier-projection.test.ts` pins the clearing.
+   * That bound holds while the Run keeps writing. A Run whose last write is
+   * deferred, and which is then abandoned in the same process with neither a
+   * barrier nor a reconcile, keeps its entry until the process exits. Adding a
+   * terminal-status cleanup here does not help: `#recordProjectionMode` has
+   * already cleared the entry by the time the fold sees the terminal status, so
+   * the branch changes no observable state. That was checked by mutating it, and
+   * the branch was removed rather than kept as reassurance.
+   * `barrier-projection.test.ts` pins the clearing it actually relies on.
    */
   #recordProjectionMode(runId: string, persistProjection: boolean | undefined): void {
     if (persistProjection === false) this.deferredProjectionRuns.add(runId);
@@ -725,9 +728,6 @@ export class ControlStore {
           try {
             const after = committed.reduce(reduce, before);
             await this.#cacheSnapshot(runId, after);
-            // A finished Run has nothing left to defer. Without this the set
-            // keeps one entry per Run that ever wrote a deferred projection,
-            // for the lifetime of the process.
           } catch {
             // The event stream is authoritative. If a write completed but the
             // local fold could not be refreshed, force the next read to rebuild.
@@ -759,7 +759,8 @@ export class ControlStore {
     // shortcut, even though a current projection would let it skip parsing the
     // stream (1,877ms -> ~5ms at 10,001 events):
     //
-    // The hint establishes currency from the log's byte size plus its trailing
+    // The hint establishes currency from the log's *revision* (size, mtime,
+    // inode -- an in-memory identity, see `JsonlRunRevision`) plus its trailing
     // seq, and authenticates the projection against the authority secret. What
     // it cannot do is prove the *historical* bytes are the ones the seal's
     // prefix hash was computed over. Rewriting an event in place while keeping
@@ -770,10 +771,12 @@ export class ControlStore {
     // Verifying that cheaply is impossible with the current seal: the hash is
     // over the canonical JSON of the parsed events, so it cannot be recomputed
     // from raw file bytes, and hashing the prefix still requires parsing it.
-    // The seal records the log's byte size to make the *adjacent* guarantees
-    // checkable (see loadProjection / loadProjectionHint), but a size cannot
-    // witness content. Until the seal can prove the prefix, the read path stays
-    // authoritative and pays O(history). Regression test:
+    // Nothing in the seal witnesses the log's content at all --
+    // `projectionSealPayload()` carries `{ schemaVersion, runId, lastSeq,
+    // snapshotHash, eventPrefixHash }` and no size field, so the "matching byte
+    // size" this comment used to appeal to was never a mechanism that existed.
+    // Until the seal can prove the prefix, the read path stays authoritative and
+    // pays O(history). Regression test:
     // packages/materials/tests/projection-read-bound.test.ts, "snapshot and
     // replay agree after a historical event is rewritten in place".
     const events = await this.eventStore.events(runId);
