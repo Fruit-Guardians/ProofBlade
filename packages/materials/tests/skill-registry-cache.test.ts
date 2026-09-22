@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,6 +50,58 @@ test("editing a skill file invalidates the memo", async () => {
     assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 2, "a changed skill must re-parse");
     assert.notEqual(after.catalogHash(), hashBefore, "the change must reach the catalog hash");
     assert.equal(after.list()[0]?.description, "edited");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a same-size rewrite with the mtime put back still invalidates the memo", async () => {
+  // R1 from the fourth review round. The memo's revision entry is
+  // `path \0 ino \0 size \0 mtimeMs \0 ctimeMs`. Drop `ctimeMs` -- which is what
+  // the `path \0 size \0 mtimeMs` key this memo used before did -- and a writer
+  // that keeps the byte length and restores the modification time reproduces the
+  // key, so the memo answers with the pre-edit parse and the catalog keeps the old
+  // description. That is the staleness this test pins down, and it is the registry
+  // half of the argument: `version-cache.test.ts` has the same-shape assertion for
+  // the *version snapshot*, whose revision is a content digest, so that assertion
+  // cannot see this key at all. It was cited as evidence for it, which it is not.
+  //
+  // It also states the mechanism the fourth round corrected: a front-matter edit
+  // like this one never moves `contentHash` (the registry hashes `skill.content`,
+  // which the loader strips the front matter out of). It reaches the catalog
+  // through `entry()`, which carries name and description. So the assertion is on
+  // `catalogHash()`/`list()`, not on `contentHash`.
+  const root = await project();
+  try {
+    const skillPath = join(root, "skills", "alpha", "SKILL.md");
+    const first = "---\nname: alpha\ndescription: aaaa\n---\n\nbody\n";
+    const second = "---\nname: alpha\ndescription: bbbb\n---\n\nbody\n";
+    assert.equal(Buffer.byteLength(first), Buffer.byteLength(second), "the two bodies must be the same length");
+    // Frozen at a whole second: restoring whatever timestamp the write produced
+    // would compare against the filesystem's rounding, and a sub-millisecond
+    // difference would fail the setup assertion below for a reason that has
+    // nothing to do with the revision key.
+    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
+    await writeFile(skillPath, first, "utf8");
+    await utimes(skillPath, frozen, frozen);
+    ProofBladeSkillRegistry.resetCache();
+
+    const before = await ProofBladeSkillRegistry.load(root);
+    const beforeStat = await stat(skillPath);
+
+    await new Promise((done) => setTimeout(done, 20));
+    await writeFile(skillPath, second, "utf8");
+    await utimes(skillPath, frozen, frozen);
+    const afterStat = await stat(skillPath);
+    assert.equal(afterStat.size, beforeStat.size, "the rewrite must keep the byte length");
+    assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs, "the rewrite must keep the modification time exactly, or this test proves nothing");
+    assert.notEqual(afterStat.ctimeMs, beforeStat.ctimeMs, "and it must move ctime, which is the field the wide key detects it by");
+
+    const after = await ProofBladeSkillRegistry.load(root);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 0, "the memo must not answer for the pre-edit bytes");
+    assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 2, "a same-size, same-mtime rewrite must re-parse");
+    assert.equal(after.list()[0]?.description, "bbbb", "the new front matter must reach the catalog");
+    assert.notEqual(after.catalogHash(), before.catalogHash(), "and the catalog hash must move with it");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

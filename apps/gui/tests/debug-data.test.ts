@@ -499,6 +499,24 @@ test("a rewritten event log is not served from the run-list cache either", async
     const runId = "CHAT-LIST-VERSION-1";
     await data.createConversation({ runId, title: "list version test", workspacePath: root });
 
+    // Freeze the timestamp at a whole second *before* the first list read, and
+    // restore that same value after the rewrite. Both halves matter:
+    //
+    // - before, because the cache entry is built from whatever the log's mtime is
+    //   at that moment. Freezing after the baseline (where this used to sit) makes
+    //   the freeze itself invalidate the entry, and then the assertion below passes
+    //   for a key that carries nothing but `mtimeMs` -- measured: with the key
+    //   narrowed to `size \0 mtimeMs` the test still passed, so it was gating
+    //   nothing about `ino`/`ctimeMs`, which is exactly what it exists to gate.
+    // - a whole second, because restoring the value `stat` happened to report
+    //   compares against sub-millisecond precision that `utimes` cannot set, so an
+    //   mtime landing mid-millisecond floors to the previous millisecond and the
+    //   setup assertion fails for a reason unrelated to the cache key. Measured: it
+    //   failed roughly one run in six that way.
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
+    await utimes(eventsPath, frozen, frozen);
+
     const first = await data.listRuns();
     assert.equal(first.length, 1);
     const warm = await data.listRuns();
@@ -523,15 +541,6 @@ test("a rewritten event log is not served from the run-list cache either", async
     // sorts keys, so `"generation":0` is followed by `"id":` in the envelope; the
     // substitution is anchored on a substring long enough to be unique rather than
     // on the field name alone.
-    const eventsPath = join(root, "runs", runId, "events.jsonl");
-    // Freeze the timestamp at a whole second *before* the baseline read, and restore
-    // that same value after the rewrite. Restoring the value `stat` happened to
-    // report compares against sub-millisecond precision that `utimes` cannot set,
-    // so a mtime landing mid-millisecond floors to the previous millisecond and the
-    // setup assertion fails for a reason unrelated to the cache key. Measured: it
-    // failed roughly one run in six that way.
-    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
-    await utimes(eventsPath, frozen, frozen);
     const beforeStat = await stat(eventsPath);
     const before = await readFile(eventsPath, "utf8");
     const marker = '"generation":0,"id"';
@@ -544,6 +553,8 @@ test("a rewritten event log is not served from the run-list cache either", async
     const afterStat = await stat(eventsPath);
     assert.equal(afterStat.size, beforeStat.size, "the rewrite must keep the byte length");
     assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs, "the rewrite must keep the modification time exactly, or this measures nothing");
+    assert.notEqual(afterStat.ctimeMs, beforeStat.ctimeMs, "and it must move ctime, which is the field the key detects it by");
+    assert.equal(afterStat.ino, beforeStat.ino, "an in-place write keeps the inode, so the inode is not what detects this");
 
     await data.listRuns();
     assert.ok(builds > 0, "a rewritten log must not be served from the list cache");

@@ -74,8 +74,12 @@ export interface RunVersionSnapshotCache {
  * key would be cheaper, but it is unsound here: NTFS mtime granularity and
  * externally edited config files both let a content change keep the same
  * metadata, which would serve a stale snapshot — precisely the class of bug this
- * cache must not introduce. `mtimeMs + size` is used only as a pre-filter, so a
- * file's bytes are re-hashed only when its metadata says something moved.
+ * cache must not introduce. There is no metadata key left to widen and no
+ * pre-filter over one: {@link versionRevision} reads and hashes every input on
+ * every call, and the measured cost of that is recorded on {@link fileDigest}. An
+ * earlier version of this comment claimed `mtimeMs + size` survived as a
+ * pre-filter; it did not, and the per-file metadata cache it described had already
+ * been removed when the claim was written.
  *
  * A failed build is never cached: the promise is cleared on rejection so the next
  * caller retries instead of inheriting one transient read error forever.

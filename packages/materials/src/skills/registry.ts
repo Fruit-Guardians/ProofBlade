@@ -251,9 +251,9 @@ function cacheKey(root: string, dirList: readonly string[]): string {
 /**
  * A cheap structural revision of every skill root.
  *
- * Walks the roots for `SKILL.md` files and records each one's path, identity and
- * metadata. That catches a skill added, removed, renamed or edited without
- * reading any file body.
+ * Walks the roots for the inputs the loader reads and records each one's path,
+ * identity and metadata. That catches a skill added, removed, renamed or edited
+ * without reading any file body.
  *
  * The key is `path \0 ino \0 size \0 mtimeMs \0 ctimeMs`, and `size + mtimeMs`
  * alone is NOT acceptable here. An earlier version of this comment argued it was,
@@ -262,11 +262,21 @@ function cacheKey(root: string, dirList: readonly string[]): string {
  * `contentHash` the snapshot records, so while the revision key looks unchanged
  * the memoised registry keeps handing back the pre-edit parse result, and the
  * snapshot ends up reporting the old content hash for a body that has changed.
- * That is measured, not hypothetical: see the same-size rewrite assertion in
- * packages/materials/tests/version-cache.test.ts.
  *
- * `ctimeMs` moves on any content change and cannot be set by ordinary writers;
- * `ino` separates a replaced file from an in-place write of the same length.
+ * Gated rather than reasoned: `skill-registry-cache.test.ts`, "a same-size rewrite
+ * with the mtime put back still invalidates the memo", freezes the mtime, rewrites
+ * a `SKILL.md` to a different description of the same byte length, puts the mtime
+ * back and asserts the memo re-parses and the catalog moves. Dropping `ctimeMs`
+ * from the key fails it. The same-shape assertion in `version-cache.test.ts` does
+ * NOT gate this key -- that one covers the snapshot's content digest -- and an
+ * earlier commit cited it here as evidence, which was wrong.
+ *
+ * `ctimeMs` moves on any content change and cannot be set by an ordinary writer;
+ * `ino` separates a replaced file from an in-place write of the same length. The
+ * boundary is therefore: a rewrite at the same length, in the same inode, landing
+ * in the same clock tick as the previous change keeps this key identical. `size`
+ * and `ino` cover the ordinary cases; a caller that needs more must hash the bytes,
+ * which `runtime/version.ts` does.
  *
  * @param roots - absolute skill root directories.
  * @returns a digest that changes whenever the skill set or any skill file does.
@@ -406,7 +416,8 @@ const SKILL_IGNORE_FILES = new Set([".gitignore", ".ignore", ".fdignore"]);
 
 async function canonicalOrResolved(path: string): Promise<string> {
   try {
-    return resolve(await realpath(path));  } catch {
+    return resolve(await realpath(path));
+  } catch {
     return resolve(path);
   }
 }
