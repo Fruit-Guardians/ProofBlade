@@ -95,10 +95,19 @@ export class ProofBladeSkillRegistry {
     // once each. Only the losers wait; the winner removes its own entry.
     const inFlight = skillRegistryLoads.get(key);
     if (inFlight) return await inFlight;
-    const load = ProofBladeSkillRegistry.read(root, requestedDirs).then((registry) => {
+    const load = ProofBladeSkillRegistry.read(root, requestedDirs).then(async (registry) => {
       skillRegistryParses += 1;
       skillRegistryCache.delete(key);
-      skillRegistryCache.set(key, { revision, projectRoot: root, registry });
+      // Cache the revision sampled *after* the parse, not the one sampled before
+      // it. The pre-parse revision describes the tree as the parser found it; if
+      // the tree changed while the parse ran, that revision is older than the
+      // registry it would be stored beside, and a later load whose tree matched
+      // the older revision would hit an entry whose contents are newer. Re-walking
+      // costs one walk on a cache miss -- the parse is the expensive part -- and
+      // gives an entry whose revision and contents were sampled in the same order
+      // every reader observes them.
+      const settledRevision = await skillTreeRevision(requestedDirs);
+      skillRegistryCache.set(key, { revision: settledRevision, projectRoot: root, registry });
       while (skillRegistryCache.size > SKILL_REGISTRY_CACHE_LIMIT) {
         const oldest = skillRegistryCache.keys().next().value;
         if (oldest === undefined) break;
