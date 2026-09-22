@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.19",
+  "version": "0.7.24",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-29T10:29:31.463Z",
+  "updatedAt": "2026-09-21T13:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 19,
-    "securityAuditCount": 19,
-    "lastBugAuditAt": "2026-08-29T10:29:31.463Z",
-    "lastSecurityAuditAt": "2026-08-29T10:29:31.463Z",
-    "sourceHash": "9dee480e6ffc8660ad9ab60160a9d4f9c281e3c61f74357bc9291c4e38411dc9",
+    "bugAuditCount": 24,
+    "securityAuditCount": 24,
+    "lastBugAuditAt": "2026-09-21T13:00:00.000Z",
+    "lastSecurityAuditAt": "2026-09-21T13:00:00.000Z",
+    "sourceHash": "d7f54673b06c79cc3c5912a3f18d64ad826d6b08d5253b620c3b5e369ed54aa5",
     "result": "passed"
   }
 }
@@ -57,6 +57,10 @@
 - Run 详情缓存必须同时观察 durable `events.jsonl` 的 `mtimeMs`/文件大小和递归排序后的 Pi Session 文件状态；Session 加载期间发生变化时重读一次，仍不稳定则不得缓存。完整详情采用容量 32、单项 8 MiB、总量 64 MiB 的加权 LRU，超限详情只返回不缓存；同一 Run 的并发 miss 必须 single-flight，命中缓存时仍要刷新进程内 `active` 状态，服务关闭时必须与列表缓存一并清空。
 - 首屏只等待轻量 bootstrap 与 Provider 设置即可解除全局 loading；Workspace Skill/MCP 能力扫描和 Run 列表必须后台加载，不能阻止用户打开“新建对话”。静态 Skill/MCP 目录在进程内 single-flight 缓存，Provider Native 状态继续按当前配置动态生成。
 - Run 列表优先读取并校验 `projection.json`，不为侧栏统计 Tool 次数而回放完整事件流；projection 缺失或损坏（含无封印的历史 Run）时才在持锁回放后回填带封印的 projection，仅落后但已校验的 projection 走尾部折叠，不得因列表刷新而重放或重写 projection。历史 Run 只在首次冷读时回放一次，后续 GUI 启动复用已校验的封印投影；列表 Tool 数是可选投影，缺失时不显示。
+- Server 启动必须在首个请求前调用 `DebugDataService.assertRuntimeShape()`，断言 `@proofblade/materials` 运行时暴露 `REQUIRED_CONTROL_METHODS` 的全部成员并打印解析到的包路径。缺失成员属于源码与 `dist` 的构建错配，必须 fail-fast；不得为该断言增加运行时兼容降级，降级会把构建问题重新变成难以定位的投影异常。`npm run gui` 先执行 `build:gui-deps` 保证产物一致，`gui:fast` 只用于已由 watcher 保证一致的场景。
+- 普通对话**不得**创建 `.proofblade-workspaces/<runId>`。`createConversation()` 构造的 TaskContract 使用用户选择的真实目录（`target`/`allowed_workspace` = 该目录、`inputs: []`），执行 cwd 由 `taskExecutionWorkspace()` 解析，因此无需 staging；即使填写了 `verificationCommand` 也仍是普通对话。staging 只服务附件验证任务，由 `startTask()` 经 `stageTaskWorkspace()` 创建，用于不可变附件、逐文件 sha256、符号链接拒绝与可重放 cwd。staging 根必须是 `dirname(runsRoot)` 而非 Run 目录内部——`JsonlControlStore` 会把任何已存在的 Run 目录当作既有 Run。该边界由回归测试**双向**锁定（普通对话不创建 + 附件任务仍创建），路径断言必须复用 `taskWorkspaceDir()`/`taskWorkspaceRoot()`，不得另写字面量以免与实现漂移。
+- `POST /api/conversations` **不得**加载 workspace 能力目录（`capabilityCatalog()`）。创建只做三件事：校验工作目录、创建最小 Run、保存调用方实际提交的偏好字段。因此 `WorkspaceSettingsStore.saveConversation()` 允许省略 `defaults`；省略时**不落地** `enabledTools`/`enabledSkills`/`enabledMcpServers`，这些列表在读取时由当前默认值解析。理由有两条：创建阶段扫描 Skills/MCP/Tool 目录属于用户尚未要求的开销；而把创建时的快照写进本地配置，会让此后新增的能力对该对话永久不可见。显式选择与已存值仍优先于默认值。
+- 后台轮询的可见状态规则必须经 `polling.ts` 的 `isPollingAllowed()` 判定，**不得在定时器回调里重新内联** `visibilityState` 比较：每个 tick 都会取回完整 RunDetail（实测一个 121 事件的 Run 为 145KB，其中 events 占 100KB），隐藏标签页不该调度这份开销。该规则由 `[contract:polling-hidden-document-is-idle]` 与 `gui-polling-idle-discipline` 契约锁定。服务端 `/api/runs/:id/events` 已支持 `afterSeq` 增量读取，但客户端**尚未采用**——采用它需要客户端累积事件并同步改动时间线与调试器，属行为变更，须浏览器验证。
 
 ## 验证
 

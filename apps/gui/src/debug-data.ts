@@ -38,7 +38,8 @@ import {
   projectionHash,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
-import { stageTaskWorkspace, type TaskWorkspaceInput } from "./task-workspace.js";
+import { assertMaterialsRuntime, type RuntimeShapeReport } from "./runtime-shape.js";
+import { stageTaskWorkspace, taskWorkspaceDir, type TaskWorkspaceInput } from "./task-workspace.js";
 import type {
   ActiveRunInfo,
   AssistantTurnDebug,
@@ -106,11 +107,11 @@ export class DebugDataService {
   private readonly taskRuns = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
-  private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
+  private readonly runListCache = new Map<string, { eventsVersion: string; item: RunListItem }>();
   private readonly runDetailLoads = new Map<string, Promise<RunDetail>>();
   private readonly runDetailCache = new BoundedLruCache<string, {
-    mtimeMs: number;
-    size: number;
+    /** `runDetailEventsVersion()` of the log this detail was built from. */
+    eventsVersion: string;
     sessionsVersion: string;
     bytes: number;
     detail: RunDetail;
@@ -139,6 +140,23 @@ export class DebugDataService {
       control: this.services.control,
       approvals: new ApprovalPolicy({ ledgerPath: join(this.services.runsRoot, "approvals.json") }),
     });
+  }
+
+  /**
+   * Verify the `@proofblade/materials` runtime the GUI actually loaded exposes
+   * every member the GUI calls unconditionally.
+   *
+   * Run once from the server entry before the first request. A stale workspace
+   * build otherwise surfaces as `loadProjectionHint is not a function` inside a
+   * request handler, which reads like corrupt projection data rather than a
+   * build problem. This fails the boot instead, naming the member and the
+   * module that was resolved.
+   *
+   * @returns the probe report, so a caller can log what was resolved.
+   * @throws when any required member is missing.
+   */
+  public assertRuntimeShape(): RuntimeShapeReport {
+    return assertMaterialsRuntime(this.services.control);
   }
 
   public updateModelProfile(profile: ModelProfileConfig): void {
@@ -205,8 +223,14 @@ export class DebugDataService {
       .map(async (entry): Promise<RunListItem | undefined> => {
         try {
           const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
+          // Same reasoning as the detail cache: `mtimeMs` alone lets a same-size,
+          // timestamp-restored rewrite serve a stale list item, and the list is the
+          // view that is on screen most of the time. `runDetailEventsVersion` is the
+          // identity both caches use, so there is one definition of "the log changed"
+          // rather than two.
+          const eventsVersion = runDetailEventsVersion(eventsStat);
           const cached = this.runListCache.get(entry.name);
-          if (cached?.mtimeMs === eventsStat.mtimeMs) return { ...cached.item, active: this.active.get(entry.name) };
+          if (cached?.eventsVersion === eventsVersion) return { ...cached.item, active: this.active.get(entry.name) };
           const snapshot = await this.runListSnapshot(entry.name, eventsStat, entries.length > 64);
           const item: RunListItem = {
             runId: snapshot.runId,
@@ -225,7 +249,7 @@ export class DebugDataService {
             },
             active: this.active.get(snapshot.runId),
           };
-          this.runListCache.set(entry.name, { mtimeMs: eventsStat.mtimeMs, item });
+          this.runListCache.set(entry.name, { eventsVersion, item });
           return item;
         } catch {
           return undefined;
@@ -280,16 +304,21 @@ export class DebugDataService {
     const eventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
     const sessionsRoot = join(this.services.runsRoot, runId, "pi-sessions");
     const sessionsVersion = await filesystemVersion(sessionsRoot);
-    const cacheKey = runDetailVersionKey(runId, eventsStat.mtimeMs, eventsStat.size, sessionsVersion);
+    // The identity of the log, not just its timestamp: see the `ino`/`ctimeMs`
+    // checks below. A rewrite of `events.jsonl` that keeps the byte length and
+    // restores mtime used to look identical here, so the stale RunDetail was
+    // served for a log that had changed.
+    const eventsVersion = runDetailEventsVersion(eventsStat);
+    const cacheKey = runDetailVersionKey(runId, eventsVersion, sessionsVersion);
     const cached = this.runDetailCache.peek(runId);
-    if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size && cached.sessionsVersion === sessionsVersion) {
+    if (cached?.eventsVersion === eventsVersion && cached.sessionsVersion === sessionsVersion) {
       const current = this.runDetailCache.get(runId);
       return { ...current!.detail, active: this.active.get(runId) };
     }
     if (cached) this.runDetailCache.delete(runId);
     const existing = this.runDetailLoads.get(cacheKey);
     if (existing) return { ...(await existing), active: this.active.get(runId) };
-    const load = this.loadRunDetail(runId, eventsStat, sessionsRoot, sessionsVersion);
+    const load = this.loadRunDetail(runId, eventsStat, eventsVersion, sessionsRoot, sessionsVersion);
     this.runDetailLoads.set(cacheKey, load);
     try {
       return { ...(await load), active: this.active.get(runId) };
@@ -298,7 +327,7 @@ export class DebugDataService {
     }
   }
 
-  private async loadRunDetail(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
+  private async loadRunDetail(runId: string, eventsStat: Stats, eventsVersion: string, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
     const snapshotPromise = this.loadSnapshotForDetail(runId);
     const eventsPromise = this.services.control.events(runId);
     const [snapshot, events, telemetry, sessionRead] = await Promise.all([
@@ -310,7 +339,7 @@ export class DebugDataService {
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const clientEvents = events.length > clientEventLimit ? events.slice(-clientEventLimit) : events;
     const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
-    const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
+    const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsVersion, sessionsRoot, loadedSessionsVersion);
     // `detail` contains the raw session entries plus derived message/tool
     // projections that intentionally repeat parts of that data. Walking the
     // whole object to estimate JSON size turns large histories into an
@@ -323,7 +352,7 @@ export class DebugDataService {
       : runDetailCacheMaxEntryBytes + 1;
     const cacheLimit = eventsStat.size > 8 * 1024 * 1024 ? largeRunDetailCacheMaxEntryBytes : runDetailCacheMaxEntryBytes;
     if (!this.closing && currentVersion && bytes <= cacheLimit) {
-      this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
+      this.runDetailCache.set(runId, { eventsVersion, sessionsVersion: loadedSessionsVersion, bytes, detail });
     }
     return detail;
   }
@@ -349,10 +378,10 @@ export class DebugDataService {
     return await new RunTelemetry(readOnlyControl).report(runId);
   }
 
-  private async isCurrentRunVersion(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
+  private async isCurrentRunVersion(runId: string, eventsVersion: string, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
     try {
       const currentEventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
-      if (currentEventsStat.mtimeMs !== eventsStat.mtimeMs || currentEventsStat.size !== eventsStat.size) return false;
+      if (runDetailEventsVersion(currentEventsStat) !== eventsVersion) return false;
       return await filesystemVersion(sessionsRoot) === sessionsVersion;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
@@ -473,9 +502,25 @@ export class DebugDataService {
     if (this.active.has(runId) || this.activeLanes.has(runId)) throw new Error("运行中的对话不能删除，请先暂停");
     const snapshot = await this.services.control.snapshot(runId);
     if (runKind(snapshot.task) !== "chat") throw new Error("只能删除普通对话，Fixture Run 请保留用于复盘");
-    await rm(join(this.services.runsRoot, runId), { recursive: true, force: false });
-    this.runListCache.delete(runId);
-    this.runDetailCache.delete(runId);
+    // Cache invalidation belongs in `finally`, not at the end of the straight line
+    // it used to sit in. `rm` on Windows fails with EPERM/EBUSY rather than ENOENT
+    // when something still holds the directory, and on that failure the Run was
+    // already gone while both caches still described it: the sidebar kept listing a
+    // conversation that no longer existed and opening it failed, until restart. A
+    // stale cache outlives the reported error, so the caches are cleared either way
+    // and the error still propagates.
+    try {
+      await rm(join(this.services.runsRoot, runId), { recursive: true, force: false, maxRetries: 20, retryDelay: 250 });
+      // A conversation with attachments owns a staged workspace beside the runs
+      // root. Deleting the Run without it leaked the staged copy of every
+      // attachment -- up to the per-task byte caps -- with nothing left pointing at
+      // it. `force: true` because a conversation that never staged has no
+      // directory here, and that is not an error.
+      await rm(taskWorkspaceDir(this.services.runsRoot, runId), { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } finally {
+      this.runListCache.delete(runId);
+      this.runDetailCache.delete(runId);
+    }
   }
 
   public async createTaskFromTemplate(input: { runId: string; templateId: string; objective: string }): Promise<RunSnapshot> {
@@ -736,8 +781,39 @@ async function filesystemVersion(root: string): Promise<string> {
   return entries.join("\n");
 }
 
-function runDetailVersionKey(runId: string, eventsMtimeMs: number, eventsSize: number, sessionsVersion: string): string {
-  return runId + "\0" + eventsMtimeMs + "\0" + eventsSize + "\0" + sessionsVersion;
+/**
+ * Identity of `events.jsonl` for cache purposes.
+ *
+ * `mtimeMs + size` alone is not enough: rewriting the log in place at the same
+ * byte length and restoring its timestamp reproduces both, so a cached
+ * RunDetail survived a change to the very data it describes. `ctimeMs` moves on
+ * any content change and cannot be set by an ordinary writer; `ino` separates a
+ * replaced file from an in-place write. Both come from the `stat()` the caller
+ * already performs, so this costs nothing extra.
+ *
+ * Scope of that guarantee, stated because it is what the key actually rests on,
+ * and measured on this project's development platform rather than assumed. On
+ * Windows/NTFS, seven runs of 40 consecutive writes to one file produced anywhere
+ * from 9 to 31 positive `ctimeMs` advances each (18, 26 and 23 in the three runs
+ * re-measured while writing this). The **count** therefore depends on write speed
+ * and clock advance and must not be quoted as a constant; the **magnitude** is
+ * stable: the smallest positive delta was 0.31-0.91ms across all seven runs and
+ * every run had a dozen or more distinct fractional parts. Sub-millisecond
+ * precision is present, not the 15.6ms tick one expects from the documented system
+ * time. A same-size in-place rewrite with `mtimeMs` restored to a whole second
+ * moved `ctimeMs` by 1.0-2.5ms in every run while `size` and `ino` stayed the
+ * same, so `ctimeMs` is the field that catches it and `ino` is not. The residual
+ * window is therefore a rewrite inside the same sub-millisecond tick, in the same
+ * inode, at the same length -- an empirical boundary, not an invariant. A caller
+ * that needs better than that must hash the bytes; `runtime/version.ts` does,
+ * which is why its revision is a content digest rather than a metadata key.
+ */
+function runDetailEventsVersion(eventsStat: Stats): string {
+  return `${eventsStat.ino}\0${eventsStat.size}\0${eventsStat.mtimeMs}\0${eventsStat.ctimeMs}`;
+}
+
+function runDetailVersionKey(runId: string, eventsVersion: string, sessionsVersion: string): string {
+  return runId + "\0" + eventsVersion + "\0" + sessionsVersion;
 }
 
 export function boundedJsonByteSize(value: unknown, limit: number): number {

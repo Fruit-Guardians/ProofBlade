@@ -47,6 +47,19 @@ type StoredProjection = RunSnapshot & {
 
 const EVENT_CACHE_LIMIT = 64;
 
+/**
+ * Lifetime parse counters for the event stream, aggregated per process.
+ *
+ * These are module-level rather than per-instance because the question they
+ * answer is "did this process deserialize the event stream", not "did this
+ * object". A GUI server builds several stores over the same runs root
+ * (`createServices` and the debug data service each hold one), and a
+ * per-instance counter would report a reassuring zero for the very read that
+ * paid the cost.
+ */
+let parsedEventCount = 0;
+let parsedEventBytes = 0;
+
 export class JsonlControlStore {
   private readonly runsRoot: string;
   private readonly writes = new KeyedOperationQueue();
@@ -60,6 +73,28 @@ export class JsonlControlStore {
   public constructor(runsRoot: string, options: { lock?: FileLockOptions } = {}) {
     this.runsRoot = runsRoot;
     this.lockOptions = options.lock ?? {};
+  }
+
+  /**
+   * Lifetime parse counters for the event stream, for this process.
+   *
+   * A read that answers a question about a Run must not pay to deserialize the
+   * whole stream first. Timing cannot gate that: a duration threshold measures
+   * the runner and gets disabled on slower machines. These are counts instead,
+   * so a test can assert "this read parsed N events" the same way
+   * `SkillRegistry.cacheStats()` asserts catalog re-parses.
+   *
+   * Every cache miss re-parses the complete `events.jsonl`, and that is exactly
+   * what the counter makes visible.
+   *
+   * It is an observation only: it changes no read path, and it is never reset
+   * implicitly, so a value read after two operations is the sum of both. A zero
+   * therefore means "nothing was parsed here", never "the counter was cleared"
+   * -- `parsedBytes` moves with `parsedEvents` so a broken counter cannot look
+   * like a healthy cache.
+   */
+  public readStats(): { parsedEvents: number; parsedBytes: number } {
+    return { parsedEvents: parsedEventCount, parsedBytes: parsedEventBytes };
   }
 
   public runPath(runId: string): string {
@@ -166,6 +201,8 @@ export class JsonlControlStore {
         if (!line) continue;
         try {
           events.push(JSON.parse(line) as HarnessEvent);
+          parsedEventCount += 1;
+          parsedEventBytes += Buffer.byteLength(line, "utf8");
         } catch (error) {
           // A process can be terminated after an append has written part of
           // the final UTF-8 record but before the newline reaches durable
@@ -273,13 +310,38 @@ export class JsonlControlStore {
    */
   public async migrateLegacyRun(runId: string, authorityHash: string): Promise<"anchored" | "migrated" | "read_only"> {
     if (!/^[a-f0-9]{64}$/i.test(authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
+    // Whole body under the Run lock. The fast path below only reads, but it
+    // decides "this Run needs no migration" and returns it to callers who may
+    // then write; taking the lock here keeps that decision serialised against a
+    // concurrent migration instead of racing it.
     return await this.withRunLock(runId, async () => {
+      // A Run is anchored exactly when `authorityAnchor()` finds an authority
+      // hash, and a current-format Run records that hash in its very first
+      // `run_started` event. Two bounded reads (`firstEvent` + `lastEventSeq`)
+      // settle that case without parsing the stream, which otherwise made every
+      // cache-missing read O(history) before it could consult the projection.
+      //
+      // The anchor predicate must match `authorityAnchor()` exactly, including
+      // its 64-hex requirement: accepting any string here would report a Run
+      // with a malformed anchor as "anchored" while the authoritative path
+      // rejects or rewrites it.
+      //
+      // `run_authority_migrated` is itself an anchor, so a stream carrying one
+      // must still take the full path below. A mis-signalled Run therefore only
+      // costs the parse, never a wrong answer.
+      const first = await this.firstEvent(runId);
+      if (first !== undefined && first.type === "run_started" && first.seq === 1 && isAuthorityAnchor(first.payload?.authorityHash)) {
+        const tailSeq = await this.lastEventSeq(runId);
+        if (tailSeq === 1) return "anchored";
+        const last = tailSeq === undefined ? undefined : await this.lastEvent(runId);
+        if (last !== undefined && last.type !== "run_authority_migrated") return "anchored";
+      }
       const events = await this.events(runId);
-      const first = events[0];
-      if (!first || first.type !== "run_started" || first.seq !== 1) throw new Error(`Run ${runId} has no valid first run_started event`);
+      const head = events[0];
+      if (!head || head.type !== "run_started" || head.seq !== 1) throw new Error(`Run ${runId} has no valid first run_started event`);
       const existing = authorityAnchor(events);
       if (existing) return "anchored";
-      if (first.payload?.taskHash !== undefined || first.payload?.authorityHash !== undefined) {
+      if (head.payload?.taskHash !== undefined || head.payload?.authorityHash !== undefined) {
         return "read_only";
       }
       const task = await this.loadTask(runId);
@@ -410,8 +472,31 @@ export class JsonlControlStore {
         stat(join(this.runsRoot, runId, "projection.json")),
         stat(this.runPath(runId)),
       ]);
+      // A projection older than the event log cannot be current. This is a
+      // temporal heuristic, and it is not sufficient on its own: coarse
+      // filesystem timestamp granularity (or any clock adjustment) can make the
+      // two mtimes compare EQUAL while the projection is still behind, which
+      // this comparison accepts. The content check below is what actually
+      // establishes currency.
       if (projectionStat.mtimeMs < eventsStat.mtimeMs) return undefined;
       const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
+      // Establish currency from content, not from time, and fail closed.
+      //
+      // The seal proves a projection is authentic and internally consistent, not
+      // that it covers the whole log: a projection sealed at lastSeq 1 stays
+      // perfectly valid after 10,000 more events. Comparing the projection's
+      // lastSeq with the log's last event closes that gap for the cost of one
+      // bounded tail read, independent of timestamp granularity.
+      //
+      // That comparison must fail closed. `lastEventSeq()` returns undefined
+      // whenever the tail cannot be read -- an unreadable or torn trailing
+      // region, or a log whose records all fail to parse -- and an earlier
+      // version treated undefined as "cannot disprove currency" and returned the
+      // projection anyway. A reader could then be handed a projection that is
+      // behind the log. Unknown currency is not currency: reject.
+      const streamLastSeq = await this.lastEventSeq(runId);
+      if (streamLastSeq === undefined) return undefined;
+      if (streamLastSeq !== stored.lastSeq) return undefined;
       const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
       const snapshot = snapshotFields as RunSnapshot;
       // Recompute the projection content hash before trusting any stored hash.
@@ -444,6 +529,152 @@ export class JsonlControlStore {
     }
   }
 
+
+  /**
+   * Read one byte range, or `undefined` when the read cannot be trusted.
+   *
+   * A short read leaves the tail of the `Buffer.alloc` zero-filled, and a
+   * concurrent truncate is exactly the scenario these bounded reads exist to
+   * survive. Those zero bytes make every line fail to parse, which reads as
+   * "no records" instead of "unknown" — the wrong answer in the direction that
+   * lets a stale projection through. `bytesRead` is therefore checked, and a
+   * short or empty read fails closed.
+   *
+   * @param path - absolute file path.
+   * @param offset - byte offset to start at.
+   * @param length - number of bytes to read.
+   * @returns the bytes read, or `undefined` when they cannot be trusted.
+   */
+  private async readBounded(path: string, offset: number, length: number): Promise<Buffer | undefined> {
+    const handle = await open(path, "r");
+    try {
+      const buffer = Buffer.alloc(length);
+      const result = await handle.read(buffer, 0, length, offset);
+      if (result.bytesRead !== length) return undefined;
+      return buffer;
+    } finally {
+      await handle.close().catch(() => undefined);
+    }
+  }
+
+  /**
+   * The first committed event, from a bounded read of the file head.
+   *
+   * Mirrors `#loadEvents()`'s record framing: a record counts only once its
+   * terminating newline is durable, and blank lines are skipped. Returns
+   * undefined when the head holds nothing usable, in which case callers must
+   * fall back to the full parse rather than conclude anything.
+   */
+  private async firstEvent(runId: string): Promise<HarnessEvent | undefined> {
+    const HEAD_BYTES = 64 * 1024;
+    try {
+      const path = this.runPath(runId);
+      const stats = await stat(path);
+      if (stats.size === 0) return undefined;
+      const length = Math.min(HEAD_BYTES, stats.size);
+      const buffer = await this.readBounded(path, 0, length);
+      if (!buffer) return undefined;
+      const content = buffer.toString("utf8");
+      const lines = content.split("\n");
+      const first = lines[0];
+      if (first === undefined || !first.trim()) return undefined;
+      // A record is committed only once its terminating newline is durable; when
+      // the head cut the first line short there is nothing to conclude.
+      if (lines.length === 1 && stats.size > length) return undefined;
+      return JSON.parse(first) as HarnessEvent;
+    } catch {
+      // A missing file, or a head that is not a complete record. Callers fall
+      // back to the full parse; neither case is worth propagating.
+      return undefined;
+    }
+  }
+
+  /** The last committed event, from the same bounded tail read as `lastEventSeq`. */
+  private async lastEvent(runId: string): Promise<HarnessEvent | undefined> {
+    const TAIL_BYTES = 64 * 1024;
+    try {
+      const path = this.runPath(runId);
+      const stats = await stat(path);
+      if (stats.size === 0) return undefined;
+      const start = Math.max(0, stats.size - TAIL_BYTES);
+      const length = stats.size - start;
+      const buffer = await this.readBounded(path, start, length);
+      if (!buffer) return undefined;
+      // Same framing rule as `lastEventSeq`: the final newline-split element is
+      // discarded, so an in-flight record is never returned as the newest one.
+      // The two must agree -- they answer the same question about the same file,
+      // and this one guards the legacy-migration fast path, which decides between
+      // `anchored` and `read_only` on it.
+      const lines = buffer.toString("utf8").split("\n");
+      const candidates = start > 0 ? lines.slice(1, -1) : lines.slice(0, -1);
+      for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        const line = candidates[index]!;
+        if (!line.trim()) continue;
+        try {
+          return JSON.parse(line) as HarnessEvent;
+        } catch {
+          // A torn or partial trailing line: keep walking back.
+        }
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * The `seq` of the newest committed event, or `undefined` when it cannot be
+   * determined.
+   *
+   * Reads a bounded tail rather than the whole file: the last record fits in the
+   * final chunk for any realistic event, and this must stay cheaper than parsing
+   * the stream, which is the whole point of the fast hint path. `undefined`
+   * means "unknown", and callers must treat that as "cannot confirm currency"
+   * rather than as "current".
+   *
+   * "Committed" follows `#loadEvents()`, which counts a record only once its
+   * terminating newline is durable. Applied from the tail that means the final
+   * newline-split element is always discarded, so an in-flight record is never
+   * reported as the newest one — see the comment on `candidates` below. A
+   * projection sealed at the previous seq would otherwise compare equal and be
+   * served as current.
+   */
+  private async lastEventSeq(runId: string): Promise<number | undefined> {
+    const TAIL_BYTES = 64 * 1024;
+    try {
+      const path = this.runPath(runId);
+      const stats = await stat(path);
+      if (stats.size === 0) return undefined;
+      const start = Math.max(0, stats.size - TAIL_BYTES);
+      const length = stats.size - start;
+      const buffer = await this.readBounded(path, start, length);
+      if (!buffer) return undefined;
+      const lines = buffer.toString("utf8").split("\n");
+      // Dropping the final element is what enforces the terminator rule, and it
+      // is the whole reason this slices instead of filtering: when the file ends
+      // with a newline that element is the empty string, and when the newest
+      // record is still in flight it is the partial record itself. Either way it
+      // is not a committed record. An earlier version filtered blank lines
+      // instead and returned the record *before* the in-flight one, which is the
+      // dangerous answer -- a projection sealed at that seq would compare equal
+      // and be served. `start > 0` additionally drops the chunk's first line,
+      // which is partial whenever the window did not begin at a record boundary.
+      const candidates = start > 0 ? lines.slice(1, -1) : lines.slice(0, -1);
+      for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        const line = candidates[index]!;
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line) as { seq?: unknown };
+          if (typeof parsed.seq === "number" && Number.isInteger(parsed.seq)) return parsed.seq;
+        } catch {
+          // A torn or partial trailing line: keep walking back.
+        }
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
 
   public async projectionDigest(runId: string): Promise<string> {
     return sha256(canonicalJson(await this.replay(runId)));
@@ -514,11 +745,23 @@ function sameEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boo
   return left.size === right.size && left.mtimeMs === right.mtimeMs;
 }
 
+/**
+ * Whether a payload value is a well-formed authority anchor.
+ *
+ * Extracted so the bounded fast path in `migrateLegacyRun` and
+ * `authorityAnchor` below cannot drift: the fast path used to accept any
+ * string, which would report a Run with a malformed anchor as "anchored" while
+ * the authoritative reader rejected or rewrote it.
+ */
+function isAuthorityAnchor(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+}
+
 function authorityAnchor(events: HarnessEvent[]): string | undefined {
   const anchors = events.flatMap((event) => {
     if (event.type !== "run_started" && event.type !== "run_authority_migrated") return [];
     const value = event.payload?.authorityHash;
-    return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value) ? [value] : [];
+    return isAuthorityAnchor(value) ? [value] : [];
   });
   if (anchors.length === 0) return undefined;
   if (new Set(anchors).size !== 1) throw new Error("Run contains conflicting authority anchors");

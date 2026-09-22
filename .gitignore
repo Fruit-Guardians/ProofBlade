@@ -13,3 +13,9 @@ tmp/
 !.env.example
 tool-catalog.json
 !tool-catalog.example.json
+# Generated project reports, derived from project-status.json plus the component
+# metadata. Every PR that touched either one checked in a different copy, so
+# merging one PR left all the others stale against the new base and
+# check:project-reports --base failed. Generate them with
+# `npm run reports:project`; CI uploads them as an artifact.
+docs/project/

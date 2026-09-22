@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { rm } from "node:fs/promises";
 import type { ArtifactRef, ArtifactSemanticMetadata } from "../domain/types.js";
 import { id, redactSecrets } from "../domain/utils.js";
 import type { ControlStore } from "../control/control-store.js";
@@ -23,13 +24,66 @@ export interface ArtifactTextRange {
   truncated: boolean;
 }
 
+/**
+ * A stored Artifact plus the exact text that was written for it.
+ *
+ * `ArtifactRef` cannot answer "what bytes are on disk": `stageText` redacts
+ * before persisting, so the caller's input string is not what the Artifact
+ * contains. Callers that want to analyse the stored content — instead of
+ * reading the file back to get it — must take `storedText` from a write result
+ * and verify it against `artifact.sha256`.
+ */
+export interface ArtifactWrite {
+  artifact: ArtifactRef;
+  /** The exact text written to disk, i.e. the post-redaction form of the input. */
+  storedText: string;
+}
+
 export class ArtifactStore {
   public constructor(private readonly runsRoot: string, private readonly controlStore: ControlStore) {}
 
   public async putText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
-    const artifact = await this.stageText(runId, content, meta);
-    await this.controlStore.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
-    return (await this.controlStore.snapshot(runId)).artifacts[artifact.id] ?? artifact;
+    return (await this.putTextWithContent(runId, content, meta)).artifact;
+  }
+
+  /**
+   * `putText` for callers that need the stored text as well as the reference.
+   *
+   * The returned `storedText` is the redacted text that was persisted, so a
+   * caller can hash it against `artifact.sha256` and skip a read-back without
+   * silently inspecting pre-redaction bytes.
+   */
+  public async putTextWithContent(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactWrite> {
+    const write = await this.stageTextWithContent(runId, content, meta);
+    try {
+      await this.controlStore.dispatch(runId, { type: "artifact", generation: write.artifact.generation, artifact: write.artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
+    } catch (error) {
+      // A failed dispatch does not mean the registration failed, and deleting the
+      // bytes on that assumption is worse than the orphan this cleanup exists to
+      // prevent. `#commitCommands` appends the events to the log and only then
+      // writes the projection, so a `saveProjection` failure (ENOSPC, an
+      // antivirus or indexer holding the file, a permissions error on the
+      // projection directory) throws *after* `artifact_registered` is durable.
+      // Removing the file there leaves a durable event pointing at bytes that no
+      // longer exist: `readText` and `verify()` fail, the Evidence provenance
+      // chain breaks, and replay and projection both name a missing file.
+      //
+      // So the log decides. Both outcomes are safe: `discardStaged` is
+      // `force: true` and tolerates a missing path, so calling it when the
+      // artifact is absent is idempotent.
+      //
+      // The check is best-effort, and it fails towards keeping the bytes: a
+      // leftover file is recoverable, a deleted one is not.
+      let registered = true;
+      try {
+        registered = (await this.controlStore.snapshot(runId)).artifacts[write.artifact.id] !== undefined;
+      } catch {
+        registered = true;
+      }
+      if (!registered) await this.discardStaged(runId, write.artifact);
+      throw error;
+    }
+    return { artifact: (await this.controlStore.snapshot(runId)).artifacts[write.artifact.id] ?? write.artifact, storedText: write.storedText };
   }
 
   /**
@@ -37,6 +91,11 @@ export class ArtifactStore {
    * capability-gated step; an unregistered file is never Evidence provenance.
    */
   public async stageText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
+    return (await this.stageTextWithContent(runId, content, meta)).artifact;
+  }
+
+  /** `stageText` for callers that also need the redacted text that was written. */
+  public async stageTextWithContent(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactWrite> {
     const snapshot = await this.controlStore.snapshot(runId);
     const generation = snapshot.generation;
     const redacted = redactSecrets(content);
@@ -61,7 +120,7 @@ export class ArtifactStore {
       truncated: meta.truncated,
       semantic: meta.semantic ? { ...meta.semantic, updatedSeq: 0 } : undefined,
     };
-    return artifact;
+    return { artifact, storedText: redacted };
   }
 
   public async readText(runId: string, artifact: ArtifactRef): Promise<string> {
@@ -88,6 +147,22 @@ export class ArtifactStore {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Delete the file behind a staged Artifact that was never registered.
+   *
+   * Best-effort by design: the caller is already handling a failure, and losing
+   * the cleanup must not replace that error with a filesystem one. The orphan it
+   * leaves behind is bounded to one file and is reported, not silent.
+   */
+  private async discardStaged(runId: string, artifact: ArtifactRef): Promise<void> {
+    try {
+      await rm(join(this.runsRoot, runId, artifact.path), { force: true });
+    } catch {
+      // A locked file on Windows, or an already-removed path. The dispatch error
+      // is the one the caller needs to see.
     }
   }
 }

@@ -30,14 +30,33 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Generate project reports
+        # Must run BEFORE check:project-reports. The four reports are generated
+        # artifacts and are no longer tracked (see .gitignore), so on a fresh
+        # clone `docs/project/` does not exist and the check fails with four
+        # "missing generated report" errors. Generating first is also what makes
+        # the check meaningful rather than circular: the reports are written from
+        # `project-status.json` plus the component metadata, and the check then
+        # confirms the committed bookkeeping actually produces them. What the
+        # `--base` flag enforces is separate and still bites -- a change that
+        # touches a tracked source must add an update record with a later
+        # `updatedAt`.
+        run: npm run reports:project
       - name: Enforce change and documentation contracts
         env:
           COMPONENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          npm run reports:project
           npm run check:components -- --base "$COMPONENT_BASE_SHA"
           npm run check:change-contracts -- --base "$COMPONENT_BASE_SHA"
           npm run check:project-reports -- --base "$COMPONENT_BASE_SHA"
+      - name: Upload project reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proofblade-project-reports-${{ github.run_id }}
+          path: docs/project/*.md
+          if-no-files-found: warn
+          retention-days: 14
       - name: Run staged repository verification
         run: npm run verify
       - name: Upload staged test logs

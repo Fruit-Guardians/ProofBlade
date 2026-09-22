@@ -10,7 +10,7 @@ import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/ma
 import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import { SingleFlightPoller } from "./polling.js";
+import { SingleFlightPoller, isPollingAllowed } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
@@ -150,7 +150,10 @@ export function App() {
   useEffect(() => {
     if (!bootstrap) return;
     const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
+      // A hidden tab must not poll at all: each tick costs a full Run detail
+      // payload, and nobody is looking at it. The rule lives in isPollingAllowed
+      // so it is tested rather than inlined here.
+      if (!isPollingAllowed(document.visibilityState)) return;
       void refreshPoller.poll(false).catch((caught) => setError(message(caught)));
     }, bootstrap.refreshIntervalMs);
     return () => window.clearInterval(timer);
@@ -346,7 +349,11 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   }, [detail.snapshot.runId, workspace]);
 
   const savePreferences = async (patch: Partial<ConversationPreferences>) => {
-    const next = await updateConversationPreferences(detail.snapshot.runId, { ...(preferences ?? {}), ...patch });
+    // Send the edit, not the whole resolved preference object. `preferences`
+    // holds the capability lists already resolved against the workspace catalog;
+    // echoing them back would persist them server-side and freeze this
+    // conversation's tool/skill/MCP lists at today's values.
+    const next = await updateConversationPreferences(detail.snapshot.runId, patch);
     setPreferences(next);
     if (workspace) onWorkspaceChange({ ...workspace, conversations: { ...workspace.conversations, [detail.snapshot.runId]: next } });
   };

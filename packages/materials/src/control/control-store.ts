@@ -642,8 +642,7 @@ export class ControlStore {
       await this.#migrateLegacyRunBestEffort(runId);
       await this.eventStore.withRunLock(runId, async (writer) => {
         const snapshot = await this.#readSnapshot(runId, { skipMigration: true });
-        const persisted = await this.loadProjection(runId).catch(() => undefined);
-        if (persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot)) {
+        if (await this.#projectionAlreadyCurrent(runId, snapshot)) {
           this.deferredProjectionRuns.delete(runId);
           return;
         }
@@ -653,6 +652,58 @@ export class ControlStore {
     });
   }
 
+  /**
+   * Whether the on-disk projection already matches `snapshot`, cheaply.
+   *
+   * `loadProjection()` answers the same question but pays for it: it parses the
+   * whole event stream and re-hashes the complete event prefix to revalidate the
+   * seal, which measured 13ms at 100 events and 328ms at 10,000.
+   *
+   * `loadProjectionHint()` authenticates the projection file itself (its own hash
+   * plus the small task-contract guard) without parsing events, and a hint that
+   * does not match `snapshot.lastSeq` settles the question: the answer is not
+   * current, because a matching prefix requires a matching `lastSeq`.
+   *
+   * The converse does not hold, and saying so precisely matters. A hint that DOES
+   * match `lastSeq` does not imply the full check passes: the two apply different
+   * guards (the hint's mtime pre-filter and the `run_started` task-contract check
+   * are not part of the prefix comparison), so the full check can still reject a
+   * matching hint. That direction is harmless -- it costs one extra projection
+   * write, never a stale projection served.
+   *
+   * Measured caveat, recorded because it bounds the benefit: the pass branch is
+   * not reachable from `flushProjection`, which reads its snapshot from the log
+   * immediately before calling this. The stream has always moved by then, so the
+   * first line returns false and `loadProjection()` is skipped -- that early exit
+   * is where the saving comes from. No test distinguishes the pass branch; see
+   * `barrier-projection.test.ts` for why, and for the two attempts that failed to
+   * pin it.
+   */
+  async #projectionAlreadyCurrent(runId: string, snapshot: RunSnapshot): Promise<boolean> {
+    const hinted = await this.loadProjectionHint(runId).catch(() => undefined);
+    if (!hinted || hinted.lastSeq !== snapshot.lastSeq) return false;
+    const persisted = await this.loadProjection(runId).catch(() => undefined);
+    return Boolean(persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot));
+  }
+
+  /**
+   * Track which Runs have a projection the hot path deferred.
+   *
+   * Bounded, and this is the mechanism that bounds it: the `else` branch runs on
+   * every dispatch that does NOT pass `persistProjection: false`, so any ordinary
+   * write clears the entry. A Run can therefore only be in this set while a
+   * deferred write is the most recent one. The other two removals are
+   * `flushProjection` and `reconcileProjection`.
+   *
+   * That bound holds while the Run keeps writing. A Run whose last write is
+   * deferred, and which is then abandoned in the same process with neither a
+   * barrier nor a reconcile, keeps its entry until the process exits. Adding a
+   * terminal-status cleanup here does not help: `#recordProjectionMode` has
+   * already cleared the entry by the time the fold sees the terminal status, so
+   * the branch changes no observable state. That was checked by mutating it, and
+   * the branch was removed rather than kept as reassurance.
+   * `barrier-projection.test.ts` pins the clearing it actually relies on.
+   */
   #recordProjectionMode(runId: string, persistProjection: boolean | undefined): void {
     if (persistProjection === false) this.deferredProjectionRuns.add(runId);
     else this.deferredProjectionRuns.delete(runId);
@@ -704,22 +755,42 @@ export class ControlStore {
       return cached.snapshot;
     }
 
-    // The authoritative snapshot must not trust a materialized projection
-    // hint here: an unsealed projection carries no HMAC (a tamperer can
-    // recompute its self-hash), and even a sealed hint skips the
-    // event-prefix revalidation that loadProjection() performs. GUI list and
-    // detail reads may use loadProjectionHint directly as an isolated,
-    // display-only DTO; the control read path stays on authoritative
-    // replay/repair below.
+    // Why the authoritative path does not take the `loadProjectionHint()`
+    // shortcut, even though a current projection would let it skip parsing the
+    // stream (1,877ms -> ~5ms at 10,001 events):
+    //
+    // The hint establishes currency from the log's *revision* (size, mtime,
+    // inode -- an in-memory identity, see `JsonlRunRevision`) plus its trailing
+    // seq, and authenticates the projection against the authority secret. What
+    // it cannot do is prove the *historical* bytes are the ones the seal's
+    // prefix hash was computed over. Rewriting an event in place while keeping
+    // the file length and the trailing seq leaves all of those checks passing,
+    // so the shortcut returned the state as of the seal while `replay()` folded
+    // the rewritten events -- the two paths disagreed about the same Run.
+    //
+    // Verifying that cheaply is impossible with the current seal: the hash is
+    // over the canonical JSON of the parsed events, so it cannot be recomputed
+    // from raw file bytes, and hashing the prefix still requires parsing it.
+    // Nothing in the seal witnesses the log's content at all --
+    // `projectionSealPayload()` carries `{ schemaVersion, runId, lastSeq,
+    // snapshotHash, eventPrefixHash }` and no size field, so the "matching byte
+    // size" this comment used to appeal to was never a mechanism that existed.
+    // Until the seal can prove the prefix, the read path stays authoritative and
+    // pays O(history). Regression test:
+    // packages/materials/tests/projection-read-bound.test.ts, "snapshot and
+    // replay agree after a historical event is rewritten in place".
     const events = await this.eventStore.events(runId);
     const streamLastSeq = events.at(-1)?.seq ?? 0;
+    // `snapshot` is undefined by construction at this point -- the block below is
+    // the only one that can assign it before the replay fallback -- so this
+    // condition is exactly "the snapshot cache missed". It used to carry a
+    // `snapshot === undefined` conjunct that could never be false.
     let snapshot: RunSnapshot | undefined;
     // A cache revision mismatch means another process (or an operator) changed
-    // durable state. Do not assume that change was append-only: replay the full
-    // stream so modified prefixes and task-contract tampering are revalidated.
+    // durable state. Do not assume that change was append-only.
     const durableStateChanged = cached !== undefined;
     if (durableStateChanged) this.snapshotCache.delete(runId);
-    if (!durableStateChanged && snapshot === undefined) {
+    if (!durableStateChanged) {
       const persisted = await this.eventStore.loadProjection(runId, {
         events,
         authoritySecret: this.#authoritySecret,

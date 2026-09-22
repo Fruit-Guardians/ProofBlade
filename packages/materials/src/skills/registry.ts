@@ -1,4 +1,5 @@
-import { realpath } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
+import type { Dirent } from "node:fs";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import {
   NodeExecutionEnv,
@@ -41,6 +42,23 @@ export class ProofBladeSkillRegistry {
   ) {}
 
   /**
+   * Loads that actually parsed the skill tree, and loads served from the memo.
+   *
+   * Exposed so tests and diagnostics can assert cache behaviour without timing
+   * assertions, which are flaky on shared runners.
+   */
+  public static cacheStats(): { readonly parses: number; readonly hits: number } {
+    return { parses: skillRegistryParses, hits: skillRegistryHits };
+  }
+
+  /** Reset the memo and its counters (tests and long-lived hosts). */
+  public static resetCache(): void {
+    skillRegistryCache.clear();
+    skillRegistryParses = 0;
+    skillRegistryHits = 0;
+  }
+
+  /**
    * Load skills from one or more directories, in PRECEDENCE order. The default
    * loads the hand-curated `skills/` dir first (ProofBlade's customized
    * ctf-reverse and evidence-triage), then the vendored `skills-library/ctf-skills`
@@ -56,11 +74,57 @@ export class ProofBladeSkillRegistry {
   ): Promise<ProofBladeSkillRegistry> {
     const root = await canonicalOrResolved(projectRoot);
     const dirList = Array.isArray(skillsDirs) ? skillsDirs : [skillsDirs];
+    const requestedDirs = dirList.map((dir) => (isAbsolute(dir) ? dir : resolve(root, dir)));
+    const key = cacheKey(root, dirList);
+    // Parsing every skill's front matter costs ~30ms on this tree and the result
+    // only changes when a skill file appears, disappears or changes, so the parse
+    // is memoized on a cheap structural revision. Both the version snapshot and
+    // every lane creation load this registry.
+    const revision = await skillTreeRevision(requestedDirs);
+    const cached = skillRegistryCache.get(key);
+    if (cached && cached.projectRoot === root && cached.revision === revision) {
+      // Re-insert so eviction is least-recently-*used*, not first-in: a hit is a
+      // use, and a plain FIFO evicts exactly the entries being reused.
+      skillRegistryCache.delete(key);
+      skillRegistryCache.set(key, cached);
+      skillRegistryHits += 1;
+      return cached.registry;
+    }
+    // Single-flight: concurrent loads of the same tree (the version snapshot and
+    // every lane creation at startup) must walk and parse once between them, not
+    // once each. Only the losers wait; the winner removes its own entry.
+    const inFlight = skillRegistryLoads.get(key);
+    if (inFlight) return await inFlight;
+    const load = ProofBladeSkillRegistry.read(root, requestedDirs).then(async (registry) => {
+      skillRegistryParses += 1;
+      skillRegistryCache.delete(key);
+      // Cache the revision sampled *after* the parse, not the one sampled before
+      // it. The pre-parse revision describes the tree as the parser found it; if
+      // the tree changed while the parse ran, that revision is older than the
+      // registry it would be stored beside, and a later load whose tree matched
+      // the older revision would hit an entry whose contents are newer. Re-walking
+      // costs one walk on a cache miss -- the parse is the expensive part -- and
+      // gives an entry whose revision and contents were sampled in the same order
+      // every reader observes them.
+      const settledRevision = await skillTreeRevision(requestedDirs);
+      skillRegistryCache.set(key, { revision: settledRevision, projectRoot: root, registry });
+      while (skillRegistryCache.size > SKILL_REGISTRY_CACHE_LIMIT) {
+        const oldest = skillRegistryCache.keys().next().value;
+        if (oldest === undefined) break;
+        skillRegistryCache.delete(oldest);
+      }
+      return registry;
+    }).finally(() => {
+      skillRegistryLoads.delete(key);
+    });
+    skillRegistryLoads.set(key, load);
+    return await load;
+  }
+
+  /** Parse the skill roots without consulting the cache. */
+  private static async read(root: string, requestedDirs: readonly string[]): Promise<ProofBladeSkillRegistry> {
     const roots = await Promise.all(
-      dirList.map(async (dir, index) => {
-        const requestedDir = isAbsolute(dir) ? dir : resolve(root, dir);
-        return { index, allowedRoot: await canonicalOrResolved(requestedDir), requestedDir };
-      }),
+      requestedDirs.map(async (requestedDir, index) => ({ index, allowedRoot: await canonicalOrResolved(requestedDir), requestedDir })),
     );
     const env = portableSkillEnv(new NodeExecutionEnv({ cwd: root }));
     const loaded = await loadSkills(env, roots.map((entry) => entry.requestedDir));
@@ -165,6 +229,190 @@ export class ProofBladeSkillRegistry {
     };
   }
 }
+
+/**
+ * Process-level memo for parsed skill registries.
+ *
+ * Keyed by canonical project root plus the requested directory list; invalidated
+ * by {@link skillTreeRevision}. Bounded because a long-lived host may be pointed
+ * at many project roots over its lifetime.
+ */
+const SKILL_REGISTRY_CACHE_LIMIT = 8;
+const skillRegistryCache = new Map<string, { revision: string; projectRoot: string; registry: ProofBladeSkillRegistry }>();
+/** Loads still running, so concurrent callers share one walk and one parse. */
+const skillRegistryLoads = new Map<string, Promise<ProofBladeSkillRegistry>>();
+let skillRegistryParses = 0;
+let skillRegistryHits = 0;
+
+function cacheKey(root: string, dirList: readonly string[]): string {
+  return `${root}\u0000${dirList.join("\u0000")}`;
+}
+
+/**
+ * A cheap structural revision of every skill root.
+ *
+ * Walks the roots for the inputs the loader reads and records each one's path,
+ * identity and metadata. That catches a skill added, removed, renamed or edited
+ * without reading any file body.
+ *
+ * The key is `path \0 ino \0 size \0 mtimeMs \0 ctimeMs`, and `size + mtimeMs`
+ * alone is NOT acceptable here. An earlier version of this comment argued it was,
+ * on the grounds that the version snapshot hashes file contents anyway -- but
+ * that reasoning does not hold. This registry is what produces the per-skill
+ * `contentHash` the snapshot records, so while the revision key looks unchanged
+ * the memoised registry keeps handing back the pre-edit parse result, and the
+ * snapshot ends up reporting the old content hash for a body that has changed.
+ *
+ * Gated rather than reasoned: `skill-registry-cache.test.ts`, "a same-size rewrite
+ * with the mtime put back still invalidates the memo", freezes the mtime, rewrites
+ * a `SKILL.md` to a different description of the same byte length, puts the mtime
+ * back and asserts the memo re-parses and the catalog moves. Dropping `ctimeMs`
+ * from the key fails it. The same-shape assertion in `version-cache.test.ts` does
+ * NOT gate this key -- that one covers the snapshot's content digest -- and an
+ * earlier commit cited it here as evidence, which was wrong.
+ *
+ * `ctimeMs` moves on any content change and cannot be set by an ordinary writer;
+ * `ino` separates a replaced file from an in-place write of the same length. The
+ * boundary is therefore: a rewrite at the same length, in the same inode, landing
+ * in the same clock tick as the previous change keeps this key identical. `size`
+ * and `ino` cover the ordinary cases; a caller that needs more must hash the bytes,
+ * which `runtime/version.ts` does.
+ *
+ * @param roots - absolute skill root directories.
+ * @returns a digest that changes whenever the skill set or any skill file does.
+ */
+async function skillTreeRevision(roots: readonly string[]): Promise<string> {
+  return sha256((await collectSkillFiles(roots)).join("\n"));
+}
+
+/**
+ * Every file the skill loaders derive their result from.
+ *
+ * This is the single definition of "the skill input set", shared by the registry
+ * memo's revision and by the version snapshot (`runtime/version.ts`), because the
+ * two caches cover the same tree and a narrower key in either one silently
+ * serves stale content.
+ *
+ * The discovery rules mirror `loadSkills` from
+ * `@earendil-works/pi-agent-core`, which the registry calls:
+ *
+ * - every root contributes `SKILL.md` files at any depth;
+ * - the **first** root also contributes its direct `*.md` files, because
+ *   `loadSkills` is documented to treat those as skills too. The registry then
+ *   drops any skill whose owner index is > 0, which is why only the first root
+ *   gets them — but the *walker* has to collect them for the first root or a new
+ *   `skills/<name>.md` would not move the revision.
+ *
+ *   Measured caveat: on Windows the upstream loader does not actually read those
+ *   files. `NodeExecutionEnv` reports absolute backslash paths, so the loader's
+ *   own `relativeEnvPath(root, path)` fails to strip the root prefix and the
+ *   `ignore` package rejects the resulting absolute path; the read is skipped as
+ *   an empty result. Collecting them anyway keeps the revision correct on the
+ *   platforms where the loader does read them, and costs only a re-parse where it
+ *   does not. The same quirk is why `.gitignore` rules inside a skill root have
+ *   no effect on Windows.
+ * - hidden entries and `node_modules` are not descended into, matching the
+ *   loader's pruning;
+ * - directory symlinks are followed (`Dirent.isDirectory()` is false for them,
+ *   yet the loader recurses by entry kind), so they are normalized with
+ *   `stat()` rather than skipped;
+ * - `.gitignore` / `.ignore` / `.fdignore` are included wherever they appear.
+ *   This is deliberately conservative: the loader consults them to prune the
+ *   walk, and reproducing its matcher here would be a second implementation of
+ *   the `ignore` package. Including the rule files themselves means a changed
+ *   rule always moves the revision, which is the safe direction — a false
+ *   invalidation costs one re-parse, a missed one serves a stale catalog.
+ *
+ * @param roots - absolute skill root directories, in precedence order.
+ * @returns `path \0 ino \0 size \0 mtimeMs \0 ctimeMs` entries, sorted.
+ */
+export async function collectSkillFiles(roots: readonly string[]): Promise<string[]> {
+  const entries: string[] = [];
+  // One `visited` set for the whole walk, not one per root: a link cycle can be
+  // rooted anywhere, and two roots may reach the same real directory.
+  const visited = new Set<string>();
+  for (const [index, root] of roots.entries()) await walkSkillRoot(root, index === 0, entries, visited);
+  return entries.sort();
+}
+
+async function walkSkillRoot(directory: string, isFirstRoot: boolean, into: string[], visited: Set<string>): Promise<void> {
+  // Key the guard on the resolved real path, so a link to an ancestor is the same
+  // directory as its target. `realpath` is only needed for entries that can be
+  // links; a plain directory's path is already canonical enough for this purpose
+  // because the walk reaches it by exactly one name.
+  const key = await canonicalOrResolved(directory);
+  if (visited.has(key)) return;
+  visited.add(key);
+  let listing: Dirent[];
+  try {
+    listing = await readdir(directory, { withFileTypes: true });
+  } catch {
+    // A missing root contributes nothing: the parser treats it as an empty
+    // catalog, so its absence must not invalidate an otherwise identical tree.
+    return;
+  }
+  for (const entry of listing) {
+    const path = resolve(directory, entry.name);
+    // Type from the `Dirent` where it is reliable, which is most entries: a
+    // `stat` per entry costs one syscall per file, and the vendored root has
+    // ~150 of them, on a walk that runs for every lane creation and every
+    // version-survey call. Only a symlink needs resolving, because `Dirent`
+    // reports the link rather than its target.
+    const kind = entry.isSymbolicLink() ? await statKind(path) : entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other";
+    if (isSkillInput(entry.name, isFirstRoot)) {
+      if (kind === "file") {
+        const stats = await stat(path).catch(() => undefined);
+        if (stats) into.push(`${path}\u0000${stats.ino}\u0000${stats.size}\u0000${stats.mtimeMs}\u0000${stats.ctimeMs}`);
+      } else if (kind === "directory") {
+        await walkSkillRoot(path, isFirstRoot, into, visited);
+      }
+      continue;
+    }
+    // Hidden entries and `node_modules` are pruned after the ignore-file test so
+    // a rule file is still collected: it is an input to the walk even though it
+    // is never descended into.
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    if (kind === "directory") await walkSkillRoot(path, isFirstRoot, into, visited);
+  }
+}
+
+/** What a path points at, following links; `other` for anything not file/dir. */
+async function statKind(path: string): Promise<"file" | "directory" | "other"> {
+  try {
+    const stats = await stat(path);
+    return stats.isFile() ? "file" : stats.isDirectory() ? "directory" : "other";
+  } catch {
+    // Raced with a deletion, or a broken link; the next load recomputes.
+    return "other";
+  }
+}
+
+/**
+ * Whether one directory entry is an input to the registry's observable output.
+ *
+ * `*.md` counts for **every** root, not only the first, and the reason is
+ * diagnostics rather than skills: the upstream loader is called with
+ * `includeRootFiles` for each root, so a vendored repo's `README.md` is read,
+ * fails front-matter parsing, and produces an `invalid_metadata` diagnostic --
+ * and the registry copies every loader diagnostic into `registry.diagnostics`,
+ * which the CLI prints. Restricting the walk to `SKILL.md` after the first root
+ * let such a file change the diagnostics without moving the revision. The
+ * registry still drops the *skill* from later roots (`owner.index > 0` below),
+ * so this only widens the input set, never the catalog.
+ *
+ * The ignore files are collected for the same reason: the loader consults them
+ * to prune its walk, and reproducing its matcher here would be a second
+ * implementation of the `ignore` package. Including the rule files means a
+ * changed rule always moves the revision -- a false invalidation costs one
+ * re-parse, a missed one serves a catalog the rules no longer describe.
+ */
+function isSkillInput(name: string, isFirstRoot: boolean): boolean {
+  if (name === "SKILL.md") return true;
+  if (SKILL_IGNORE_FILES.has(name)) return true;
+  return name.endsWith(".md");
+}
+
+const SKILL_IGNORE_FILES = new Set([".gitignore", ".ignore", ".fdignore"]);
 
 async function canonicalOrResolved(path: string): Promise<string> {
   try {

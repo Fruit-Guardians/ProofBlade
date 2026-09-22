@@ -156,7 +156,7 @@ test("Pwn supervisor host composes with the durable service across a host restar
     assert.deepEqual(await restarted.actionService.pwnWrite(sessionRuntimeWireResource(record), "payload"), { delta: "ack", waitReason: "idle", exited: false, truncated: false });
     assert.equal((await restarted.create(requestValue, HASH)).state, "EXISTING");
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -183,7 +183,7 @@ test("Pwn supervisor contract never creates a duplicate tube across concurrent s
     assert.ok(outcomes.some((outcome) => outcome.state === "CREATED"));
     assert.ok(outcomes.every((outcome) => outcome.state === "CREATED" || outcome.state === "EXISTING" || outcome.state === "UNKNOWN"));
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -218,7 +218,7 @@ test("Pwn supervisor contract never replaces an interrupted STARTING reservation
     assert.deepEqual(await service.create(requestValue, HASH), { state: "UNKNOWN", summary: "Session create is awaiting exact host reconciliation" });
     assert.equal(createCalls, 0);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -251,7 +251,7 @@ test("Pwn supervisor release failures remain retryable without changing the tube
     assert.equal(releaseCalls, 2);
     assert.equal(state.size, 1, "release retry must not create or replace the tube");
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -327,7 +327,7 @@ test("real detached Pwn backend converges after a Control Store fault", async ()
     });
   } finally {
     if (created) await new DurablePwnSessionSupervisor(supervisorOptions).release(created.externalId, requestValue, "real handoff test cleanup").catch(() => undefined);
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -432,7 +432,7 @@ test("real remote TCP Pwn backend converges after Control Store commit and keeps
   } finally {
     if (created) await new DurablePwnSessionSupervisor(supervisorOptions).release(created.externalId, requestValue, "remote handoff test cleanup").catch(() => undefined);
     await new Promise<void>((resolveClose, reject) => fixture.close((error) => error ? reject(error) : resolveClose()));
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -586,6 +586,6 @@ test("real remote TCP Pwn backend fault matrix never creates a replacement tube"
     }
   } finally {
     await new Promise<void>((resolveClose, reject) => fixture.close((error) => error ? reject(error) : resolveClose()));
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

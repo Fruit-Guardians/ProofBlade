@@ -1,4 +1,4 @@
-import type { ControlStore } from "../control/control-store.js";
+import type { ControlDispatchOptions, ControlStore } from "../control/control-store.js";
 import type { DomainPhase, ExperimentOutcome, ExperimentRecord } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 
@@ -10,6 +10,32 @@ export interface ExperimentGateInput {
   input: unknown;
   outcome: ExperimentOutcome;
   summary: string;
+  /**
+   * How durably to write this record's projection.
+   *
+   * Defaults to `{ persistProjection: false }`. The event log append is
+   * unaffected and still durable; only the derived `projection.json` is deferred.
+   *
+   * What writes it later, stated exactly, because an earlier version of this
+   * comment named a barrier that does not exist. `ControlStore.flushProjection()`
+   * has three callers: the turn/agent-end barrier (`pi-events.ts`), the lane
+   * close path (`coding-lane.ts`), and the legacy Pi adapter's close
+   * (`pi-adapter.ts`). **A checkpoint is not one of them** -- `checkpoint.ts` only
+   * forwards `persistProjection`, and `coding-lane.ts` explicitly passes `false`
+   * for the checkpoint so its projection is deferred to the turn-end barrier like
+   * everything else. `reconcileProjection()` at the next start is the remaining
+   * repair path.
+   *
+   * This matches the rest of the hot path: `ArtifactStore`, the Effect Journal,
+   * Pi observability and checkpoints all already pass `persistProjection: false`.
+   *
+   * Every foreground `bash` records at least one experiment, and serializing the
+   * whole `RunSnapshot` plus rewriting the projection for an auxiliary
+   * no-repeat ledger is the single largest avoidable cost on that path. Pass
+   * `{ persistProjection: true }` where the projection itself must be durable at
+   * the moment of the call.
+   */
+  dispatch?: ControlDispatchOptions;
 }
 
 export interface ExperimentGateResult {
@@ -61,7 +87,7 @@ export class ExperimentGate {
         commands: [{ type: "experiment", experiment, lane: "executor" }],
         project: (after) => ({ allowed: true, repeatKey, previousFailures, record: after.experiments[experiment.id] }),
       };
-    });
+    }, input.dispatch ?? { persistProjection: false });
   }
 
   public async assertAllowed(input: Omit<ExperimentGateInput, "outcome" | "summary">): Promise<{ repeatKey: string; previousFailures: number }> {

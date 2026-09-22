@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, sep } from "node:path";
 import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { taskWorkspaceDir, taskWorkspaceRoot } from "../src/task-workspace.js";
 import { JsonlControlStore, projectionHash, RunEventIngress } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
@@ -338,6 +339,66 @@ test("RunDetail exposes the durable observation queue projection for the GUI", a
   }
 });
 
+test("an ordinary conversation never stages a workspace while an attachment task still does", async () => {
+  // Regression guard for the behaviour PLAN-240 §2.2 verified as already correct:
+  // createConversation() builds its TaskContract from the user's real directory
+  // (target/allowed_workspace = root, inputs = []), and execution resolves cwd
+  // through taskExecutionWorkspace(), so no staging directory is ever created.
+  // Staging exists only for attachment-backed verifier tasks, where immutable
+  // inputs, per-file sha256 and a replay-safe cwd are required.
+  //
+  // Both directions are asserted. Without the second one, deleting staging
+  // altogether would leave this test green.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-staging-boundary-"));
+  let data: DebugDataService | undefined;
+  try {
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runsRoot = join(root, config.storage.runsDir);
+
+    const chatRunId = "CHAT-STAGING-001";
+    await data.createConversation({ runId: chatRunId, title: "no staging", workspacePath: root });
+    assert.equal(await exists(taskWorkspaceDir(runsRoot, chatRunId)), false, "an ordinary conversation must not create a staged workspace");
+
+    // A conversation that merely declares a verification command is still an
+    // ordinary conversation: createConversation() writes it into the contract
+    // without staging anything.
+    const verifiedChatRunId = "CHAT-STAGING-002";
+    await data.createConversation({ runId: verifiedChatRunId, title: "no staging with verifier", workspacePath: root, verificationCommand: "echo ok" });
+    assert.equal(await exists(taskWorkspaceDir(runsRoot, verifiedChatRunId)), false, "a verification command alone must not trigger staging");
+
+    // The task path does stage, and the staged task also owns the immutable copy.
+    const attachment = join(root, "input.txt");
+    await writeFile(attachment, "challenge input\n", "utf8");
+    const taskRunId = "CHAT-STAGING-003";
+    await data.startTask({
+      runId: taskRunId,
+      objective: "verify the attachment",
+      workspacePath: root,
+      attachmentPaths: ["input.txt"],
+      verificationCommand: "echo ok",
+      mode: "auto",
+      maxTurns: 1,
+    });
+    const staged = taskWorkspaceDir(runsRoot, taskRunId);
+    assert.equal(await exists(staged), true, "an attachment task must still stage its workspace");
+    assert.equal(await exists(join(staged, "attachments", "input.txt")), true, "the attachment must be copied into the staged workspace");
+    assert.equal(await exists(join(staged, "challenge.md")), true, "the staged task must record its objective");
+
+    // The staging root sits beside the runs directory, never inside it: a
+    // pre-existing run directory would make JsonlControlStore treat the staged
+    // task as an already-created Run. Asserting equality with
+    // `join(root, ".proofblade-workspaces")` restated the helper's own
+    // definition, so dropping `dirname` from the helper left it green; this
+    // asserts the constraint the comment claims.
+    assert.equal(taskWorkspaceRoot(runsRoot).startsWith(`${runsRoot}${sep}`), false, "the staging root must not be inside the runs directory");
+    assert.equal(isAbsolute(taskWorkspaceRoot(runsRoot)), true, "the staging root must be absolute, not a run-relative fragment");
+    assert.equal(await exists(join(runsRoot, ".proofblade-workspaces")), false, "nothing may be staged inside the runs root");
+  } finally {
+    await data?.close?.().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("deletes an idle coding conversation and rejects active deletion", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-delete-conversation-"));
   try {
@@ -346,6 +407,158 @@ test("deletes an idle coding conversation and rejects active deletion", async ()
     await data.createConversation({ runId, title: "待删除", workspacePath: root });
     await data.deleteConversation(runId);
     await assert.rejects(() => data.getRun(runId), /ENOENT|no such file/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("deleting a conversation also removes the staged workspace it owns", async () => {
+  // A conversation with attachments stages a copy of them beside the runs root.
+  // Deleting only `runs/<runId>` left those bytes behind with nothing pointing at
+  // them: not reachable from the GUI, not counted anywhere, not reaped.
+  //
+  // The staging is driven through `startTask`, which also starts a lane, so the
+  // service is closed first -- `deleteConversation` refuses an active
+  // conversation, and that guard is the subject of the test above.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-delete-staged-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runsRoot = join(root, config.storage.runsDir);
+    const attachment = join(root, "input.txt");
+    await writeFile(attachment, "challenge input\n", "utf8");
+    const runId = "CHAT-DELETE-STAGED";
+    await data.startTask({
+      runId,
+      objective: "verify the attachment",
+      workspacePath: root,
+      attachmentPaths: ["input.txt"],
+      verificationCommand: "echo ok",
+      mode: "auto",
+      maxTurns: 1,
+    });
+    const staged = taskWorkspaceDir(runsRoot, runId);
+    assert.equal(await exists(staged), true, "the task must have staged a workspace");
+    assert.equal(await exists(join(staged, "attachments", "input.txt")), true, "the staged copy must be there to leak");
+
+    await data.close();
+    await data.deleteConversation(runId);
+
+    assert.equal(await exists(join(runsRoot, runId)), false, "the Run directory must be gone");
+    assert.equal(await exists(staged), false, "the staged workspace must be gone with it");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a rewritten event log is not served from the RunDetail cache", async () => {
+  // Review finding on the version-cache change, propagated here: the RunDetail
+  // cache identified `events.jsonl` by `mtimeMs + size`, so a rewrite of the log
+  // reproduced that key and the stale detail survived a change to the data it
+  // describes. The identity now also carries the inode and ctime.
+  //
+  // Scope, stated rather than implied: this asserts the observable outcome -- the
+  // cached detail must not survive a rewrite of the log -- and it does NOT pin
+  // the exact byte length of the rewrite. Byte-exact padding was attempted and
+  // abandoned; what matters for the behaviour is that the log's identity moved,
+  // which is what the version cache now detects.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-version-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-CACHE-VERSION-1";
+    await data.createConversation({ runId, title: "version test", workspacePath: root });
+
+    const first = await data.getRun(runId);
+    const warm = await data.getRun(runId);
+    assert.equal(warm.snapshot, first.snapshot, "an unchanged detail is reused");
+
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+    const beforeStat = await stat(eventsPath);
+    const before = await readFile(eventsPath, "utf8");
+    const lines = before.split("\n");
+    const parsed = JSON.parse(lines[0]!) as { payload?: Record<string, unknown> };
+    parsed.payload = { ...(parsed.payload ?? {}), cacheRewriteMarker: "rewritten" };
+    await writeFile(eventsPath, [JSON.stringify(parsed), ...lines.slice(1)].join("\n"), "utf8");
+
+    const after = await data.getRun(runId);
+    assert.notEqual(after.snapshot, first.snapshot, "a rewritten log must not be served from cache");
+    await data.close().catch(() => undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+test("a rewritten event log is not served from the run-list cache either", async () => {
+  // m8 from the third review round. The detail cache was fixed to identify the log
+  // by inode/size/mtime/ctime, but the *list* cache beside it still matched on
+  // `mtimeMs` alone -- and the sidebar list is the view that is on screen most of
+  // the time. Both now use `runDetailEventsVersion`, so there is one definition of
+  // "the log changed" rather than two that can drift.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-list-version-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const services = (data as unknown as { services: { control: { loadProjectionHint: (...args: never[]) => Promise<unknown> } } }).services;
+    const runId = "CHAT-LIST-VERSION-1";
+    await data.createConversation({ runId, title: "list version test", workspacePath: root });
+
+    // Freeze the timestamp at a whole second *before* the first list read, and
+    // restore that same value after the rewrite. Both halves matter:
+    //
+    // - before, because the cache entry is built from whatever the log's mtime is
+    //   at that moment. Freezing after the baseline (where this used to sit) makes
+    //   the freeze itself invalidate the entry, and then the assertion below passes
+    //   for a key that carries nothing but `mtimeMs` -- measured: with the key
+    //   narrowed to `size \0 mtimeMs` the test still passed, so it was gating
+    //   nothing about `ino`/`ctimeMs`, which is exactly what it exists to gate.
+    // - a whole second, because restoring the value `stat` happened to report
+    //   compares against sub-millisecond precision that `utimes` cannot set, so an
+    //   mtime landing mid-millisecond floors to the previous millisecond and the
+    //   setup assertion fails for a reason unrelated to the cache key. Measured: it
+    //   failed roughly one run in six that way.
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
+    await utimes(eventsPath, frozen, frozen);
+
+    const first = await data.listRuns();
+    assert.equal(first.length, 1);
+    const warm = await data.listRuns();
+    assert.deepEqual(warm[0], first[0], "an unchanged list item is reused");
+
+    // The observable half is a build counter, not an object identity: a cache hit
+    // returns a spread copy, so identity differs either way and an identity check
+    // passes with or without the fix. `runListSnapshot` is the per-item rebuild
+    // and its first act is a projection-hint read, which is a public method on the
+    // control store -- so counting that read counts rebuilds.
+    let builds = 0;
+    const realHint = services.control.loadProjectionHint.bind(services.control);
+    services.control.loadProjectionHint = (async (...args: Parameters<typeof realHint>) => {
+      builds += 1;
+      return await realHint(...args);
+    }) as typeof services.control.loadProjectionHint;
+
+    await data.listRuns();
+    assert.equal(builds, 0, "an unchanged list must be served from the cache without rebuilding");
+
+    // Rewrite the log in place at the same byte length. The canonical serialization
+    // sorts keys, so `"generation":0` is followed by `"id":` in the envelope; the
+    // substitution is anchored on a substring long enough to be unique rather than
+    // on the field name alone.
+    const beforeStat = await stat(eventsPath);
+    const before = await readFile(eventsPath, "utf8");
+    const marker = '"generation":0,"id"';
+    assert.equal(before.split(marker).length - 1, 1, "the marker must be unique in the log for a length-preserving rewrite");
+    const rewritten = before.replace(marker, '"generation":9,"id"');
+    assert.equal(Buffer.byteLength(rewritten), Buffer.byteLength(before), "the rewrite must keep the byte length");
+    assert.notEqual(rewritten, before, "the bytes must actually differ");
+    await writeFile(eventsPath, rewritten, "utf8");
+    await utimes(eventsPath, frozen, frozen);
+    const afterStat = await stat(eventsPath);
+    assert.equal(afterStat.size, beforeStat.size, "the rewrite must keep the byte length");
+    assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs, "the rewrite must keep the modification time exactly, or this measures nothing");
+    assert.notEqual(afterStat.ctimeMs, beforeStat.ctimeMs, "and it must move ctime, which is the field the key detects it by");
+    assert.equal(afterStat.ino, beforeStat.ino, "an in-place write keeps the inode, so the inode is not what detects this");
+
+    await data.listRuns();
+    assert.ok(builds > 0, "a rewritten log must not be served from the list cache");
+    await data.close().catch(() => undefined);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -1070,6 +1283,16 @@ const config: ProofBladeConfig = {
 
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+/** Path existence as a boolean, so staging assertions read directly. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function hash(value: string): string {

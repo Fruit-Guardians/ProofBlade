@@ -9,6 +9,7 @@ import { componentTransitionErrors } from "../component-transition-lib.mjs";
 import { changeContractErrors } from "../change-contract-lib.mjs";
 import { requiresProjectStatus } from "../project-report-change-lib.mjs";
 import { selectTestCommands } from "../check-changed-tests.mjs";
+import { PROJECT_REPORT_FILES, loadProjectStatus, renderProjectReports } from "../project-report-lib.mjs";
 
 test("[contract:unchanged-source-no-reaudit] rejects audit churn without a source change", () => {
   const previous = metadata({ version: "1.2.3", updatedAt: "2026-08-07T10:00:00+08:00", count: 4, hash: "a".repeat(64) });
@@ -156,6 +157,89 @@ test("[contract:component-audit-time-fallback] resolves audit time from explicit
   assert.equal(resolveAuditTimestamp({ now }), "2026-08-08T10:00:00.000Z");
 });
 
+test("every script typechecks, with no exclusion left to hide breakage", () => {
+  // `scripts/**` belonged to no TypeScript project, so `tsc -b` could not see it:
+  // `npm run baseline:tools -- --json` shipped with a `ReferenceError` on a name
+  // that exists only inside a function, and neither the build nor any test
+  // reached that branch. `tsconfig.scripts.json` closes the class.
+  //
+  // Three scripts were excluded at first, and that list turned out to be hiding a
+  // real type error in each of them (four unchecked calls on a
+  // `BrowserContextPort | BrowserVerifierContextHandle` union, a `ProofBladeConfig`
+  // literal seven fields short, and a narrowing lost inside a closure). All three
+  // are fixed, so the list is empty and this test now pins it that way: an entry
+  // here means a script nobody typechecks, which is how the ReferenceError shipped
+  // in the first place. The `allowImportingTsExtensions` assertion is the other
+  // half -- two hosts import their sibling by path with an explicit `.ts`, and
+  // dropping the flag would force those files back onto the exclusion list.
+  const config = JSON.parse(readFileSync(resolve(process.cwd(), "tsconfig.scripts.json"), "utf8"));
+  assert.deepEqual(
+    config.exclude ?? [],
+    [],
+    "an entry in tsconfig.scripts.json's exclude list hides a real type error; fix the script instead",
+  );
+  assert.ok(config.include.includes("scripts/**/*.ts"), "the project must include the scripts it gates");
+  assert.equal(
+    config.compilerOptions?.allowImportingTsExtensions,
+    true,
+    "the path-launched hosts import their siblings with a .ts extension; without this flag they cannot be checked",
+  );
+  const root = JSON.parse(readFileSync(resolve(process.cwd(), "tsconfig.json"), "utf8"));
+  assert.ok(
+    root.references.some((reference) => reference.path === "./tsconfig.scripts.json"),
+    "the scripts project must be in the root build so `tsc -b` and `npm run build` typecheck it",
+  );
+});
+
+test("the provider-free baseline script can emit JSON", () => {
+  // The `--json` branch is the one no test or build reached; asserting the source
+  // shape keeps this cheap, and the CI step that runs the script exercises it for
+  // real. Both are needed: the shape check is what fails at review time.
+  const source = readFileSync(resolve(process.cwd(), "scripts", "tool-hot-path-baseline.ts"), "utf8");
+  const emitted = source.slice(source.indexOf("if (asJson)"), source.indexOf("} else {"));
+  assert.match(emitted, /JSON\.stringify\(/, "the --json branch must serialise something");
+  assert.doesNotMatch(
+    emitted,
+    /JSON\.stringify\(\{\s*iterations,\s*summaries\s*\}/,
+    "`summaries` only exists inside printReport; serialising it throws at runtime",
+  );
+});
+
+test("the project reports are deterministic and carry the ledger's content", () => {
+  // The byte-comparison gate over `docs/project/*.md` no longer has teeth: those
+  // files are untracked and CI generates them immediately before checking them, so
+  // `check:project-reports` is guaranteed to pass and a renderer regression is
+  // invisible. Re-tracking them is what produced the merge conflicts this removed,
+  // so the resolution is to test the generator here -- the job that gate was doing
+  // -- and to state the tradeoff rather than keep a gate that cannot fail.
+  const files = renderProjectReports(process.cwd());
+  assert.deepEqual([...files.keys()].sort(), Object.values(PROJECT_REPORT_FILES).sort());
+  for (const [path, text] of files) {
+    assert.ok(text.length > 0, `${path} must not be empty`);
+    assert.match(text, /\S/, `${path} must contain non-whitespace`);
+  }
+
+  // Deterministic: the same ledger renders the same bytes, which is what lets the
+  // reports stay untracked and still be reproducible in CI.
+  const again = renderProjectReports(process.cwd());
+  assert.deepEqual(again, files, "rendering must be a pure function of project-status.json");
+
+  // And the content is the ledger's, not a stub: every plan, update and completion
+  // id has to appear in the report that lists it.
+  const status = loadProjectStatus(process.cwd());
+  const plan = files.get(PROJECT_REPORT_FILES.plan);
+  const updates = files.get(PROJECT_REPORT_FILES.updates);
+  const completions = files.get(PROJECT_REPORT_FILES.completions);
+  for (const item of status.plans) {
+    assert.ok(plan.includes(item.id), `PLAN.md must list ${item.id}`);
+  }
+  for (const update of status.updates) {
+    assert.ok(updates.includes(update.id), `UPDATE_LOG.md must list ${update.id}`);
+  }
+  for (const completion of status.completions ?? []) {
+    assert.ok(completions.includes(completion.id), `COMPLETION_REPORT.md must list ${completion.id}`);
+  }
+});
 function metadata({ version, updatedAt, count, hash }) {
   return {
     version,

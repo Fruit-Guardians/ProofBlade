@@ -38,12 +38,23 @@ export interface PiObservabilityOptions {
     parentEpochId?: string;
   };
   scheduling?: ProviderSchedulingTelemetry;
-  /** Internal write-behind coordinator shared with provider scheduling hooks. */
-  telemetry?: ControlEventBatcher;
 }
 
 type TelemetryEvent = Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">;
-const telemetryByOptions = new WeakMap<object, ControlEventBatcher>();
+
+/**
+ * A queued telemetry event plus its optional deferred enrichment.
+ *
+ * `resolve` never reaches the event log: it is stripped at drain time and its
+ * result merged into `payload`.
+ */
+type QueuedTelemetryEvent = TelemetryEvent & { resolve?: () => Promise<Record<string, unknown>> };
+/**
+ * The batcher an attachment created for itself, so `append` can reuse it once
+ * `options.scheduling` is absent. Only ever written by the attachment that owns
+ * the key, so it can never smuggle in a second queue over the same event log.
+ */
+const defaultBatcherByOptions = new WeakMap<object, ControlEventBatcher>();
 
 /**
  * Bounded write-behind for low-value observability events.
@@ -55,7 +66,7 @@ const telemetryByOptions = new WeakMap<object, ControlEventBatcher>();
  * as a quiescence barrier.  Control-plane commands never use this class.
  */
 export class ControlEventBatcher {
-  private readonly queue: TelemetryEvent[] = [];
+  private readonly queue: QueuedTelemetryEvent[] = [];
   private flushPromise: Promise<void> | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -65,7 +76,23 @@ export class ControlEventBatcher {
     private readonly lane: Lane,
   ) {}
 
-  public append(type: TelemetryEvent["type"], actor: TelemetryEvent["actor"], payload: Record<string, unknown>): void {
+  /**
+   * Queue one telemetry event.
+   *
+   * `resolve` defers fields that are expensive to compute — typically anything
+   * needing a `ControlStore` snapshot — until the batch is actually drained.
+   * Telemetry is a fail-soft side channel, so its enrichment must never sit on
+   * the tool-result path: the model would wait on a snapshot read purely to
+   * decorate an observational payload. The resolver runs at drain time, off the
+   * critical path, and a throwing resolver degrades to the unresolved payload
+   * rather than losing the event.
+   */
+  public append(
+    type: TelemetryEvent["type"],
+    actor: TelemetryEvent["actor"],
+    payload: Record<string, unknown>,
+    resolve?: () => Promise<Record<string, unknown>>,
+  ): void {
     this.queue.push({
       schemaVersion: 1,
       lane: this.lane,
@@ -73,14 +100,29 @@ export class ControlEventBatcher {
       actor,
       type,
       payload,
+      ...(resolve ? { resolve } : {}),
     });
     this.schedule();
   }
 
-  /** Wait until all currently queued telemetry has reached the event log. */
+  /**
+   * Wait until all currently queued telemetry has reached the event log.
+   *
+   * Best-effort, not a strict barrier: a batch that fails to append is put back
+   * at the head of the queue and retried on a 1s timer, and this resolves once
+   * the drain loop returns even if that retry is still outstanding. Callers that
+   * need to know whether anything is still owed must check `pending()` — a
+   * non-zero count after a flush means the event log is behind, not that the
+   * flush is still running.
+   */
   public async flush(): Promise<void> {
     if (!this.flushPromise) this.flushPromise = this.flushQueued();
     await this.flushPromise;
+  }
+
+  /** Events queued but not yet appended. */
+  public pending(): number {
+    return this.queue.length;
   }
 
   private schedule(delayMs = 10): void {
@@ -97,7 +139,7 @@ export class ControlEventBatcher {
       while (this.queue.length > 0) {
         const batch = this.queue.splice(0, 128);
         try {
-          await this.controlStore.append(this.runId, batch, { persistProjection: false });
+          await this.controlStore.append(this.runId, await resolveBatch(batch), { persistProjection: false });
         } catch {
           // Telemetry is fail-soft. Keep the batch for the next turn-end or
           // timer retry instead of turning an observability outage into a
@@ -112,6 +154,29 @@ export class ControlEventBatcher {
       if (this.queue.length > 0 && !this.timer) this.schedule();
     }
   }
+}
+
+/**
+ * Apply each event's deferred fields.
+ *
+ * A resolver that throws is dropped, not propagated: the event is still worth
+ * recording without its enrichment, and telemetry must never fail the run.
+ */
+async function resolveBatch(batch: readonly QueuedTelemetryEvent[]): Promise<TelemetryEvent[]> {
+  const resolved: TelemetryEvent[] = [];
+  for (const event of batch) {
+    if (!event.resolve) {
+      resolved.push(event);
+      continue;
+    }
+    const { resolve, ...rest } = event;
+    try {
+      resolved.push({ ...rest, payload: { ...rest.payload, ...await resolve() } });
+    } catch {
+      resolved.push(rest);
+    }
+  }
+  return resolved;
 }
 
 /** Safe ContextManifest projection persisted beside the RequestEpoch. */
@@ -364,8 +429,12 @@ interface PendingTool {
 const toolPolicies = new Map(solverToolContractSnapshot().map((contract) => [String(contract.name), contract]));
 
 export function attachPiObservability<TContext extends object | undefined>(harness: AgentHarness<TContext>, options: PiObservabilityOptions): () => void {
-  const telemetry = options.telemetry ?? options.scheduling?.batcher ?? new ControlEventBatcher(options.controlStore, options.runId, options.lane);
-  telemetryByOptions.set(options, telemetry);
+  // Exactly one batcher per attachment: `scheduling.batcher` when the caller
+  // brings provider scheduling, otherwise a private one. A caller-supplied
+  // second batcher used to win here and orphan the scheduling one, which left
+  // two flush barriers racing over one event log.
+  const telemetry = options.scheduling?.batcher ?? new ControlEventBatcher(options.controlStore, options.runId, options.lane);
+  defaultBatcherByOptions.set(options, telemetry);
   const providers: PendingProvider[] = [];
   const tools = new Map<string, PendingTool>();
   const unsubscribeBefore = harness.on("before_provider_request", async (event) => {
@@ -524,7 +593,6 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       const pending = tools.get(event.toolCallId);
       tools.delete(event.toolCallId);
       const details = toolResultDetails(event.result);
-      const snapshot = await options.controlStore.snapshot(options.runId);
       const artifactIds = collectStringRefs(details, "artifact");
       const evidenceIds = collectStringRefs(details, "evidence");
       const errorSignature = event.isError ? structuredErrorSignature(details, event.result) : undefined;
@@ -535,8 +603,16 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         outputBytes: byteLength(event.result),
         isError: event.isError,
         errorSignature,
-        artifactHashes: artifactIds.map((artifactId) => snapshot.artifacts[artifactId]?.sha256).filter((hash): hash is string => Boolean(hash)),
-        evidenceAdded: evidenceIds.some((evidenceId) => Boolean(snapshot.evidence[evidenceId])),
+      }, async () => {
+        // Resolved at drain time, never on the tool-result path: these two fields
+        // are the only reason this handler needed a ControlStore snapshot, and
+        // they decorate an observational payload the model never reads. The ids
+        // themselves are already present in the result's own details.
+        const snapshot = await options.controlStore.snapshot(options.runId);
+        return {
+          artifactHashes: artifactIds.map((artifactId) => snapshot.artifacts[artifactId]?.sha256).filter((hash): hash is string => Boolean(hash)),
+          evidenceAdded: evidenceIds.some((evidenceId) => Boolean(snapshot.evidence[evidenceId])),
+        };
       });
       return;
     }
@@ -549,7 +625,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     }
   });
   return () => {
-    telemetryByOptions.delete(options);
+    defaultBatcherByOptions.delete(options);
     void telemetry.flush();
     unsubscribeEvents();
     unsubscribePayload?.();
@@ -558,17 +634,19 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   };
 }
 
-function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "model_context_frame_recorded" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
-  const telemetry = options.telemetry ?? options.scheduling?.batcher ?? telemetryByOptions.get(options);
+function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "model_context_frame_recorded" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>, resolve?: () => Promise<Record<string, unknown>>): Promise<void> {
+  const telemetry = options.scheduling?.batcher ?? defaultBatcherByOptions.get(options);
   if (telemetry) {
-    telemetry.append(type, actor, payload);
+    telemetry.append(type, actor, payload, resolve);
     return Promise.resolve();
   }
-  return options.controlStore.append(
+  // No batcher: this path is already synchronous, so the deferred fields must be
+  // materialized here to keep the recorded payload shape identical either way.
+  return Promise.resolve(resolve?.()).then((extra) => options.controlStore.append(
     options.runId,
-    [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }],
+    [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload: { ...payload, ...extra } }],
     { persistProjection: false },
-  ).then(() => undefined);
+  )).then(() => undefined);
 }
 
 function providerKey(provider: string, model: string): string {

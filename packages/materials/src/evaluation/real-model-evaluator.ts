@@ -457,6 +457,10 @@ export class RealModelEvaluationRunner {
     let providerDiagnostics: RealModelProviderDiagnostics = emptyProviderDiagnostics(false);
     let failureCategory: RealEvaluationFailureCategory | undefined;
     try {
+      // Force the barrier before reading anything derived from the projection:
+      // the hot path defers `projection.json`, so the file trails the log until
+      // one runs and a correct run would otherwise be scored as a parity failure.
+      await services.control.flushProjection(runId).catch(() => undefined);
       const snapshot = await services.control.snapshot(runId);
       const eventLog = await services.control.events(runId);
       const replayed = await services.control.replay(runId);

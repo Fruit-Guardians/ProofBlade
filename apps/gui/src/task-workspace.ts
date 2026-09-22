@@ -8,6 +8,34 @@ const MAX_ATTACHMENT_BYTES = 128 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENT_BYTES = 512 * 1024 * 1024;
 const WORKSPACE_TARGET_PREFIX = "LOCAL_WORKSPACE:";
 
+/**
+ * The staged-workspace root for a given runs root.
+ *
+ * Kept next to (not inside) the JSONL Run directory: `JsonlControlStore` treats
+ * any pre-existing run directory as an existing Run, so staging inside it would
+ * make every staged task look already-created.
+ *
+ * Exported so the regression test asserts against the same path the staging code
+ * writes, rather than a re-derived string that could drift away from it.
+ *
+ * @param runsRoot - absolute runs directory.
+ * @returns the absolute staging root.
+ */
+export function taskWorkspaceRoot(runsRoot: string): string {
+  return join(dirname(runsRoot), ".proofblade-workspaces");
+}
+
+/**
+ * The staged workspace directory for one Run.
+ *
+ * @param runsRoot - absolute runs directory.
+ * @param runId - the Run being staged.
+ * @returns the absolute per-Run staging directory.
+ */
+export function taskWorkspaceDir(runsRoot: string, runId: string): string {
+  return join(taskWorkspaceRoot(runsRoot), runId);
+}
+
 export interface TaskWorkspaceInput {
   runId: string;
   objective: string;
@@ -35,7 +63,7 @@ export async function stageTaskWorkspace(input: TaskWorkspaceInput, runsRoot: st
   if (!sourceStats.isDirectory()) throw new Error("workspacePath must be a directory");
   // Keep the staged workspace next to (not inside) the JSONL Run directory:
   // JsonlControlStore treats any pre-existing run directory as an existing Run.
-  const stagingRoot = join(dirname(runsRoot), ".proofblade-workspaces", input.runId);
+  const stagingRoot = taskWorkspaceDir(runsRoot, input.runId);
   await mkdir(join(stagingRoot, "attachments"), { recursive: true });
 
   const attachments = [...new Set((input.attachmentPaths ?? []).map((value) => value.trim()).filter(Boolean))];
