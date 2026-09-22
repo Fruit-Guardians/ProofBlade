@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-22T18:56:00+08:00",
+  "updatedAt": "2026-09-22T19:35:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2212,6 +2212,40 @@
         "如实记录的失败尝试与自身错误：R3 的两条测试都不具区分力（同尺寸目录因路径进 revision 必然不同；钩子不触发则两种顺序恒等），故不加测试并把理由写进提交信息；m8 的用例最初用对象身份与渲染值断言，两者在修复与 bug 下都通过，改为统计 loadProjectionHint 调用（重建的第一步）；该用例随后以约 1/6 的概率失败，原因是 utimes 无法设置 stat 报告出的亚毫秒部分，改为整秒冻结后 8/8 通过",
         "tsc -b 与 tsc -p tsconfig.scripts.json 干净；fast 1047/1047、slow 25/25、integration 92/92（4 项为环境跳过）；check:components / check:change-contracts / check:project-reports / api:index:check / check:changed-tests / test:ci-gates 通过",
         "修复只推到 fix/review-blockers（非任何 PR 的 head，CI 仍不会运行）；perf/version-snapshot-cache 保持在 53b6e9b 且其 CI 为绿。审查 §7.6-1 的硬阻塞（把修复分支变成 PR 或更新 PR head）仍未处理，需要用户决定"
+      ]
+    },
+    {
+      "id": "UPDATE-20260922-002",
+      "occurredAt": "2026-09-22T19:35:00+08:00",
+      "summary": "第三、四轮评审的收尾：为两处 ino/ctime 缓存键补上会失败的回归门禁（m12/R1），修正 CURRENCY-8 与预算测试登记（m4/m5），就地撤销已失效的 O(增量) 读取快路径（计划与拆分文档），并把修复分支变成 PR #246——CI 因此第一次真正跑在修复后的提交上。",
+      "branch": "fix/review-blockers",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "m12/R1：三处 ino/ctime 键里有两处没有会失败的门禁。新增 skill-registry-cache.test.ts「a same-size rewrite with the mtime put back still invalidates the memo」；修正 debug-data.test.ts 的列表缓存用例——它原先在基线读取之后才冻结 mtime，冻结本身就让缓存条目失效，于是把键退回 size+mtimeMs 仍然通过，测的是「键里有 mtimeMs」而不是 ino/ctime。实测证明：窄键下新用例转红，把 ctimeMs 钉成常量（仍是 5 字段、格式不变）同样转红。version.ts 已不含元数据键（无条件内容摘要），由运行期同长同 mtime 改写断言与结构性守卫（必须到达 readFile、不得读 ino/mtimeMs/ctimeMs/size）覆盖",
+        "m11①：version.ts 的「mtimeMs + size 只作预筛」是不实陈述——预筛与它所属的 per-file 元数据缓存都已不存在；就地改写为「每次调用都读取并哈希每个输入」，并保留实测成本。m11②的 registry.ts revision 注释原先引用的是另一条缓存（版本快照）的测试，改为指向真正门禁它的用例，并写明该键的残余窗口（同长度、同 inode、同一时钟刻度）",
+        "m4：CURRENCY-8（尾部记录大于 64 KiB 窗口）原先靠 mtime 预筛返回 undefined，窗口规则从未被触及；现用 utimes 中和预筛，并把超大记录的 seq 改成投影自身的 seq——否则即使整文件读取也会因序号不符被拒，测不出有界与无界之别。变异：把 lastEventSeq 改成读整文件 → 该用例转红；恢复后 8/8 连跑三次",
+        "m5：hot-path-budget.test.ts 只登记在 runtime-recovery 规则，而该规则的 sourceGlobs 不含它 import 的 knowledge/、skills/（以及 tools/、verification/、competition/），改动这些目录的贡献者不会被提示运行预算门禁。把这 5 个 glob 加入该规则（该规则的 command 已包含此测试）",
+        "m13：「技能内容陈旧性线索」确为 fixture 假象。核对上游 skills.js：`const { frontmatter, body } = parsed.value` 后 `content: body`，所以 contentHash 只看正文；只改 front matter 的重写不会移动它，移动 skillCatalogHash 的是 entry() 里的 name/description（正是同文件另一条断言仍然通过的原因）。代码与文档里已无「第二层记忆化」残迹，正确解释写进新用例注释",
+        "§7.4-5：删除 #readSnapshot 里恒真的 `snapshot === undefined` 合取项（该变量在那一行之前只可能是 undefined），注释改写成该条件的实际含义「快照缓存未命中」",
+        "N9：计划文档就地替换四处（不追加）：①§7.2.1 两行探针数字标为历史记录、不可复现、非受控对照（2095.8ms 与可复现的 1846.0ms 名义条件相同但事件数差 1 解释不了 250ms），②重复的两段三点时序合并为一处，③control-store.ts:736 类行号引用换成 #readSnapshot 的 eventStore.events(runId)、④摘要表 read≈25ms「固定」改为 command 列含两次 durable 提交、9.3s 行标明是 replay()（n=1）最后一道回退；§7.2.2 补上快路径已被撤销及其原因；新增「修订说明（评审修订 3）」并声明本轮未重测任何数字",
+        "拆分文档 §6.6 由「已实施：读取路径降为 O(增量)」改写为「实现过、测出 150 倍、然后撤回」：150× 表保留但标为已撤回证据，删除（而非追加）6 处被推翻的论断，含 §6.5「权威读取路径不需要重算前缀哈希」与 §6.4「且没有安全代价」，12 处 file.ts:行号 锚点换成函数/测试名，版本升 1.2.0",
+        "评审索引（给评审者的单页入口）§2.1/§3/§3.0/§3.1/§4/§5/§6 重写为撤销后的实际状态，新增 §8 记录第三/四轮要求的三项：分支取舍（以 perf/version-snapshot-cache 为承载、fix/version-revision-key 作废）、报表字节校验的取舍（docs/project 不再跟踪 + CI 先生成后校验 ⇒ 该比对无法失败，替代门禁是 ci-gates 的渲染器用例，仍有约束力的是 --base 的账本义务）、Windows/NTFS 的 inode/ctime 结论与残余窗口",
+        "§7.6-1 硬阻塞关闭：开 PR #246（fix/review-blockers → main）。首次查询显示 0 个 check——原因不是配置，而是 GitHub 对**有冲突**的 PR 不生成 merge ref，pull_request 工作流因此根本不会启动；把 main 合并进来（冲突只在 docs/generated、docs/project、两个 COMPONENT.md 与 project-status.json）后 CI 在 4m11s 内变绿。docs/project 的四处 modify/delete 按本分支既定策略保留删除，两个 COMPONENT.md 取本分支较新的一侧，账本用「取并集后重新序列化」解析（先验证过重新序列化与原文件逐字节相同，故无格式扰动）",
+        "账本自身两处更正：UPDATE-20260920-002 原记「把权威读取路径降为 O(增量)」为已交付，现于该条目开头写明撤销、原因与保留部分；updatedAt 与 UPDATE-20260922-001 的 occurredAt 原写成 21:00，晚于写下它们的提交（18:43）两小时——账本不能记录自己未来的工作，改为实际写入时间",
+        "记录一处未处理的现实：#244 的 head（b01e822，本地 ref origin/fix/barrier-cadence-evidence）仍带那条已被撤销的不安全快路径（其 control-store.ts 的 #readSnapshot 会先问 loadProjectionHint），撤销只存在于集成分支。22 个 PR 的 head 刷新不在本轮范围，评审入口是 PR #246"
+      ],
+      "validation": [
+        "变异验证：registry 条目退回 path\\0size\\0mtimeMs → 新用例 not ok 3；保留 5 字段但 ctimeMs 钉成常量 → 同样 not ok 3（证明它门的是字段而非条目格式）；GUI 键退回 size\\0mtimeMs → 「a rewritten event log is not served from the run-list cache either」not ok 23；lastEventSeq 读整文件 → CURRENCY-8 not ok 5。以上四处恢复后分别 18/18×4、45/45×4、8/8×3",
+        "定向套件：skill-registry-cache 18/18、debug-data 45/45、projection-hint-currency 8/8、projection-read-bound + control-store + barrier-projection + projection-hint-currency 合计 41/41",
+        "全量：node scripts/run-test-stage.mjs all → fast # tests 1068 / pass 1064 / fail 0 / skipped 4，slow 25/25 / fail 0，integration 92/92 / fail 0（.proofblade/test-logs/*.log）",
+        "其余 verify 组成：npm run build 无 error TS；test:ci-gates 43/43；test:platform-fault-matrix 6/6；api:index:test 5/5；eval --enforce-gate exit 0；npm audit --omit=dev 0 vulnerabilities；check:changed-tests --base origin/main 13 条定向命令",
+        "文档门禁：check:components --base origin/main（26 components / 11 affected）、check:change-contracts --base origin/main（11 contracts / 97 files）、check:project-reports --base origin/main（4 reports, complete）、api:index:check 通过（合并后曾因本分支的注释改动陈旧一次，已 npm run api:index 重新生成）",
+        "CI：PR #246 两次成功——run 35718719759（4m11s，合并提交 0f297c6）与 run 35719345324（3m34s，N9 提交 3c8ca54）。这是 §7.6-1「修复从未在 CI 上跑过」的关闭证据；此前 gh run list --branch fix/review-blockers 为空",
+        "仍未处理并在索引文档中列明：§7.6-5 的 #245（他人 PR，未改其代码）与 #223/#230/#231/#235/#240/#241 的部分 Minor；22 个 PR 的 head 仍指向修复前提交。所有 PR 一律未合并，main 未动",
+        "对 UPDATE-20260922-001 里那组 NTFS 数字的更正：那里把「40 次连续写入产生 18 次 ctimeMs 前进」当成常数，重测表明**次数不稳定**（连同评审侧共 7 次运行落在 9–31 之间，本次复测三次为 18/26/23），稳定的是量级（最小正增量 0.31–0.91ms、每次运行都有 12 个以上不同小数部分；同长度改写 + 还原整秒 mtime 使 ctimeMs 前进 1.0–2.5ms，size 与 ino 不变）。apps/gui/src/debug-data.ts 的注释已按这个口径改写：次数不引用为常数，量级与「捕获它的是 ctimeMs、不是 ino」保留"
       ]
     }
   ],

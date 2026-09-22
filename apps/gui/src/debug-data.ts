@@ -793,16 +793,20 @@ async function filesystemVersion(root: string): Promise<string> {
  *
  * Scope of that guarantee, stated because it is what the key actually rests on,
  * and measured on this project's development platform rather than assumed. On
- * Windows/NTFS, 40 consecutive writes to one file produced 18 distinct `ctimeMs`
- * advances with a smallest positive delta of 0.44ms and 19 of 40 distinct
- * fractional parts -- sub-millisecond precision is present, not the 15.6ms tick
- * one expects from the documented system time. A same-size in-place rewrite with
- * `mtimeMs` restored moved `ctimeMs` by 1.1ms and left `ino` unchanged. So on
- * NTFS the key catches that rewrite, and the residual window is narrower than
- * "same size, same tick": it needs a change that lands within the same
- * sub-millisecond tick as the previous one. A caller that needs better than that
- * must hash the bytes; `runtime/version.ts` does, which is why its revision is a
- * content digest rather than a metadata key.
+ * Windows/NTFS, seven runs of 40 consecutive writes to one file produced anywhere
+ * from 9 to 31 positive `ctimeMs` advances each (18, 26 and 23 in the three runs
+ * re-measured while writing this). The **count** therefore depends on write speed
+ * and clock advance and must not be quoted as a constant; the **magnitude** is
+ * stable: the smallest positive delta was 0.31-0.91ms across all seven runs and
+ * every run had a dozen or more distinct fractional parts. Sub-millisecond
+ * precision is present, not the 15.6ms tick one expects from the documented system
+ * time. A same-size in-place rewrite with `mtimeMs` restored to a whole second
+ * moved `ctimeMs` by 1.0-2.5ms in every run while `size` and `ino` stayed the
+ * same, so `ctimeMs` is the field that catches it and `ino` is not. The residual
+ * window is therefore a rewrite inside the same sub-millisecond tick, in the same
+ * inode, at the same length -- an empirical boundary, not an invariant. A caller
+ * that needs better than that must hash the bytes; `runtime/version.ts` does,
+ * which is why its revision is a content digest rather than a metadata key.
  */
 function runDetailEventsVersion(eventsStat: Stats): string {
   return `${eventsStat.ino}\0${eventsStat.size}\0${eventsStat.mtimeMs}\0${eventsStat.ctimeMs}`;
