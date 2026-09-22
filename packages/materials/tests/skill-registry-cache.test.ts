@@ -254,10 +254,16 @@ test("an ignore file in a skill root moves the revision", async () => {
   }
 });
 
-test("a second root's loose *.md does not move the revision", async () => {
-  // The registry drops non-SKILL.md skills from roots after the first, so the
-  // walker must not collect them either: a vendored repo's README.md is not an
-  // input to the catalog.
+test("a second root's loose *.md moves the revision even though it adds no skill", async () => {
+  // m10 from the third review round. The registry drops non-SKILL.md *skills*
+  // from roots after the first, so this file never becomes a skill -- but the
+  // upstream loader still reads it as one and reports `invalid_metadata` for it,
+  // and the registry copies every loader diagnostic into `registry.diagnostics`,
+  // which the CLI prints. So the file IS an input to the registry's observable
+  // output, and excluding it from the walker let it change that output without
+  // moving the revision. The walker now collects it for every root, which is a
+  // conservative superset: it can cause a re-parse that was not needed, never a
+  // stale catalog.
   const root = await mkdtemp(join(tmpdir(), "proofblade-skill-cache-second-"));
   try {
     await mkdir(join(root, "skills", "alpha"), { recursive: true });
@@ -270,14 +276,15 @@ test("a second root's loose *.md does not move the revision", async () => {
     await ProofBladeSkillRegistry.load(root);
     assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 1);
 
-    // Editing the loose doc must be a no-op for a deterministic mtime order as
-    // well: the revision stays, so the memo still answers.
+    // Editing the loose doc must invalidate: it is not a skill, but it is an
+    // input to the diagnostics the registry exposes.
     ProofBladeSkillRegistry.resetCache();
     await ProofBladeSkillRegistry.load(root);
     await writeFile(join(root, "skills-library", "ctf-skills", "README.md"), "# vendored docs, edited\n", "utf8");
     const after = await ProofBladeSkillRegistry.load(root);
-    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 1, "a second-root loose doc is not an input");
-    assert.deepEqual(after.list().map((skill) => skill.name), ["alpha"]);
+    assert.equal(ProofBladeSkillRegistry.cacheStats().hits, 0, "a second-root loose doc is an input to diagnostics");
+    assert.equal(ProofBladeSkillRegistry.cacheStats().parses, 2, "so it must force a re-parse");
+    assert.deepEqual(after.list().map((skill) => skill.name), ["alpha"], "and still contribute no skill");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

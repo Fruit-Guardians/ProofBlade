@@ -377,10 +377,29 @@ async function statKind(path: string): Promise<"file" | "directory" | "other"> {
   }
 }
 
+/**
+ * Whether one directory entry is an input to the registry's observable output.
+ *
+ * `*.md` counts for **every** root, not only the first, and the reason is
+ * diagnostics rather than skills: the upstream loader is called with
+ * `includeRootFiles` for each root, so a vendored repo's `README.md` is read,
+ * fails front-matter parsing, and produces an `invalid_metadata` diagnostic --
+ * and the registry copies every loader diagnostic into `registry.diagnostics`,
+ * which the CLI prints. Restricting the walk to `SKILL.md` after the first root
+ * let such a file change the diagnostics without moving the revision. The
+ * registry still drops the *skill* from later roots (`owner.index > 0` below),
+ * so this only widens the input set, never the catalog.
+ *
+ * The ignore files are collected for the same reason: the loader consults them
+ * to prune its walk, and reproducing its matcher here would be a second
+ * implementation of the `ignore` package. Including the rule files means a
+ * changed rule always moves the revision -- a false invalidation costs one
+ * re-parse, a missed one serves a catalog the rules no longer describe.
+ */
 function isSkillInput(name: string, isFirstRoot: boolean): boolean {
   if (name === "SKILL.md") return true;
   if (SKILL_IGNORE_FILES.has(name)) return true;
-  return isFirstRoot && name.endsWith(".md");
+  return name.endsWith(".md");
 }
 
 const SKILL_IGNORE_FILES = new Set([".gitignore", ".ignore", ".fdignore"]);
