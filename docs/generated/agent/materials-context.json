@@ -65,7 +65,7 @@
     "src/evaluation/ablation.ts": "e58828bff6ebacfb7bef193b6659fbf44ed2a28e6fc44eac739f4489703bf152",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
-    "src/evaluation/fixture-evaluator.ts": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+    "src/evaluation/fixture-evaluator.ts": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
     "src/evaluation/information-value.ts": "f607d133f18f9d9f89f35695d6a63d88b17f5f68a429b5da80c94cf5b4191ab0",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
@@ -887,7 +887,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 114,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": [
         "packages/materials/tests/evaluation.test.ts"
       ]
@@ -2559,7 +2559,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 18,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": [
         "packages/materials/tests/evaluation.test.ts"
       ]
@@ -2575,7 +2575,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 19,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -2589,7 +2589,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 20,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -2603,7 +2603,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 21,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -11378,7 +11378,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 25,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -11392,7 +11392,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 43,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -11406,7 +11406,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 36,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -11420,7 +11420,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 70,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
@@ -24557,7 +24557,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 121,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -41970,7 +41970,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 23,
-      "moduleHash": "5b99b15c53efe0eae62510d3e7a574c53e0fa2d7da47ad9274e4d3af8d1bd195",
+      "moduleHash": "a2d5e2c144f82cd8e44d6939ebcb26bfd8f583faa6b088bb00c12270d9e59dd2",
       "testRefs": []
     },
     {
