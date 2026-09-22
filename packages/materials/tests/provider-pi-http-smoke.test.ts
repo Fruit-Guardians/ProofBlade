@@ -87,7 +87,7 @@ test("Responses tool continuation preserves the complete previous input prefix",
   } finally {
     await lane?.close();
     delete process.env[apiKeyEnv];
-    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
@@ -171,7 +171,7 @@ test("update_phase refreshes dynamic context and strict routing within the same 
   } finally {
     await lane?.close();
     delete process.env[apiKeyEnv];
-    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
@@ -253,7 +253,7 @@ test("default compiled system context stays below 10K after Provider serializati
   } finally {
     await closeTransport?.();
     delete process.env[apiKeyEnv];
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
@@ -358,7 +358,7 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
   } finally {
     await closeTransport?.();
     delete process.env[apiKeyEnv];
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
@@ -436,7 +436,7 @@ test("PiCodingLane exposes generic external_submit only for a declared target wi
   } finally {
     await lane?.close();
     delete process.env[apiKeyEnv];
-    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
@@ -642,7 +642,7 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     await resumedLane?.close();
     await lane?.close();
     await services?.sandbox.close();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });

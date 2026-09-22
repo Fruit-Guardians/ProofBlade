@@ -104,7 +104,7 @@ test("update_phase changes the durable phase before later investigation actions"
     assert.deepEqual(phaseEvent?.payload, { domainPhase: "EXPERIMENT", reason: "The packet layout is known; execute the bounded decoder." });
   } finally {
     await services.sandbox.close();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -128,7 +128,7 @@ test("ordinary read follows bounded continuation pages into one complete model r
     assert.doesNotMatch(text, /Use offset=\d+ to continue/);
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -201,7 +201,7 @@ test("generic result proposals accept ordinary text without CTF formatting", asy
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[completion.artifactId]!), "ordinary report result");
   } finally {
     await runtime.close();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -253,7 +253,7 @@ test("verify_result accepts a durable result Artifact with a hash-bound verifier
     const conflictingText = await verifier.project("Verify the report Artifact", "最终结果：a different text result");
     assert.equal(conflictingText.status, "unverified", "a stated text result must not inherit a different Artifact verification");
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -459,7 +459,7 @@ test("evidence_record has an exact write contract and legacy record calls are no
     );
   } finally {
     await services.sandbox.close();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -512,7 +512,7 @@ test("real AgentHarness projects evidence_record schema failures into structured
     assert.match(result.content[0]?.text ?? "", /^\[ProofBlade evidence error\] \{/);
   } finally {
     await env.cleanup();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -633,7 +633,7 @@ test("[contract:evidence-inspect-forest-max-chars] generic result verification r
     assert.equal(continuous.terminate, undefined, "continuous recovery keeps result verification in the same lane");
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -697,7 +697,7 @@ test("coding bash is blocked after the durable evidence curation threshold", asy
     assert.match(text, /evidence curation required/);
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -848,7 +848,7 @@ test("[contract:coding-capability-proxy] coding capability proxy discovers lazil
     }, context), /fixture|relative path/);
   } finally {
     await runtime.close();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -917,7 +917,7 @@ test("coding bash archives raw output before returning RTK-compressed content", 
     assert.ok(snapshot.artifacts[artifactId]);
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!), raw);
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -990,7 +990,7 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     assert.equal(artifact.semantic?.role, "supporting");
   } finally {
     await runtime.close();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -1074,7 +1074,7 @@ test("shell_background returns immediately and shell_job polls then stops the re
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
   }
 });
@@ -1132,7 +1132,7 @@ test("shell_job stop reaps descendants when setsid is unavailable", async (t) =>
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
   }
 });
@@ -1195,7 +1195,7 @@ test("shell_job stop reaps a descendant after the fallback user command exits", 
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
   }
 });
@@ -1264,7 +1264,7 @@ test("fallback supervisor survives user trap, PATH changes, and exec", async (t)
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
   }
 });
@@ -1311,7 +1311,7 @@ test("shell_job stop accepts a schema 1 process-group record during upgrade", as
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
   }
 });
@@ -1628,7 +1628,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
   }
 });
