@@ -524,6 +524,14 @@ test("a rewritten event log is not served from the run-list cache either", async
     // substitution is anchored on a substring long enough to be unique rather than
     // on the field name alone.
     const eventsPath = join(root, "runs", runId, "events.jsonl");
+    // Freeze the timestamp at a whole second *before* the baseline read, and restore
+    // that same value after the rewrite. Restoring the value `stat` happened to
+    // report compares against sub-millisecond precision that `utimes` cannot set,
+    // so a mtime landing mid-millisecond floors to the previous millisecond and the
+    // setup assertion fails for a reason unrelated to the cache key. Measured: it
+    // failed roughly one run in six that way.
+    const frozen = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
+    await utimes(eventsPath, frozen, frozen);
     const beforeStat = await stat(eventsPath);
     const before = await readFile(eventsPath, "utf8");
     const marker = '"generation":0,"id"';
@@ -532,12 +540,10 @@ test("a rewritten event log is not served from the run-list cache either", async
     assert.equal(Buffer.byteLength(rewritten), Buffer.byteLength(before), "the rewrite must keep the byte length");
     assert.notEqual(rewritten, before, "the bytes must actually differ");
     await writeFile(eventsPath, rewritten, "utf8");
-    // Put the original timestamps back so this measures the key and not the clock.
-    await utimes(eventsPath, beforeStat.atime, beforeStat.mtime);
-    // Millisecond granularity, because `utimes` cannot express the sub-millisecond
-    // part `stat` reports. The cache key carries the same rounded value on both
-    // sides, so the equality the test depends on is the millisecond one.
-    assert.equal(Math.floor((await stat(eventsPath)).mtimeMs), Math.floor(beforeStat.mtimeMs), "the rewrite must keep the modification time");
+    await utimes(eventsPath, frozen, frozen);
+    const afterStat = await stat(eventsPath);
+    assert.equal(afterStat.size, beforeStat.size, "the rewrite must keep the byte length");
+    assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs, "the rewrite must keep the modification time exactly, or this measures nothing");
 
     await data.listRuns();
     assert.ok(builds > 0, "a rewritten log must not be served from the list cache");

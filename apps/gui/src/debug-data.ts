@@ -791,14 +791,18 @@ async function filesystemVersion(root: string): Promise<string> {
  * replaced file from an in-place write. Both come from the `stat()` the caller
  * already performs, so this costs nothing extra.
  *
- * Scope of that guarantee, stated because it is what the key actually rests on:
- * `ctimeMs` comes from the system clock, so an in-place rewrite that lands in the
- * same clock tick as the previous change can carry the same value. On NTFS that
- * tick is 100ns in principle and about 15.6ms in practice. `ino` still separates a
- * replaced file and `size` still catches most edits, so the remaining window is
- * "same size, same tick, same inode" rather than "any same-size edit". A caller
- * that needs more than that must hash the bytes; `runtime/version.ts` does, which
- * is why its revision is a content digest rather than a metadata key.
+ * Scope of that guarantee, stated because it is what the key actually rests on,
+ * and measured on this project's development platform rather than assumed. On
+ * Windows/NTFS, 40 consecutive writes to one file produced 18 distinct `ctimeMs`
+ * advances with a smallest positive delta of 0.44ms and 19 of 40 distinct
+ * fractional parts -- sub-millisecond precision is present, not the 15.6ms tick
+ * one expects from the documented system time. A same-size in-place rewrite with
+ * `mtimeMs` restored moved `ctimeMs` by 1.1ms and left `ino` unchanged. So on
+ * NTFS the key catches that rewrite, and the residual window is narrower than
+ * "same size, same tick": it needs a change that lands within the same
+ * sub-millisecond tick as the previous one. A caller that needs better than that
+ * must hash the bytes; `runtime/version.ts` does, which is why its revision is a
+ * content digest rather than a metadata key.
  */
 function runDetailEventsVersion(eventsStat: Stats): string {
   return `${eventsStat.ino}\0${eventsStat.size}\0${eventsStat.mtimeMs}\0${eventsStat.ctimeMs}`;
