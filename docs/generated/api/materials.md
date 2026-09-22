@@ -1963,7 +1963,7 @@
 ### createEffectInput
 - Kind: `function`
 - Signature: `(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }`
-- Source: [src/control/control-store.ts:2410](../../../packages/materials/src/control/control-store.ts:2410)
+- Source: [src/control/control-store.ts:2414](../../../packages/materials/src/control/control-store.ts:2414)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create effect input operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9398,7 +9398,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: find operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/barrier-projection.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dispatch-transaction-batch.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/lane-observer-diagnostics.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/observer-diagnostics.test.ts`, `packages/materials/tests/projection-read-bound.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-analysis.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/security-tool-profile.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/tool-timing.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/version-cache.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/barrier-projection.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dispatch-transaction-batch.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/lane-observer-diagnostics.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/observer-diagnostics.test.ts`, `packages/materials/tests/projection-hint-currency.test.ts`, `packages/materials/tests/projection-read-bound.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-analysis.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/security-tool-profile.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/tool-timing.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/version-cache.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CapabilityRegistry.list
 - Kind: `method`
@@ -10358,7 +10358,7 @@
 ### ControlStore.#cacheSnapshot
 - Kind: `method`
 - Signature: `(runId: string, snapshot: RunSnapshot): Promise<void>`
-- Source: [src/control/control-store.ts:815](../../../packages/materials/src/control/control-store.ts:815)
+- Source: [src/control/control-store.ts:819](../../../packages/materials/src/control/control-store.ts:819)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #cache snapshot operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10366,7 +10366,7 @@
 ### ControlStore.#commitCommands
 - Kind: `method`
 - Signature: `(runId: string, before: RunSnapshot, commands: DomainCommand[], authority: ControlAuthority, writer: JsonlRunWriter, options?: ControlDispatchOptions): Promise<{ after: RunSnapshot; events: HarnessEvent[]; }>`
-- Source: [src/control/control-store.ts:830](../../../packages/materials/src/control/control-store.ts:830)
+- Source: [src/control/control-store.ts:834](../../../packages/materials/src/control/control-store.ts:834)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #commit commands operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10375,7 +10375,7 @@
 ### ControlStore.#createFixtureControlPort
 - Kind: `method`
 - Signature: `(): FixtureControlPort`
-- Source: [src/control/control-store.ts:926](../../../packages/materials/src/control/control-store.ts:926)
+- Source: [src/control/control-store.ts:930](../../../packages/materials/src/control/control-store.ts:930)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create fixture control port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10383,7 +10383,7 @@
 ### ControlStore.#createUpdateEvaluationPort
 - Kind: `method`
 - Signature: `(): UpdateEvaluationControlPort`
-- Source: [src/control/control-store.ts:960](../../../packages/materials/src/control/control-store.ts:960)
+- Source: [src/control/control-store.ts:964](../../../packages/materials/src/control/control-store.ts:964)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create update evaluation port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10391,7 +10391,7 @@
 ### ControlStore.#createVerificationRecoveryPort
 - Kind: `method`
 - Signature: `(): VerificationRecoveryControlPort`
-- Source: [src/control/control-store.ts:941](../../../packages/materials/src/control/control-store.ts:941)
+- Source: [src/control/control-store.ts:945](../../../packages/materials/src/control/control-store.ts:945)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verification recovery port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10399,7 +10399,7 @@
 ### ControlStore.#createVerifierEffectPort
 - Kind: `method`
 - Signature: `(): VerifierEffectControlPort`
-- Source: [src/control/control-store.ts:903](../../../packages/materials/src/control/control-store.ts:903)
+- Source: [src/control/control-store.ts:907](../../../packages/materials/src/control/control-store.ts:907)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier effect port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10407,7 +10407,7 @@
 ### ControlStore.#createVerifierPort
 - Kind: `method`
 - Signature: `(): VerifierControlPort`
-- Source: [src/control/control-store.ts:871](../../../packages/materials/src/control/control-store.ts:871)
+- Source: [src/control/control-store.ts:875](../../../packages/materials/src/control/control-store.ts:875)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier port operation used to perform a durable write.
 - Summary source: `inferred`
