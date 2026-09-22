@@ -10,6 +10,18 @@ import { type LinkReasoningNodesInput } from "../knowledge/evidence-graph.js";
 
 export interface ResultReproduction {
   verified: boolean;
+  /**
+   * Why `verified` is what it is, in terms the caller can act on.
+   *
+   * `verified` alone is ambiguous for a run whose task binds no verification
+   * command: the reproduction really did run and really did derive the candidate,
+   * and the harness records it as Evidence -- but no Completion can be accepted,
+   * because acceptance requires a task-owned rule. A caller that only sees
+   * `verified: false` reports that as a verification failure and retries, which is
+   * what happened in CHAT-1790093502899. `observation_only` says "recorded, not
+   * accepted, and retrying cannot change it".
+   */
+  acceptance: "verified" | "observation_only";
   candidate: string;
   candidateHash: string;
   commandHash: string;
@@ -26,6 +38,8 @@ export interface ResultReproduction {
 /** A verifier result bound to an existing durable Artifact rather than text. */
 export interface ResultArtifactReproduction {
   verified: boolean;
+  /** Same distinction as {@link ResultReproduction.acceptance}. */
+  acceptance: "verified" | "observation_only";
   resultHash: string;
   resultArtifactId: string;
   commandHash: string;
@@ -291,6 +305,7 @@ export class TaskResultVerifier {
     });
     return {
       verified: reproduction.verified,
+      acceptance: reproduction.acceptance,
       resultHash: reproduction.candidateHash,
       resultArtifactId: reproduction.candidateArtifactId,
       commandHash: reproduction.commandHash,
@@ -373,6 +388,7 @@ export class TaskResultVerifier {
         const durableReceiptArtifactId = durableEvidence?.provenance.artifactIds.find((artifactId) => artifactId !== durableExecutionArtifactId && durableSnapshot.artifacts[artifactId]?.sourceEffectId === undefined) ?? durableExecutionArtifactId;
         return {
           verified: durable.completion.status === "ACCEPTED",
+          acceptance: durable.completion.status === "ACCEPTED" ? "verified" : "observation_only",
           candidate: "",
           candidateHash: durable.completion.candidateHash,
           commandHash,
@@ -396,6 +412,7 @@ export class TaskResultVerifier {
       if (!receipt) throw new Error(`Durable claim verification ${durable.completion.id} has no valid receipt`);
       return {
         verified: true,
+        acceptance: "verified",
         candidate: durableCandidate,
         candidateHash: durable.completion.candidateHash,
         commandHash: receipt.commandHash,
@@ -478,13 +495,13 @@ export class TaskResultVerifier {
           if (!input.execute) throw new Error("A model-supplied claim command requires the ordinary lane executor");
           const result = await input.execute(innerSignal);
           if (result.exitCode !== 0) return result;
-          if (!stdoutContainsExactCandidate(result.stdout, candidate)) return { ...result, stderr: `${result.stderr}\nreproduction output did not contain the exact candidate`, exitCode: 1 };
+          if (!stdoutContainsExactCandidate(result.stdout, candidate)) return { ...result, stderr: `${result.stderr}\n${exactCandidateRuleMessage(result.stdout, candidate)}`, exitCode: 1 };
           return result;
         }, signal);
       if (execution.result.exitCode !== 0 || (!resultArtifactMode && !stdoutContainsExactCandidate(execution.result.stdout, candidate))) {
         throw new Error(resultArtifactMode
           ? "Result verifier command did not complete successfully"
-          : "Reproduction command did not successfully derive the exact candidate");
+          : exactCandidateRuleMessage(execution.result.stdout, candidate));
       }
       if (resultArtifactMode && !acceptedResultEnvelope(execution.result.stdout, candidateHash)) {
         throw new Error("Result verifier must print {\"accepted\":true,\"resultHash\":\"<artifact sha256>\"}");
@@ -664,7 +681,7 @@ export class TaskResultVerifier {
       status: locallyJudged ? "SUPPORTED" : "ACTIVE",
     });
 
-    return { verified: locallyJudged, candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
+    return { verified: locallyJudged, acceptance: locallyJudged ? "verified" : "observation_only", candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
   }
 
   /** Rebuild verification exclusively from durable current-generation state. */
@@ -904,6 +921,23 @@ function extractFinalCandidate(assistantText: string): string | undefined {
 
 function stdoutContainsExactCandidate(stdout: string, candidate: string): boolean {
   return stdout.split(/\r?\n/).some((line) => line.trim() === candidate);
+}
+
+/**
+ * Why a run that printed the candidate still failed the reproduction rule.
+ *
+ * The rule is "some line equals the candidate after trimming", not "the output
+ * contains the candidate". The old message said the output "did not contain the
+ * exact candidate" while the output plainly did contain it, and the model had to
+ * guess that the surrounding text was the problem; the reviewer's run burned one
+ * verify_result call on that (`FLAG             : GEELY{...}` failed, a bare
+ * `GEELY{...}` line passed). The message now states the rule and shows what the
+ * first non-empty lines actually were, truncated so a huge dump stays readable.
+ */
+function exactCandidateRuleMessage(stdout: string, candidate: string): string {
+  const lines = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 3);
+  const preview = lines.map((line) => (line.length > 120 ? `${line.slice(0, 120)}…` : line)).join(" | ");
+  return `Reproduction command did not print the exact candidate on its own line: a line must equal ${JSON.stringify(candidate)} after trimming whitespace, and the command's first non-empty line(s) were ${preview ? JSON.stringify(preview) : "(none)"}`;
 }
 
 function acceptedResultEnvelope(stdout: string, resultHash: string): boolean {

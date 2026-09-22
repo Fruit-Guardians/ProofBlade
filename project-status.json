@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-22T23:35:00+08:00",
+  "updatedAt": "2026-09-23T00:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2263,7 +2263,7 @@
         "#245（Pwn 利用构造工具，另一位作者的 PR）按所有者指示未做任何改动，§3.1 的 1 条 Major 与 13 条 Minor 留在该 PR 与其作者处；本次没有向该分支推送，也没有再提交评论",
         "落地（所有者授权「可以把我们已经完成的合并到 main」）：本记录随本分支以 PR #246（fix/review-blockers → main，含 #222–#243 全部提交与五轮评审的全部修复）一并进入 main；#222–#244 与 #227 在其后关闭为 superseded，各自留一条说明指向 #246 与其覆盖关系；#245 保持打开等待作者。合并方式与 CI 结果记录见 validation",
         "ci-gates 的门禁同步更新：scripts/tests/ci-gates.test.mjs 原先断言排除清单恰好等于那三个文件，现在断言它为空（新增一条排除＝又有一个脚本没人做类型检查，这正是当初 ReferenceError 出厂的方式），并断言 allowImportingTsExtensions 为真（两个按路径启动的 host 用 .ts 扩展名导入兄弟模块，去掉该开关就得把它们放回排除清单）。该用例用 JSON.parse 读 tsconfig.scripts.json，所以那个文件必须保持严格 JSON——理由写在用例注释里而不是文件注释里，第一次提交正是因为文件里的注释让这条门禁在 CI 转红",
-    "评审 §3.3 的两条不再需要所有者二次决策的结论已按评审建议执行：(a) 以 #246 一次性落地，#222–#243 关闭为 superseded；(b) #227 与 #246 的双重承载以 #246 为准（#227 的内容完全包含在 #246 的提交历史里，且 #246 的版本已把配置项改为值键）"
+        "评审 §3.3 的两条不再需要所有者二次决策的结论已按评审建议执行：(a) 以 #246 一次性落地，#222–#243 关闭为 superseded；(b) #227 与 #246 的双重承载以 #246 为准（#227 的内容完全包含在 #246 的提交历史里，且 #246 的版本已把配置项改为值键）"
       ],
       "validation": [
         "类型检查：`npx tsc -p tsconfig.scripts.json` exit 0（排除项为零），`npx tsc -b` exit 0；改动前这三个文件在检查下分别报 4 个联合类型错误、2 个配置/收窄错误、1 个 .ts 扩展名错误",
@@ -2272,6 +2272,31 @@
         "门禁：check:components、check:change-contracts、check:project-reports（--base origin/main）、api:index:check 全绿",
         "CI：修复提交推送到 fix/review-blockers 后 PR #246 的 CI 通过；main 收到合并提交后 push 事件触发的 CI 通过（运行号见 PR/分支页）",
         "边界：本轮未复核评审 §3.1 所列 #245 的任何条目（按指示不碰他人 PR）；也未逐个更新 #222–#243 的 head——它们以 superseded 关闭，内容由 #246 承载"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-001",
+      "occurredAt": "2026-09-23T00:40:00+08:00",
+      "summary": "会话 CHAT-1790093502899 两个现象定位并修复：①给出 flag 后对话面板变空——GUI 用「压缩后的上下文分支」渲染历史，而该运行最后一条 Pi 条目正是 compaction；②verify_result 在未绑定 verifier 规则的对话里返回 verified:false 却不说原因，模型只能反复重试。另把候选匹配失败的报错改成说清「候选必须单独占一行」。",
+      "branch": "fix/chat-claim-and-compaction-view",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "现象①的根因（已直接复现，不是推断）：Pi 的 JsonlStorage.getPathToRootOrCompaction 在遇到带 retainedTail 的 compaction 时立刻停止回溯，于是 getBranch() 只返回那一条 compaction；apps/gui/src/debug-data.ts 用 conversationMessagesFromEntries(branch) 渲染对话，面板因此为空。实测该运行文件有 69 条 entry、branch 1 条、从 branch 渲染 0 条消息、从 entries 渲染 30 条。修法：对话历史改从完整 entry 路径渲染（history = entries），上下文分支继续以 branchEntryIds 暴露；「会话说过什么」与「模型上下文里有什么」是两个问题，后者不该回答前者",
+        "现象②的根因：任务的 verification 是 { kind: 'reproduction', required_reproductions: 0 } 且没有 command，于是 taskRequiresVerification() 为 false——orchestrator 侧的 latestPending/latestAcceptedVerification 一律返回 undefined（该轮以 run_paused 'Assist turn completed without a completion proposal.' 结束），而 verification/claim-verification.ts 里 completion_verified 只在任务绑定了 verifier 命令时才派发（locallyJudged = verifierDefinedCommand）。结论：这种对话里 verify_result 只能把候选记录成 observation，永远不可能进入 ACCEPTED。行为本身是既有设计，问题是工具对此一言不发",
+        "修复（不改接受语义）：ResultReproduction/ResultArtifactReproduction 新增 acceptance: 'verified' | 'observation_only'；verify_result 在 observation_only 时返回 verifierFeedback = { stage: 'policy', retryable: false, reason: '本任务的 task contract 没有 verification.command…重试无法改变结果', nextAction: '把结果与 Evidence id 报告给用户，除非任务契约更新否则不要再调用 verify_result' }",
+        "修复（只改文案，不改规则）：stdoutContainsExactCandidate 要求「某一行 trim 后与候选完全相等」，而失败文案写的是 did not contain the exact candidate——输出里其实包含候选项，模型据此只能猜。新增 exactCandidateRuleMessage()：说明规则、并附上命令输出的前三条非空行（截断 120 字符/行）。该运行第一次 verify_result 用的命令输出是 'FLAG             : GEELY{...}'，正是被这条规则拒绝的形态",
+        "测试：apps/gui/tests/debug-data.test.ts 新增用例（构造带 retainedTail 的 compaction，断言 entries=3、branchEntryIds=['m3']、messages=['user','assistant']；首版漏了 retainedTail，于是分支不截断、断言空转，已修正）；packages/materials/tests/coding-resources.test.ts 新增用例（无 verifier 规则的对话：前缀输出报错必须说 own line 且不得再写 did not contain the exact candidate；成功复现后必须返回 policy 反馈且 retryable=false，completion 仍为 PROPOSED、project() 仍为 unverified）",
+        "未做（等所有者拍板）：评审/所有者已同意方向但未选定形态的 D 项——允许给对话绑定验证命令（任务契约层，安全性同既有 verifier 任务）或让复现成功即 ACCEPT（改「什么算已验证」的语义）。本次没有触碰这两种语义"
+      ],
+      "validation": [
+        "现象①端到端复现与验证：用 GUI 自己的 DebugDataService.getRun 读取该运行，修复前 messages=0、修复后 messages=30（首条 user、末条 assistant 带 flag）；变异验证：把 history 改回 branch → 新用例 not ok",
+        "现象②变异验证：去掉 observation_only 反馈 → 新用例 not ok；把 exactCandidateRuleMessage 换回旧文案 → 新用例 not ok（两次均恢复后通过）",
+        "定向套件：coding-resources / claim-verification-recovery / verification-recovery / debug-data / tool-presentation 共 102 用例、fail 0（--test-concurrency=1）。另注：并发跑时 coding-resources 的 shell_background 用例曾失败一次，单文件重跑通过，属既有的负载相关抖动，与本次改动无关",
+        "门禁：api:index 重新生成后 check 通过；check:components / check:change-contracts / check:project-reports（--base origin/main）通过；test:ci-gates 43/43",
+        "缓存问题（所有者同轮提出，只做测量未改代码）：该运行 29 次请求总体命中 87.4%，三次低命中（22%/40%/33%）的成因不是前缀小，而是上下文维护在**已发送过的消息上原地改写**（#253 把 message[10] 从 5045 收到 820 tokens、#343/#359 两次改写 message[19] 25870→24275→677），每次都紧跟一次 checkpoint_created；DeepSeek 的前缀缓存只能复用到改动点，其后约 32k tokens 按新输入计费。其余请求 93–100%"
       ]
     }
   ],

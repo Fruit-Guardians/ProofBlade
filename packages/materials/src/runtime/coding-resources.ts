@@ -594,6 +594,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
           evidenceId: reproduction.evidenceId,
           completionId: reproduction.completionId,
           supportingEvidenceIds: reproduction.supportingEvidenceIds,
+          ...(reproduction.acceptance === "observation_only" ? { verifierFeedback: observationOnlyFeedback() } : {}),
         });
         return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
       } catch (error) {
@@ -642,6 +643,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
       completionId: reproduction.completionId,
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
+      ...(reproduction.acceptance === "observation_only" ? { verifierFeedback: observationOnlyFeedback() } : {}),
     });
     return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
   },
@@ -2759,6 +2761,30 @@ function toolResult(details: unknown, isError = false, maxChars?: number): Retur
     details,
     isError,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+/**
+ * Feedback for a reproduction the harness ran and could not turn into an accepted
+ * Completion, because the task binds no verification rule.
+ *
+ * Without this the tool returned `verified: false` beside a fresh artifactId,
+ * evidenceId and completionId and said nothing else, so the model read it as a
+ * failed verification and retried with a different command -- which cannot change
+ * the outcome, because acceptance is decided by the task contract, not by the
+ * command. `retryable: false` is the honest answer here.
+ */
+function observationOnlyFeedback(): {
+  stage: "input" | "policy" | "execution" | "recovery";
+  reason: string;
+  retryable: boolean;
+  nextAction: string;
+} {
+  return {
+    stage: "policy",
+    reason: "This run's task declares no verification rule (no verification.command), so a claim can only be recorded as observed Evidence; no Completion can be accepted and retrying verify_result cannot change that.",
+    retryable: false,
+    nextAction: "Report the result to the user with the Evidence id. Do not call verify_result again unless the task contract is updated with a verification command.",
+  };
 }
 
 function verifierFailureFeedback(error: unknown): {
