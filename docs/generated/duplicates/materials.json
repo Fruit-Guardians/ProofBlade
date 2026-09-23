@@ -478,7 +478,7 @@
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
-          "line": 187,
+          "line": 200,
           "summary": "Execute a verifier-owned browser clean-context attestation."
         },
         {
@@ -488,7 +488,7 @@
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
-          "line": 153,
+          "line": 166,
           "summary": "Execute a verifier-owned web attestation without exposing the verifier port to the lane."
         }
       ],
@@ -507,7 +507,7 @@
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 266,
+          "line": 279,
           "summary": "Mark a browser verifier Completion accepted/rejected after its Evidence is recorded."
         },
         {
@@ -517,7 +517,7 @@
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 271,
+          "line": 284,
           "summary": "Mark a Pwn verifier Completion accepted/rejected after its bound Evidence."
         },
         {
@@ -527,7 +527,7 @@
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 261,
+          "line": 274,
           "summary": "Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded."
         }
       ],
