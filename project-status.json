@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T01:05:00+08:00",
+  "updatedAt": "2026-09-23T01:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2318,6 +2318,27 @@
         "变异验证：把门禁条件改回恒真 → 新用例 not ok（恢复后 3/3 通过）",
         "定向套件：phase-gate / coding-resources / single-agent-loop 共 67 用例 fail 0（--test-concurrency=1）；npx tsc -b exit 0",
         "范围说明：本次不改「什么算已验证」的语义——没有让模型自证即 ACCEPT，也没有新增任务级命令绑定；只去掉了一个永远无法满足的门禁要求"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-003",
+      "occurredAt": "2026-09-23T01:40:00+08:00",
+      "summary": "对两份内容相同的 harness 使用反馈（其中一份已核实为 runs/CHAT-1790096643438 的最终 assistant 消息，另一份来源未确认）逐条核对代码与事件，产出更新计划文档；预算计数、skill 路由兜底、无 verifier 任务的双树与 VR 债四条经核实成立并立项。",
+      "branch": "docs/harness-feedback-update-plan",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "新增 docs/PROOFBLADE_HARNESS_FEEDBACK_UPDATE_PLAN_ZH.md：先给来源与证据等级声明（第一份=该 run 事件 #355 的 text，逐字一致；第二份来源未确认，不作为独立证据；反馈本身是使用者自述而非实测），再逐条核对 9 条，给出 P0/P1 与「不做」清单",
+        "核实成立：预算字段 run_tool_calls_used 实际数的是 durable effects（phase-budget.ts:27），该 run 显示 2 而真实工具结果 10；skill-routing.ts:28 用宽泛正则给 ctf-misc 兜底 12 分；VR-1e0de02d/VR-de190718 在 #339/#340 产生 verification_recovery_required；TREE-b8f448bb 与 TREE-6254a5fe 为同一结论建了两棵树",
+        "核实为「部分」：skill 兜底规则成立，但反馈所称 pyjail/HISTFILE/SECCOMP 正文未在 prompt 快照中命中（快照只含系统提示），需一次带 load_skill 的复现定性；「重复探测误判迭代」未复现，列为待验证",
+        "计划：P0-1 预算字段按真实 tool call 统计并拆出 durable_effects_used；P0-2 skill 路由无领域信号时弃权；P0-3 无 verifier 规则任务进入 observed-only（不生成 RECOVERY_REQUIRED、不为同一结论建第二棵树）；P1-1 phase/gate 由真实证据推进（已解出时不再 blocked，优先只改展示）；P1-2 重复探测判定加入输出指纹",
+        "明确不做：模型自证即 ACCEPT、删除证据链/封印/世代绑定；P0-3 与 P1-1 落地前需所有者确认"
+      ],
+      "validation": [
+        "本文档不含未跑过的实验结论：所有机制名与 id 都指向该 run 的事件序号或源码行（已逐条 grep/读码核对）",
+        "边界已写入 §4：除「计数 10 vs 2」与两棵树的 id 外，其余影响程度未量化；pyjail 正文注入一条标为未复现"
       ]
     }
   ],
