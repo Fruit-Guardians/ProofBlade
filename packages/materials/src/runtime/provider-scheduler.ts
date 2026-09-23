@@ -202,7 +202,7 @@ export class ProviderRequestScheduler {
         const idle = new AbortController();
         const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
         const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
-        const outcome = await this.drainAttempt(source, idle, observer, requestId, attempt, Date.now(), scope);
+        const outcome = await this.drainAttempt(source, idle, options?.signal, observer, requestId, attempt, Date.now(), scope);
         // A terminal error this attempt produced (either a real error event or a
         // synthetic one from an idle stall / iterator throw).
         const errorMessage = outcome.kind === "error" ? outcome.event.error : outcome.kind === "threw" ? errorEvent(model, outcome.error).error : undefined;
@@ -283,6 +283,7 @@ export class ProviderRequestScheduler {
   private async drainAttempt(
     source: AssistantMessageEventStream,
     idle: AbortController,
+    requestSignal: AbortSignal | undefined,
     observer: ProviderRequestSchedulingObserver | undefined,
     requestId: string | undefined,
     attempt: number,
@@ -307,6 +308,7 @@ export class ProviderRequestScheduler {
     const iterator = source[Symbol.asyncIterator]();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let lastEventAt = attemptStartedAt;
+    let onRequestAbort: (() => void) | undefined;
     // Local, not an instance field: concurrent streams each run their own attempt
     // and must not share one timer handle.
     let rearm: () => void = () => {};
@@ -323,6 +325,11 @@ export class ProviderRequestScheduler {
       };
       rearm();
     });
+    const requestAbort = new Promise<never>((_, reject) => {
+      onRequestAbort = () => reject(new ProviderRequestQueueAbortedError());
+      if (requestSignal?.aborted) onRequestAbort();
+      else requestSignal?.addEventListener("abort", onRequestAbort, { once: true });
+    });
     try {
       for (;;) {
         const pending = iterator.next();
@@ -330,7 +337,7 @@ export class ProviderRequestScheduler {
         // later reject once the abort tears down the fetch; swallow that so it
         // never surfaces as an unhandled rejection.
         pending.catch(() => {});
-        const next = await Promise.race([pending, stall]);
+        const next = await Promise.race([pending, stall, requestAbort]);
         if (next.done) return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };
         const event = next.value;
         const now = Date.now();
@@ -347,6 +354,7 @@ export class ProviderRequestScheduler {
       return { kind: "threw", events, error, stats };
     } finally {
       clearTimeout(timer);
+      if (onRequestAbort) requestSignal?.removeEventListener("abort", onRequestAbort);
       // Best-effort close so the abandoned generator can run its own cleanup.
       void iterator.return?.(undefined).catch(() => {});
     }
@@ -496,7 +504,7 @@ export function providerRequestScheduler(): ProviderRequestScheduler {
 }
 
 export function configuredMaxConcurrentRequests(value: number | undefined): number {
-  return value ?? 1;
+  return value ?? 4;
 }
 
 function assertScope(scope: ProviderRequestScope): void {

@@ -40,7 +40,7 @@
 - 运行中状态以服务端 `active` 投影为准，页面切换或组件重挂载不得恢复为可发送状态；暂停确认前按钮保持可见并禁用重复暂停。
 - 模型标签和右侧配置必须显示当前对话下一轮使用的 Provider/Model/Thinking；最近一条响应的模型仅作为历史元数据，不得覆盖当前选择。
 - Provider Profile 必须显示并保存实际 wire protocol；模型发现按 OpenAI Bearer 或 Anthropic `x-api-key`/版本头发送。能力面板按本对话 Profile 显示 Provider Native 状态：协议候选未接入时不可勾选，和受控 workspace 工具语义重合时显示被接管原因，不能把产品内置工具误展示为 ProofBlade 可执行能力。
-- Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 1）；普通对话与 Fixture Solver 共用按 Provider/model 的 FIFO 槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
+- Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 4）；普通对话与 Fixture Solver 共用按 Provider/model 的 FIFO 槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
 - 上下文面板显示最近一次真实 Provider 请求的已用 tokens、窗口上限、剩余 tokens 和利用率；对话可选择 20%-80% 的主动压缩阈值，该偏好由服务端传入现有 Coding Lane 维护链，不能在 GUI 另建压缩流程。
 - “待处理观察”面板直接由 `ControlStore` 事件重建，不维护 GUI 私有队列；显示 Job/Provider/Verifier/Maintenance 的有界脱敏摘要、待消费和 urgent 数量、来源、事件序号、关联 Job/Request/Artifact/ref。Coding Lane 在安全点只注入本次确实展示的前 8 项，消费标记以 `observation_consumed` 事件持久化，重启后可重建且幂等。
@@ -60,7 +60,7 @@
 - Server 启动必须在首个请求前调用 `DebugDataService.assertRuntimeShape()`，断言 `@proofblade/materials` 运行时暴露 `REQUIRED_CONTROL_METHODS` 的全部成员并打印解析到的包路径。缺失成员属于源码与 `dist` 的构建错配，必须 fail-fast；不得为该断言增加运行时兼容降级，降级会把构建问题重新变成难以定位的投影异常。`npm run gui` 先执行 `build:gui-deps` 保证产物一致，`gui:fast` 只用于已由 watcher 保证一致的场景。
 - 普通对话**不得**创建 `.proofblade-workspaces/<runId>`。`createConversation()` 构造的 TaskContract 使用用户选择的真实目录（`target`/`allowed_workspace` = 该目录、`inputs: []`），执行 cwd 由 `taskExecutionWorkspace()` 解析，因此无需 staging；即使填写了 `verificationCommand` 也仍是普通对话。staging 只服务附件验证任务，由 `startTask()` 经 `stageTaskWorkspace()` 创建，用于不可变附件、逐文件 sha256、符号链接拒绝与可重放 cwd。staging 根必须是 `dirname(runsRoot)` 而非 Run 目录内部——`JsonlControlStore` 会把任何已存在的 Run 目录当作既有 Run。该边界由回归测试**双向**锁定（普通对话不创建 + 附件任务仍创建），路径断言必须复用 `taskWorkspaceDir()`/`taskWorkspaceRoot()`，不得另写字面量以免与实现漂移。
 - `POST /api/conversations` **不得**加载 workspace 能力目录（`capabilityCatalog()`）。创建只做三件事：校验工作目录、创建最小 Run、保存调用方实际提交的偏好字段。因此 `WorkspaceSettingsStore.saveConversation()` 允许省略 `defaults`；省略时**不落地** `enabledTools`/`enabledSkills`/`enabledMcpServers`，这些列表在读取时由当前默认值解析。理由有两条：创建阶段扫描 Skills/MCP/Tool 目录属于用户尚未要求的开销；而把创建时的快照写进本地配置，会让此后新增的能力对该对话永久不可见。显式选择与已存值仍优先于默认值。
-- 后台轮询的可见状态规则必须经 `polling.ts` 的 `isPollingAllowed()` 判定，**不得在定时器回调里重新内联** `visibilityState` 比较：每个 tick 都会取回完整 RunDetail（实测一个 121 事件的 Run 为 145KB，其中 events 占 100KB），隐藏标签页不该调度这份开销。该规则由 `[contract:polling-hidden-document-is-idle]` 与 `gui-polling-idle-discipline` 契约锁定。服务端 `/api/runs/:id/events` 已支持 `afterSeq` 增量读取，但客户端**尚未采用**——采用它需要客户端累积事件并同步改动时间线与调试器，属行为变更，须浏览器验证。
+- 后台轮询的可见状态规则必须经 `polling.ts` 的 `isPollingAllowed()` 判定，**不得在定时器回调里重新内联** `visibilityState` 比较。首次进入会话仍取完整 RunDetail，后续 tick 使用 `/api/runs/:id/updates?afterSeq=` 只传递事件尾部和轻量状态；暂停、终态或事件缺口时再刷新一次完整详情。该规则由 `[contract:polling-hidden-document-is-idle]` 与 `gui-polling-idle-discipline` 契约锁定。
 
 ## 验证
 

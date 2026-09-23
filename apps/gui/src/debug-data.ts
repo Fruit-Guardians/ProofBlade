@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { access, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -51,6 +52,7 @@ import type {
   RunDetail,
   RunKind,
   RunListItem,
+  RunUpdates,
   ToolCallDebug,
   TokenUsage,
 } from "./shared.js";
@@ -104,6 +106,8 @@ export class DebugDataService {
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
   private readonly chatTasks = new Set<Promise<void>>();
+  private readonly chatRuns = new Map<string, AbortController>();
+  private readonly chatCleanupFailures = new Map<string, unknown>();
   private readonly taskRuns = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
@@ -174,8 +178,9 @@ export class DebugDataService {
     this.runDetailLoads.clear();
     const aborts: Promise<unknown>[] = [];
     for (const [runId, lane] of this.activeLanes) {
-      if (!this.taskRuns.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
+      if (!this.taskRuns.has(runId) && !this.chatRuns.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
     }
+    for (const controller of this.chatRuns.values()) controller.abort("GUI shutting down");
     for (const task of this.taskRuns.values()) task.controller.abort("GUI shutting down");
     const abortResults = await Promise.allSettled(aborts);
     const taskResults = await Promise.allSettled([
@@ -185,6 +190,10 @@ export class DebugDataService {
     const sandboxResult = await Promise.allSettled([this.services.sandbox.close()]);
     const failures = [...abortResults, ...taskResults, ...sandboxResult]
       .flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+    for (const failure of this.chatCleanupFailures.values()) {
+      if (failure instanceof AggregateError) failures.push(...failure.errors);
+      else failures.push(failure);
+    }
     this.runListCache.clear();
     this.runDetailCache.clear();
     this.runDetailLoads.clear();
@@ -327,6 +336,37 @@ export class DebugDataService {
     }
   }
 
+  /** Return only the durable event suffix needed by the background GUI poller. */
+  public async updates(runId: string, afterSeq: number, knownSessionVersion?: string): Promise<RunUpdates> {
+    assertRunId(runId);
+    if (!Number.isInteger(afterSeq) || afterSeq < 0) throw new Error("afterSeq must be a non-negative integer");
+    const sessionsVersion = await filesystemVersion(join(this.services.runsRoot, runId, "pi-sessions"));
+    const sessionVersionToken = hashFilesystemVersion(sessionsVersion);
+    const [events, items, eventsStat] = await Promise.all([
+      this.services.control.events(runId),
+      this.listRuns(),
+      stat(join(this.services.runsRoot, runId, "events.jsonl")),
+    ]);
+    const item = items.find((candidate) => candidate.runId === runId);
+    if (!item) throw new Error(`Run not found: ${runId}`);
+    const suffix = events.filter((event) => event.seq > afterSeq);
+    const reloadDetail = item.status === "PAUSED"
+      || ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(item.status)
+      || suffix.length > clientEventLimit
+      || (knownSessionVersion !== undefined && knownSessionVersion !== sessionVersionToken);
+    return {
+      runId,
+      lastSeq: item.lastSeq,
+      status: item.status,
+      phase: item.phase,
+      active: this.active.get(runId),
+      events: suffix.length > clientEventLimit ? suffix.slice(-clientEventLimit) : suffix,
+      updatedAt: eventsStat.mtime.toISOString(),
+      sessionVersion: sessionVersionToken,
+      reloadDetail,
+    };
+  }
+
   private async loadRunDetail(runId: string, eventsStat: Stats, eventsVersion: string, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
     const snapshotPromise = this.loadSnapshotForDetail(runId);
     const eventsPromise = this.services.control.events(runId);
@@ -338,7 +378,7 @@ export class DebugDataService {
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const clientEvents = events.length > clientEventLimit ? events.slice(-clientEventLimit) : events;
-    const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), sessionVersion: hashFilesystemVersion(loadedSessionsVersion), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsVersion, sessionsRoot, loadedSessionsVersion);
     // `detail` contains the raw session entries plus derived message/tool
     // projections that intentionally repeat parts of that data. Walking the
@@ -459,7 +499,7 @@ export class DebugDataService {
         this.activeLanes.set(task.task_id, lane);
         if (this.pauseRequests.has(task.task_id)) {
           await this.ensurePaused(task.task_id, "Paused by user");
-          await lane.abort("Paused by user");
+          void lane.abort("Paused by user").catch(() => undefined);
         }
       },
     }).then(() => {
@@ -562,6 +602,15 @@ export class DebugDataService {
     this.chatTasks.add(task);
     try {
       await task;
+    } catch (error) {
+      // Cleanup failures are reported by shutdown as an AggregateError. Keep
+      // the per-request promise observed so a late abort cannot surface as an
+      // unhandled rejection while the GUI is closing.
+      if (this.closing || error instanceof AggregateError) {
+        this.chatCleanupFailures.set(runId, error);
+      } else {
+        throw error;
+      }
     } finally {
       this.chatTasks.delete(task);
     }
@@ -596,6 +645,8 @@ export class DebugDataService {
     const info: ActiveRunInfo = { runId, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(runId, info);
     this.streamEmitters.set(runId, emit);
+    const controller = new AbortController();
+    this.chatRuns.set(runId, controller);
     emit({ type: "started", runId });
     let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
@@ -634,6 +685,7 @@ export class DebugDataService {
         mode: "assist",
         maxTurns: 1,
         userPrompt: text,
+        signal: controller.signal,
         onTurn: (outcome) => { taskOutcome = outcome; },
         onEvent: (event) => emitAgentEvent(event, emit),
         onLaneReady: async (activeLane) => {
@@ -641,7 +693,7 @@ export class DebugDataService {
           this.activeLanes.set(runId, activeLane);
           if (this.pauseRequests.has(runId)) {
             await this.ensurePaused(runId, "Paused by user");
-            await activeLane.abort("Paused by user");
+            void activeLane.abort("Paused by user").catch(() => undefined);
           }
         },
       });
@@ -662,10 +714,14 @@ export class DebugDataService {
         await this.ensurePaused(runId, "Paused by user");
         emit({ type: "paused", runId });
       } else {
+        if (this.closing || error instanceof AggregateError) this.chatCleanupFailures.set(runId, error);
         emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
       }
     } finally {
-      await lane?.close().catch(() => undefined);
+      // SingleAgentLoop owns the lane cleanup and already bounds it. Closing
+      // here a second time calls Pi's waitForIdle() without that bound and can
+      // keep a paused chat request open behind a provider that ignores abort.
+      this.chatRuns.delete(runId);
       this.activeLanes.delete(runId);
       this.pauseRequests.delete(runId);
       this.streamEmitters.delete(runId);
@@ -690,8 +746,10 @@ export class DebugDataService {
     const paused: ActiveRunInfo = { ...current, state: "paused" };
     this.active.set(runId, paused);
     const taskRun = this.taskRuns.get(runId);
+    const chatRun = this.chatRuns.get(runId);
     if (taskRun) taskRun.controller.abort(reason);
-    else await this.activeLanes.get(runId)?.abort(reason);
+    else if (chatRun) chatRun.abort(reason);
+    else void this.activeLanes.get(runId)?.abort(reason).catch(() => undefined);
     return paused;
   }
 
@@ -789,6 +847,10 @@ async function filesystemVersion(root: string): Promise<string> {
   await visit(root);
   entries.sort();
   return entries.join("\n");
+}
+
+function hashFilesystemVersion(version: string): string {
+  return createHash("sha256").update(version).digest("hex");
 }
 
 /**

@@ -309,8 +309,22 @@ export interface RunDetail {
   controlView: RunControlView;
   active?: ActiveRunInfo;
   updatedAt: string;
+  sessionVersion?: string;
   context?: ContextRuntimeInfo;
   observationQueue: ObservationQueueProjection;
+}
+
+/** Lightweight background polling payload; it never includes sessions or telemetry. */
+export interface RunUpdates {
+  runId: string;
+  lastSeq: number;
+  status: RunSnapshot["status"];
+  phase: RunSnapshot["phase"];
+  active?: ActiveRunInfo;
+  events: HarnessEvent[];
+  updatedAt: string;
+  sessionVersion?: string;
+  reloadDetail: boolean;
 }
 
 export interface ContextRuntimeInfo {

@@ -1,4 +1,4 @@
-import type { AblationDetail, AblationListItem, ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetSnapshot, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
+import type { AblationDetail, AblationListItem, ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetSnapshot, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, RunUpdates, WorkspaceSettings } from "./shared.js";
 import type { ProviderApi } from "@proofblade/materials";
 
 export async function getBootstrap(): Promise<BootstrapData> {
@@ -87,6 +87,12 @@ export async function removeFolder(folderId: string): Promise<void> {
 
 export async function getRun(runId: string): Promise<RunDetail> {
   return await request(`/api/runs/${encodeURIComponent(runId)}`);
+}
+
+export async function getRunUpdates(runId: string, afterSeq: number, sessionVersion?: string): Promise<RunUpdates> {
+  const query = new URLSearchParams({ afterSeq: String(afterSeq) });
+  if (sessionVersion !== undefined) query.set("sessionVersion", sessionVersion);
+  return await request(`/api/runs/${encodeURIComponent(runId)}/updates?${query}`);
 }
 
 export async function getArtifact(runId: string, artifactId: string, offset = 0, limit = 64 * 1024): Promise<ArtifactContent> {

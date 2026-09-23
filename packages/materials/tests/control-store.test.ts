@@ -110,6 +110,34 @@ test("ControlStore folds from the durable projection and only replays a telemetr
   }
 });
 
+test("a warm JSONL reader parses only an appended event suffix", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-jsonl-tail-"));
+  try {
+    const runsRoot = join(root, "runs");
+    const runId = "JSONL-TAIL-001";
+    const creator = new ControlStore(new JsonlControlStore(runsRoot), undefined, "jsonl-tail-secret-0123456789abcdef");
+    await creator.createRun(runId, demoTask(runId, root, config));
+    const reader = new JsonlControlStore(runsRoot);
+    const initial = await reader.events(runId);
+    const before = reader.readStats();
+    await creator.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      actor: "model",
+      correlationId: "jsonl-tail",
+      type: "model_usage",
+      payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    const appended = await reader.events(runId);
+    const after = reader.readStats();
+    assert.equal(appended.length, initial.length + 1);
+    assert.equal(after.parsedEvents - before.parsedEvents, 1);
+    assert.equal(after.parsedBytes - before.parsedBytes, Buffer.byteLength(canonicalJson(appended.at(-1)), "utf8"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("ControlStore rejects a self-hashed projection that is not sealed to the event prefix", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-projection-seal-"));
   try {

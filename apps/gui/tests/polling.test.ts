@@ -137,13 +137,14 @@ test("the background timer enforces the visibility rule through the tested predi
   assert.doesNotMatch(source, /visibilityState\s*!==\s*"visible"/, "the guard must not be re-inlined, or the predicate stops being the single rule");
 });
 
-test("the incremental events endpoint stays available for the chat poll to adopt", async () => {
-  // Item I, second half: the server side already supports `afterSeq`, but no
-  // client calls it, so every poll still transfers the whole event stream. The
-  // client change needs browser verification and is deliberately not made here.
-  // This keeps the endpoint from being removed as "unused" while that is pending.
-  const source = await readFile(join(import.meta.dirname, "..", "src", "server.ts"), "utf8");
-  assert.match(source, /afterSeq/, "the events endpoint must keep supporting incremental reads");
+test("background chat polling adopts the incremental updates endpoint", async () => {
+  const server = await readFile(join(import.meta.dirname, "..", "src", "server.ts"), "utf8");
+  const api = await readFile(join(import.meta.dirname, "..", "src", "api.ts"), "utf8");
+  const app = await readFile(join(import.meta.dirname, "..", "src", "App.tsx"), "utf8");
+  assert.match(server, /parts\[3\] === "updates"[\s\S]*afterSeq/);
+  assert.match(api, /getRunUpdates[\s\S]*afterSeq/);
+  assert.match(app, /mode === "background"\) await refreshUpdates/);
+  assert.doesNotMatch(app, /mode === "background"\) await refreshDetail/);
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {

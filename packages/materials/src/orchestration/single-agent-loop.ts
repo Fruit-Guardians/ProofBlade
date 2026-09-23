@@ -170,6 +170,7 @@ export class SingleAgentLoop {
     let lane: AgentLanePort | undefined;
     let removeAbortListener: (() => void) | undefined;
     let abortPromise: Promise<void> | undefined;
+    let abortFailure: unknown;
     let turns = 0;
     let verification: VerificationOutcome | undefined;
     let activeWorkItemId: string | undefined;
@@ -203,7 +204,12 @@ export class SingleAgentLoop {
       });
       const activeLane = lane;
       const onAbort = () => {
-        abortPromise = activeLane.abort(options.signal?.reason ?? "GUI shutting down");
+        // Observe the lane promise immediately. Cleanup below reintroduces the
+        // captured failure into its aggregate without leaving an unhandled
+        // rejection during AbortController event dispatch.
+        abortPromise = Promise.resolve()
+          .then(() => activeLane.abort(options.signal?.reason ?? "GUI shutting down"))
+          .then(() => undefined, (error: unknown) => { abortFailure = error; });
       };
       if (options.signal) {
         options.signal.addEventListener("abort", onAbort, { once: true });
@@ -355,6 +361,7 @@ export class SingleAgentLoop {
       removeAbortListener?.();
       const results: Array<{ resource: string; result: PromiseSettledResult<void> }> = [];
       if (abortPromise) results.push({ resource: "coding_lane_abort", result: await settleWithTimeout(abortPromise, "coding lane abort") });
+      if (abortFailure !== undefined) results.push({ resource: "coding_lane_abort", result: { status: "rejected", reason: abortFailure } });
       if (lane) results.push({ resource: "coding_lane_close", result: await settleWithTimeout(Promise.resolve().then(() => lane!.close()), "coding lane close") });
       results.push({ resource: "tool_runtime_close", result: await settleWithTimeout(Promise.resolve().then(() => runtime.close()), "tool runtime close") });
       const timedOutResources = results.flatMap(({ resource, result }) => result.status === "rejected" && isCleanupTimeout(result.reason) ? [resource] : []);

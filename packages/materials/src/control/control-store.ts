@@ -976,6 +976,9 @@ export class ControlStore {
 function sameRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
   return left.size === right.size
     && left.mtimeMs === right.mtimeMs
+    && (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
+    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino)
+    && (left.ctimeMs === undefined || right.ctimeMs === undefined || left.ctimeMs === right.ctimeMs)
     && left.taskSize === right.taskSize
     && left.taskMtimeMs === right.taskMtimeMs;
 }

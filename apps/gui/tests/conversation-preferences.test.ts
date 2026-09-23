@@ -144,7 +144,8 @@ test("creating a conversation does not load the capability catalog", async () =>
   const source = await readFile(join(import.meta.dirname, "../src/server.ts"), "utf8");
   const start = source.indexOf('if (method === "POST" && url.pathname === "/api/conversations")');
   assert.ok(start > 0, "the create-conversation route must exist");
-  const end = source.indexOf("\n  }\n", start);
+  const relativeEnd = source.slice(start).search(/\r?\n  }\r?\n/);
+  const end = relativeEnd < 0 ? -1 : start + relativeEnd;
   assert.ok(end > start, "the create-conversation route must have a body");
   const route = source.slice(start, end);
 
