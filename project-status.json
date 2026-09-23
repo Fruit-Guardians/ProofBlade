@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T01:40:00+08:00",
+  "updatedAt": "2026-09-23T02:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2339,6 +2339,27 @@
       "validation": [
         "本文档不含未跑过的实验结论：所有机制名与 id 都指向该 run 的事件序号或源码行（已逐条 grep/读码核对）",
         "边界已写入 §4：除「计数 10 vs 2」与两棵树的 id 外，其余影响程度未量化；pyjail 正文注入一条标为未复现"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-004",
+      "occurredAt": "2026-09-23T02:30:00+08:00",
+      "summary": "按反馈计划 P0-1 的第一半：把「预算」字段按它真正计量的东西改名——max_tool_calls 限制的是 Effect Journal 条目，而 bash/read/edit/write 从不进入 Journal，所以那个数字不是工具调用次数。",
+      "branch": "fix/journaled-effect-budget-label",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "phase-budget.ts：runToolCallsUsed/Remaining 改名为 journaledEffectsUsed/Remaining，并在接口上写明 max_tool_calls 的真实语义（effect-journal.ts 的 Tool budget exhausted 用 Object.keys(snapshot.effects).length 判定；competition/COMPONENT.md 明确 bash/read/edit/write 与一等 MCP 工具不计入）",
+        "context/compiler.ts 的相位块改为 journaled_effects_used / journaled_effects_remaining；GUI 侧 shared.ts、control-view.ts、App.tsx 同步改名，标签由「Run Tool 预算」改为「Journaled Effect 预算」并注明它不统计工具调用",
+        "没有做的事：没有伪造一个「真实工具调用数」。该视图只有 snapshot（无事件），精确计数需要把 tool_result_recorded 接进 ContextBuildInput，属 P0-1 的第二半，已记在计划文档里",
+        "证据：CHAT-1790096643438 提示里显示 2 used / 998 remaining，而该 run 实际工具结果 10 次（bash 7、read 2、update_phase 1）；计数正确、名字错误"
+      ],
+      "validation": [
+        "变异验证：把提示里的键名改回 run_tool_calls_used / run_tool_calls_remaining → context.test.ts not ok（恢复后通过）",
+        "context.test.ts 与 control-view.test.ts 共 20 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过",
+        "全仓 grep：旧名只剩 phase-budget.ts 注释里的一句历史说明"
       ]
     }
   ],
