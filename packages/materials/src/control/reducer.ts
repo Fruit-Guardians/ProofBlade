@@ -824,7 +824,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "provider_request_inter_event_idle":
     case "provider_request_stalled":
     case "tool_call_recorded":
+      break;
     case "tool_result_recorded":
+      // The real tool-call count. Telemetry otherwise, but the prompt needs a number
+      // that matches what the model actually did -- see `RunSnapshot.toolCalls`.
+      next.toolCalls = (next.toolCalls ?? 0) + 1;
+      break;
     case "consolidate_started":
     case "consolidate_summary":
     case "consolidate_finished":

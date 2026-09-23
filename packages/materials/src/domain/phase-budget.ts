@@ -25,6 +25,12 @@ export interface PhaseBudgetView {
    */
   journaledEffectsUsed: number;
   journaledEffectsRemaining: number;
+  /**
+   * Tool results folded into the snapshot: how many tools were actually called.
+   * Undefined when the snapshot does not know (see RunSnapshot.toolCalls), in
+   * which case callers must omit it instead of showing a lower bound.
+   */
+  toolCallsUsed?: number;
   submissionsUsed: number;
   submissionsRemaining: number;
   replansUsed: number;
@@ -42,6 +48,7 @@ export interface PhaseBudgetView {
 export function phaseBudget(snapshot: RunSnapshot, now?: number): PhaseBudgetView {
   const actionBundle = snapshot.toolPreparation?.actionBundles?.find((bundle) => bundle.domainPhase === snapshot.domainPhase);
   const phaseActionsUsed = Object.values(snapshot.experiments).filter((experiment) => experiment.generation === snapshot.generation && experiment.domainPhase === snapshot.domainPhase).length;
+  const toolCallsUsed = snapshot.toolCalls;
   const journaledEffectsUsed = Object.keys(snapshot.effects).length;
   const journaledEffectsRemaining = Math.max(0, snapshot.task.constraints.max_tool_calls - journaledEffectsUsed);
   const submissionsUsed = Object.values(snapshot.effects).filter((effect) => effect.operation === "fixture_score").length;
@@ -59,6 +66,7 @@ export function phaseBudget(snapshot: RunSnapshot, now?: number): PhaseBudgetVie
     ...(actionBundle ? { actionBundle: structuredClone(actionBundle) } : {}),
     phaseActionsUsed,
     ...(phaseActionsRemaining === undefined ? {} : { phaseActionsRemaining }),
+    ...(toolCallsUsed === undefined ? {} : { toolCallsUsed }),
     journaledEffectsUsed,
     journaledEffectsRemaining,
     submissionsUsed,

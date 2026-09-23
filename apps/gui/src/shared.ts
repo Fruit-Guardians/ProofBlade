@@ -183,6 +183,8 @@ export interface RunControlView {
   budget: {
     phaseActionsUsed: number;
     phaseActionsRemaining?: number;
+    /** Real tool calls (durable tool results); absent when the fold cannot know. */
+    toolCallsUsed?: number;
     /** Effect Journal entries, not tool calls -- see `PhaseBudgetView`. */
     journaledEffectsUsed: number;
     journaledEffectsRemaining: number;

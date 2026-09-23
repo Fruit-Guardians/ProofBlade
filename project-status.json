@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T04:40:00+08:00",
+  "updatedAt": "2026-09-23T05:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2441,6 +2441,27 @@
         "变异验证：把交集判定改成恒不命中（existingTree = undefined）→ 新用例 not ok（恢复后通过）",
         "coding-resources.test.ts 44 用例 fail 0；claim-verification-recovery + verification-recovery + phase-gate + evidence-curation-gate 共 23 用例 fail 0；npx tsc -b exit 0",
         "过程中的两次失败尝试已记录：evidence_record 工具在最小上下文里返回的是裁剪后的投影（无 treeId），改用图 API 后仍不建树——原因是 recordEvidence 需要 claim 字段才建树；用 claim 后才复现出重叠场景"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-009",
+      "occurredAt": "2026-09-23T05:20:00+08:00",
+      "summary": "按反馈计划 P0-1 的后半：给出真实的工具调用计数。RunSnapshot 新增 toolCalls（由 tool_result_recorded 折叠而来，可重放），相位块输出 tool_calls_used，与「enforced 的 Effect Journal 预算」并列显示——两者曾经被混为一谈。",
+      "branch": "fix/tool-call-count",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "domain/types.ts：RunSnapshot 新增可选 toolCalls，注释写明它是「折叠进来的工具结果数」、undefined 表示不知道（旧投影被尾部折叠时早期工具结果不在 fold 里），调用方必须省略而不是把下界当计数；control/reducer.ts 把 tool_result_recorded 从 no-op 分支移出并自增",
+        "domain/phase-budget.ts 暴露 toolCallsUsed（snapshot 不知道时不填）；context/compiler.ts 的相位块输出 tool_calls_used，与 journaled_effects_used/remaining 并列；GUI 侧 shared.ts、control-view.ts、App.tsx 同步显示「工具调用 N 次 · Journaled Effect x used」",
+        "为什么两条并存：max_tool_calls 强制的是 Effect Journal 条目（effect-journal.ts 的判定），而 bash/read/edit/write 与一等 MCP 工具不进 Journal。PR #250 把那个计数器改名成 journaled_effects_*，本项补上真正的调用数——反馈的原话是「当计数与事实差一个数量级时，预算就不该作为信号展示」",
+        "测试：新增 packages/materials/tests/tool-call-count.test.ts 两条——①追加 3 条 tool_result_recorded 后 snapshot.toolCalls=3、effects=0、phaseBudget.toolCallsUsed=3、提示里出现 tool_calls_used:3 且 journaled_effects_used:0；②未折叠任何工具结果的快照在提示里完全不出现 tool_calls_used（没有数据就不编数字）"
+      ],
+      "validation": [
+        "变异验证：把 reducer 的自增改回 break → 第一条用例 not ok（恢复后通过）",
+        "tool-call-count.test.ts 2 用例 + apps/gui/tests/control-view.test.ts 1 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过；check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
+        "边界：既有投影（写于本字段之前）被尾部折叠时 toolCalls 保持 undefined，提示里不显示该字段——这条边界写在 RunSnapshot.toolCalls 的注释里，而不是靠读者推断"
       ]
     }
   ],
