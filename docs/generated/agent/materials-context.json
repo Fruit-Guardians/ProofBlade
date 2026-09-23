@@ -49,7 +49,7 @@
     "src/domain/handoff.ts": "c8b05fccff8b0751c98aab3bd8ef5702a1c07fa85084e70b2a72436b4d88f88c",
     "src/domain/intent.ts": "68773dfc14034905acf9de2d19fe03fae8efebe6c8717d461a308d5784761c9c",
     "src/domain/phase-budget.ts": "47af0fe408e15eb825933452b8125ffb807a1a478a28844742e4926cb80387bc",
-    "src/domain/phase-gate.ts": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
+    "src/domain/phase-gate.ts": "bd661225843d426b8038f439986642409fad973f7704e1a543e587e04eab231d",
     "src/domain/reasoning.ts": "8b963b8589782b26805e02dad008b06def6ed33b75d95a05fd6cb0005de2fec0",
     "src/domain/records.ts": "0959042f6f622d5a773c21e58c8f10917ec12f8d7fb73a347fc478283fe147b6",
     "src/domain/run-id.ts": "44bc23a8071c0b6e545b52c4718d13eef4c453741f0a05eee1b51a5befc1d5a5",
@@ -4321,7 +4321,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
       "line": 41,
-      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
+      "moduleHash": "bd661225843d426b8038f439986642409fad973f7704e1a543e587e04eab231d",
       "testRefs": [
         "packages/materials/tests/phase-gate.test.ts"
       ]
@@ -4337,7 +4337,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
       "line": 15,
-      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
+      "moduleHash": "bd661225843d426b8038f439986642409fad973f7704e1a543e587e04eab231d",
       "testRefs": [
         "packages/materials/tests/phase-gate.test.ts"
       ]
@@ -9853,7 +9853,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
       "line": 24,
-      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
+      "moduleHash": "bd661225843d426b8038f439986642409fad973f7704e1a543e587e04eab231d",
       "testRefs": []
     },
     {
@@ -20294,6 +20294,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
@@ -22322,6 +22323,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
@@ -24156,6 +24158,7 @@
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -28833,6 +28836,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -29161,6 +29165,7 @@
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -29510,6 +29515,7 @@
         "packages/materials/tests/lane-observer-diagnostics.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -30719,6 +30725,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -30979,6 +30986,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -33487,6 +33495,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -34756,6 +34765,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/model-context-frame.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/read-path-parse-budget.test.ts",
@@ -36474,6 +36484,7 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/observer-diagnostics.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
         "packages/materials/tests/projection-read-bound.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -41403,7 +41414,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/phase-gate.ts",
       "line": 3,
-      "moduleHash": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
+      "moduleHash": "bd661225843d426b8038f439986642409fad973f7704e1a543e587e04eab231d",
       "testRefs": []
     },
     {

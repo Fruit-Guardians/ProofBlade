@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T03:30:00+08:00",
+  "updatedAt": "2026-09-23T04:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2400,6 +2400,26 @@
         "变异验证：把 OBSERVED_ONLY 守卫改成恒假 → 新用例 not ok（恢复后通过）",
         "verification-recovery.test.ts 与 claim-verification-recovery.test.ts 共 13 用例 fail 0；npx tsc -b exit 0",
         "边界：有规则的任务（含 demoTask 的 required_reproductions=2）行为不变——既有 PENDING/RECOVERY_REQUIRED 用例仍绿"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-007",
+      "occurredAt": "2026-09-23T04:00:00+08:00",
+      "summary": "按反馈计划 P1-1：RECON 相位门禁不再在「已经复现出结论」时索要 target-model-or-hypothesis——真实证据可以推进门禁，缺失的假设只在什么都还没复现时才阻塞。",
+      "branch": "fix/recon-gate-evidence-driven",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "domain/phase-gate.ts 的 RECON 分支：target-model-or-hypothesis 的满足条件改为「存在当前世代假设 或 已接受/已复现的结论」（acceptedCompletion 或 verifier 记录的 reproduction Evidence）",
+        "证据：CHAT-1790096643438 已经解完并复现了任务，而相位视图仍显示 gate.blocked + missing [target-model-or-hypothesis]，等于要求它为已完成的工作再建一个目标模型",
+        "只改门禁判定，不动相位推进本身：仍由 update_phase 驱动，避免在没有显式迁移的情况下改变 domain guard 的行为"
+      ],
+      "validation": [
+        "变异验证：把满足条件改回「只看 currentHypothesis」→ 新用例 not ok 3（恢复后 4/4 通过）",
+        "phase-gate.test.ts 4 用例 fail 0（含此前两条：old-generation 观察判 stale、SUBMIT 要求 accepted 证据与已完成工作项）；npx tsc -b exit 0",
+        "边界：没有复现结论时 RECON 仍然 blocked——新用例先断言这一点，再注入 reproduction Evidence 后断言不再缺该条"
       ]
     }
   ],
