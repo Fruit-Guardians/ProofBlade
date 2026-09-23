@@ -140,7 +140,7 @@
     "src/runtime/security-tool-profile.ts": "9ea961569e4080e6de8cf28867d2239ba979a08bae73b6f41758d50afbfa97a0",
     "src/runtime/skill-routing.ts": "0251387384e4a3806a35654ccb08d76cf6b34561d9b4c022463b020ea6e46db4",
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
-    "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
+    "src/runtime/tool-repeat-breaker.ts": "8d8abf125e4c20f6c2feae12d6b679e30442a2390bbe717518c72528a8775185",
     "src/runtime/tool-scheduler.ts": "d1363d82238e4312dc40e27aa95610afc83e0fd4385f09949a402d4167c408fe",
     "src/runtime/version.ts": "ab9f98a33a2101e7691dccc55ca2cecde21c3a35f6996ca536e7ee2d6bcdf083",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",

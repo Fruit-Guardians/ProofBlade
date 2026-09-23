@@ -61,6 +61,17 @@ export class ExperimentBudgetBreaker {
   private longRunning = 0;
   private timeouts = 0;
   private readonly families = new Map<string, number>();
+  /**
+   * Fingerprints of the long-running calls seen, so "four slow calls" can be told
+   * apart from "the same slow call four times".
+   *
+   * `isLongRunningCommand` matches the command *text* -- a `for`/`while` loop, a
+   * `timeout N` prefix, a fuzzer name. A model writing a fresh loop each time is
+   * iterating, not repeating, and CHAT-1790096643438 was nudged to stop probing after
+   * four such commands even though all fifteen of its experiments had distinct repeat
+   * keys. The counter stays; the nudge now requires an actual repeat.
+   */
+  private readonly longRunningFingerprints = new Map<string, number>();
   private readonly limits: Required<ExperimentBudgetLimits>;
 
   public constructor(limits: ExperimentBudgetLimits = {}) {
@@ -83,6 +94,7 @@ export class ExperimentBudgetBreaker {
       this.longRunning = 0;
       this.timeouts = 0;
       this.families.clear();
+      this.longRunningFingerprints.clear();
       return { count: this.experimentCalls, terminate: false, key: "" };
     }
     if (!isExperimentObservation(observation)) return { count: this.experimentCalls, terminate: false, key: "" };
@@ -90,7 +102,14 @@ export class ExperimentBudgetBreaker {
     this.experimentCalls += 1;
     const command = commandText(observation);
     const long = isLongRunningCommand(command, observation);
-    if (long) this.longRunning += 1;
+    if (long) {
+      this.longRunning += 1;
+      // Reuse the breaker's own notion of "the same call": input plus output, with the
+      // archived artifact hash preferred when the tool provides one. Two identical
+      // commands that printed different things are a model learning something.
+      const fingerprint = observationKey(observation) ?? sha256(command);
+      this.longRunningFingerprints.set(fingerprint, (this.longRunningFingerprints.get(fingerprint) ?? 0) + 1);
+    }
     if (isTimeoutObservation(observation, command)) this.timeouts += 1;
     const family = experimentFamily(observation, command);
     const familyCount = family ? (this.families.set(family, (this.families.get(family) ?? 0) + 1), this.families.get(family)!) : 0;
@@ -99,6 +118,16 @@ export class ExperimentBudgetBreaker {
       return { count: this.experimentCalls, terminate: true, key: "experiment-calls", reason: "tool_calls", ...(family ? { family } : {}) };
     }
     if (this.longRunning >= this.limits.maxLongRunning) {
+      // Four slow commands that all did something different is iteration: the model
+      // is narrowing the problem, and the earlier advice ("reconstruct the logic as a
+      // small script instead of probing again") is only right when the probes repeat.
+      // Distinct fingerprints therefore pass through with a key the projection can
+      // tell apart, while an exact repeat still nudges. The hard total-call ceiling
+      // above still bounds the wasteful case either way.
+      const repeated = [...this.longRunningFingerprints.values()].some((count) => count > 1);
+      if (!repeated) {
+        return { count: this.longRunning, terminate: false, key: "long-running-distinct", reason: "long_running", ...(family ? { family } : {}) };
+      }
       return { count: this.longRunning, terminate: true, key: "long-running", reason: "long_running", ...(family ? { family } : {}) };
     }
     if (this.timeouts >= this.limits.maxTimeouts) {
@@ -115,6 +144,7 @@ export class ExperimentBudgetBreaker {
     this.longRunning = 0;
     this.timeouts = 0;
     this.families.clear();
+    this.longRunningFingerprints.clear();
   }
 }
 
@@ -388,6 +418,16 @@ function isExperimentObservation(observation: ToolFailureObservation): boolean {
 function isLongRunningCommand(command: string, observation: ToolFailureObservation): boolean {
   if (observation.toolName === "shell_background") return true;
   return /\btimeout\s+\d+|--timeout(?:=|\s+)\d+|\b(?:for|while)\b[\s\S]*\b(?:in|do)\b|\b(?:fuzz|afl|nmap|ffuf|sqlmap)\b/i.test(command);
+}
+
+/**
+ * Identity of one long-running call: what was run and what came back.
+ *
+ * Prefers {@link observationKey}, the breaker's own input-plus-output identity, so
+ * "the same call" means one thing in this file rather than two.
+ */
+function longRunningFingerprint(observation: ToolFailureObservation, command: string): string {
+  return observationKey(observation) ?? sha256(command);
 }
 
 function isTimeoutObservation(observation: ToolFailureObservation, command: string): boolean {

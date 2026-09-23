@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T05:20:00+08:00",
+  "updatedAt": "2026-09-23T06:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2462,6 +2462,27 @@
         "变异验证：把 reducer 的自增改回 break → 第一条用例 not ok（恢复后通过）",
         "tool-call-count.test.ts 2 用例 + apps/gui/tests/control-view.test.ts 1 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过；check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
         "边界：既有投影（写于本字段之前）被尾部折叠时 toolCalls 保持 undefined，提示里不显示该字段——这条边界写在 RunSnapshot.toolCalls 的注释里，而不是靠读者推断"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-010",
+      "occurredAt": "2026-09-23T06:00:00+08:00",
+      "summary": "按反馈计划 P1-2：实验预算提示不再把正常迭代误判为重复探测——先度量确实存在误判（该 run 15 次实验、15 个不同 repeatKey，却因 4 次「长命令」被判为重复），再让「长命令」分支要求真正的重复才提示。",
+      "branch": "fix/experiment-nudge-repeat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "度量（先做）：CHAT-1790096643438 的 15 条 experiment_recorded 有 15 个互不相同的 repeatKey，而模型收到的提示是 {count:4, key:'long-running', reason:'long_running'}——即计数来自 isLongRunningCommand 对命令文本的启发式（含 for/while 循环、timeout N、fuzzer 名），与「是否重复」无关。反馈所称的误判成立",
+        "runtime/tool-repeat-breaker.ts：ExperimentBudgetBreaker 记录每次长命令的指纹（复用本文件既有的 observationKey——输入+输出，优先用归档 artifact 哈希），maxLongRunning 触发时先判是否存在真正的重复；全部互不相同则返回 terminate:false、key:'long-running-distinct'（投影据此不发提示），存在重复才返回原来的 terminate:true、key:'long-running'。durable progress 与 reset() 一并清理该指纹表",
+        "保留的边界：maxExperimentCalls（总调用上限）仍在最前面无条件终止，所以「一直跑不同的慢命令」仍会被总量兜住；本次只去掉错误的「重复」指控",
+        "测试：packages/materials/tests/tool-repeat-breaker.test.ts 新增用例——四次互不相同的长命令全部 terminate:false 且第四次 key 为 long-running-distinct；同一长命令四次则 terminate:true、key 为 long-running，且 experimentBudgetNudge 文案含 is repeating（提示语在新触发条件下才成立）"
+      ],
+      "validation": [
+        "变异验证：把重复判定改成恒真（恢复旧的「四次长命令即提示」）→ 新用例 not ok（恢复后通过）",
+        "tool-repeat-breaker.test.ts 34 用例 fail 0；npx tsc -b exit 0；api:index / check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
+        "计划文档 §P1-2 的「先度量再改」至此完成：度量结论是「误判成立且根因是命令文本启发式」，不是「未复现」"
       ]
     }
   ],
