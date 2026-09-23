@@ -12,7 +12,7 @@ import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
 import { AblationPolicyController } from "../src/evaluation/ablation-policy.js";
 import { DEFAULT_HARNESS_POLICY } from "../src/evaluation/ablation.js";
-import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 
 const readOnlyEffect = { readOnly: true, sideEffect: "none" as const };
@@ -954,6 +954,38 @@ test("experiment budget is advisory and does not depend on task wording", async 
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("the experiment nudge needs a repeat, not four slow commands that each did something new", () => {
+  // CHAT-1790096643438 was told "reconstruct the logic as a small script instead of
+  // probing again" after four long-running commands -- and all fifteen of its
+  // experiments had distinct repeat keys. `isLongRunningCommand` matches the command
+  // text (a loop, a `timeout N`, a fuzzer name), so a model writing a fresh loop each
+  // time was counted as repeating itself. Iteration must pass; an exact repeat must
+  // still nudge.
+  const observation = (command: string, output: string) => ({
+    toolName: "bash",
+    input: { command },
+    isError: false,
+    content: [{ type: "text", text: output }],
+  });
+
+  const iterating = new ExperimentBudgetBreaker({ maxExperimentCalls: 20, maxLongRunning: 4, maxTimeouts: 9, maxFamily: 9 });
+  const decisions = [
+    iterating.observe(observation("for i in 1 2 3; do probe-alpha; done", "alpha: 0x11")),
+    iterating.observe(observation("for i in 1 2 3; do probe-beta; done", "beta: 0x22")),
+    iterating.observe(observation("for i in 1 2 3; do probe-gamma; done", "gamma: 0x33")),
+    iterating.observe(observation("for i in 1 2 3; do probe-delta; done", "delta: 0x44")),
+  ];
+  assert.deepEqual(decisions.map((decision) => decision.terminate), [false, false, false, false], "four different slow probes are iteration");
+  assert.equal(decisions[3]?.key, "long-running-distinct", "and the key says so instead of claiming repetition");
+
+  const repeating = new ExperimentBudgetBreaker({ maxExperimentCalls: 20, maxLongRunning: 4, maxTimeouts: 9, maxFamily: 9 });
+  const same = observation("for i in 1 2 3; do probe-alpha; done", "alpha: 0x11");
+  const repeated = [repeating.observe(same), repeating.observe(same), repeating.observe(same), repeating.observe(same)];
+  assert.equal(repeated[3]?.terminate, true, "the same slow call four times is exactly what the nudge is for");
+  assert.equal(repeated[3]?.key, "long-running");
+  assert.match(experimentBudgetNudge(repeated[3]!), /is repeating/);
 });
 
 test("tool-call budget blocks and terminates the next inner turn", async () => {

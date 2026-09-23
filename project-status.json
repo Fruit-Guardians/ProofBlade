@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T01:05:00+08:00",
+  "updatedAt": "2026-09-23T06:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2318,6 +2318,171 @@
         "变异验证：把门禁条件改回恒真 → 新用例 not ok（恢复后 3/3 通过）",
         "定向套件：phase-gate / coding-resources / single-agent-loop 共 67 用例 fail 0（--test-concurrency=1）；npx tsc -b exit 0",
         "范围说明：本次不改「什么算已验证」的语义——没有让模型自证即 ACCEPT，也没有新增任务级命令绑定；只去掉了一个永远无法满足的门禁要求"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-003",
+      "occurredAt": "2026-09-23T01:40:00+08:00",
+      "summary": "对两份内容相同的 harness 使用反馈（其中一份已核实为 runs/CHAT-1790096643438 的最终 assistant 消息，另一份来源未确认）逐条核对代码与事件，产出更新计划文档；预算计数、skill 路由兜底、无 verifier 任务的双树与 VR 债四条经核实成立并立项。",
+      "branch": "docs/harness-feedback-update-plan",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "新增 docs/PROOFBLADE_HARNESS_FEEDBACK_UPDATE_PLAN_ZH.md：先给来源与证据等级声明（第一份=该 run 事件 #355 的 text，逐字一致；第二份来源未确认，不作为独立证据；反馈本身是使用者自述而非实测），再逐条核对 9 条，给出 P0/P1 与「不做」清单",
+        "核实成立：预算字段 run_tool_calls_used 实际数的是 durable effects（phase-budget.ts:27），该 run 显示 2 而真实工具结果 10；skill-routing.ts:28 用宽泛正则给 ctf-misc 兜底 12 分；VR-1e0de02d/VR-de190718 在 #339/#340 产生 verification_recovery_required；TREE-b8f448bb 与 TREE-6254a5fe 为同一结论建了两棵树",
+        "核实为「部分」：skill 兜底规则成立，但反馈所称 pyjail/HISTFILE/SECCOMP 正文未在 prompt 快照中命中（快照只含系统提示），需一次带 load_skill 的复现定性；「重复探测误判迭代」未复现，列为待验证",
+        "计划：P0-1 预算字段按真实 tool call 统计并拆出 durable_effects_used；P0-2 skill 路由无领域信号时弃权；P0-3 无 verifier 规则任务进入 observed-only（不生成 RECOVERY_REQUIRED、不为同一结论建第二棵树）；P1-1 phase/gate 由真实证据推进（已解出时不再 blocked，优先只改展示）；P1-2 重复探测判定加入输出指纹",
+        "明确不做：模型自证即 ACCEPT、删除证据链/封印/世代绑定；P0-3 与 P1-1 落地前需所有者确认"
+      ],
+      "validation": [
+        "本文档不含未跑过的实验结论：所有机制名与 id 都指向该 run 的事件序号或源码行（已逐条 grep/读码核对）",
+        "边界已写入 §4：除「计数 10 vs 2」与两棵树的 id 外，其余影响程度未量化；pyjail 正文注入一条标为未复现"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-004",
+      "occurredAt": "2026-09-23T02:30:00+08:00",
+      "summary": "按反馈计划 P0-1 的第一半：把「预算」字段按它真正计量的东西改名——max_tool_calls 限制的是 Effect Journal 条目，而 bash/read/edit/write 从不进入 Journal，所以那个数字不是工具调用次数。",
+      "branch": "fix/journaled-effect-budget-label",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "phase-budget.ts：runToolCallsUsed/Remaining 改名为 journaledEffectsUsed/Remaining，并在接口上写明 max_tool_calls 的真实语义（effect-journal.ts 的 Tool budget exhausted 用 Object.keys(snapshot.effects).length 判定；competition/COMPONENT.md 明确 bash/read/edit/write 与一等 MCP 工具不计入）",
+        "context/compiler.ts 的相位块改为 journaled_effects_used / journaled_effects_remaining；GUI 侧 shared.ts、control-view.ts、App.tsx 同步改名，标签由「Run Tool 预算」改为「Journaled Effect 预算」并注明它不统计工具调用",
+        "没有做的事：没有伪造一个「真实工具调用数」。该视图只有 snapshot（无事件），精确计数需要把 tool_result_recorded 接进 ContextBuildInput，属 P0-1 的第二半，已记在计划文档里",
+        "证据：CHAT-1790096643438 提示里显示 2 used / 998 remaining，而该 run 实际工具结果 10 次（bash 7、read 2、update_phase 1）；计数正确、名字错误"
+      ],
+      "validation": [
+        "变异验证：把提示里的键名改回 run_tool_calls_used / run_tool_calls_remaining → context.test.ts not ok（恢复后通过）",
+        "context.test.ts 与 control-view.test.ts 共 20 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过",
+        "全仓 grep：旧名只剩 phase-budget.ts 注释里的一句历史说明"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-005",
+      "occurredAt": "2026-09-23T03:00:00+08:00",
+      "summary": "按反馈计划 P0-2：skill 自动路由在只有泛 CTF 信号时弃权——该信号此前能单独把 ctf-misc 整个拉进来（pyjail / bash jail / HISTFILE / SECCOMP 高位 fd / rvim 逃逸），而触发它的只是一个『题目』或『CTF』字样。",
+      "branch": "fix/skill-routing-abstain",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "runtime/skill-routing.ts：ctf-misc 那条泛信号标记为 corroborating，不再参与选择，只在一个领域信号已经命中时作为佐证加入；若领域先验与具体信号都没有命中（scores 为空），直接返回空选择而不是兜底",
+        "理由与证据：CHAT-1790096643438 的 target_kind=unknown、目标是一个『固件补丁链 + 密钥派生』任务，objective 里的『题目』字样让泛信号以 12 分把 ctf-misc 选中并注入整块无关内容",
+        "保留：durable target_kind 的先验（如 target_kind=misc → ctf-misc）不受影响——那是任务声明的领域，不是猜测"
+      ],
+      "validation": [
+        "变异验证：去掉 corroborating 标记让泛信号重新参与选择 → 新用例 not ok 4 与 not ok 5（恢复后 6/6 通过）",
+        "skill-routing.test.ts 6 用例 fail 0（含原有 4 条：forensics 优先、durable prior、不可用技能不选、有界确定性）；npx tsc -b exit 0；api:index 重新生成"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-006",
+      "occurredAt": "2026-09-23T03:30:00+08:00",
+      "summary": "按反馈计划 P0-3 的前半：无 verifier 规则的任务里，proposed Completion 不再被当成「等待 verifier Effect」的恢复义务——那条债永远还不清，因为该契约不可能产出 verifier Effect。新增 OBSERVED_ONLY 终态。",
+      "branch": "fix/observed-only-recovery",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "recovery/verification-recovery.ts：VerificationRecoveryStatus 新增 OBSERVED_ONLY；evaluate 在「Completion 已提议且没有任何 verifier Effect」时先判 verificationBindsRule(snapshot.task)，为假则返回 OBSERVED_ONLY（reason 写明该契约绑定不了验证规则、重试也改不了），不再返回 PENDING",
+        "效果：reconcile 的 required 判定只把 PENDING/PROPOSED_EFFECT/IN_FLIGHT_EFFECT/AMBIGUOUS 计为待恢复，OBSERVED_ONLY 不在其中，因此不再产生 verification_recovery_required，也不再让恢复预算长期非零",
+        "证据：CHAT-1790096643438 的 VR-1e0de02d 与 VR-de190718 在 #339/#340 都以 \"Completion is proposed but no verifier Effect is durable yet.\" 进入 RECOVERY_REQUIRED，而该任务的 verification 是 {kind: reproduction, required_reproductions: 0} 且无 command——harness 里没有任何路径能兑现这两条",
+        "未做（P0-3 的剩余一半）：同一结论的第二棵树（TREE-6254a5fe 与 TREE-b8f448bb）仍会生成，已记在计划文档里"
+      ],
+      "validation": [
+        "变异验证：把 OBSERVED_ONLY 守卫改成恒假 → 新用例 not ok（恢复后通过）",
+        "verification-recovery.test.ts 与 claim-verification-recovery.test.ts 共 13 用例 fail 0；npx tsc -b exit 0",
+        "边界：有规则的任务（含 demoTask 的 required_reproductions=2）行为不变——既有 PENDING/RECOVERY_REQUIRED 用例仍绿"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-007",
+      "occurredAt": "2026-09-23T04:00:00+08:00",
+      "summary": "按反馈计划 P1-1：RECON 相位门禁不再在「已经复现出结论」时索要 target-model-or-hypothesis——真实证据可以推进门禁，缺失的假设只在什么都还没复现时才阻塞。",
+      "branch": "fix/recon-gate-evidence-driven",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "domain/phase-gate.ts 的 RECON 分支：target-model-or-hypothesis 的满足条件改为「存在当前世代假设 或 已接受/已复现的结论」（acceptedCompletion 或 verifier 记录的 reproduction Evidence）",
+        "证据：CHAT-1790096643438 已经解完并复现了任务，而相位视图仍显示 gate.blocked + missing [target-model-or-hypothesis]，等于要求它为已完成的工作再建一个目标模型",
+        "只改门禁判定，不动相位推进本身：仍由 update_phase 驱动，避免在没有显式迁移的情况下改变 domain guard 的行为"
+      ],
+      "validation": [
+        "变异验证：把满足条件改回「只看 currentHypothesis」→ 新用例 not ok 3（恢复后 4/4 通过）",
+        "phase-gate.test.ts 4 用例 fail 0（含此前两条：old-generation 观察判 stale、SUBMIT 要求 accepted 证据与已完成工作项）；npx tsc -b exit 0",
+        "边界：没有复现结论时 RECON 仍然 blocked——新用例先断言这一点，再注入 reproduction Evidence 后断言不再缺该条"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-008",
+      "occurredAt": "2026-09-23T04:40:00+08:00",
+      "summary": "按反馈计划 P0-3 的后半：同一个结论不再建第二棵树。verification 链在挂树前先检查「本次要挂的节点是否已被既有树覆盖」，覆盖则复用那棵树并把决定回报给调用方。",
+      "branch": "fix/single-tree-per-conclusion",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "verification/claim-verification.ts：新增 plannedNodeIds 与既有树的交集判定；命中则复用既有树（不再调用 createTree），ResultReproduction/ResultArtifactReproduction 增加 treeId/treeReused（可选字段，durable-recovery 两条返回路径在不掌握树时不填），工具响应把这两个字段带给调用方",
+        "证据（先量后改）：CHAT-1790096643438 的 TREE-b8f448bb（agent，3 节点，根是 fact）与 TREE-6254a5fe（verification 链，9 节点，根是永远无法 ACCEPT 的 C-af331919）**共享两个节点**：supporting Evidence EV-3a67f1b4 与它指向的 Artifact A-76a42d21。注意共享的不是 completion 自己的 artifactId（A-7e777dd3），所以判据取「节点集有交集」而不是「同一个候选」",
+        "复用而不是合并：图只有 createTree 一个写入口，没有给既有树追加节点的 API；verification 的溯源本来就走 reasoning edges（linkNodesBatch），树只是视图，因此复用既有树不丢信息",
+        "测试：packages/materials/tests/coding-resources.test.ts 新增用例，用真实链路构造重叠——先 CodingEvidenceGraph.recordEvidence（带 claim，否则不建树）造出含 supporting Evidence 的树，再 verify_result 带上该 evidenceId；断言 treeReused=true、treeId 等于既有树、且事后仍只有一棵树"
+      ],
+      "validation": [
+        "变异验证：把交集判定改成恒不命中（existingTree = undefined）→ 新用例 not ok（恢复后通过）",
+        "coding-resources.test.ts 44 用例 fail 0；claim-verification-recovery + verification-recovery + phase-gate + evidence-curation-gate 共 23 用例 fail 0；npx tsc -b exit 0",
+        "过程中的两次失败尝试已记录：evidence_record 工具在最小上下文里返回的是裁剪后的投影（无 treeId），改用图 API 后仍不建树——原因是 recordEvidence 需要 claim 字段才建树；用 claim 后才复现出重叠场景"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-009",
+      "occurredAt": "2026-09-23T05:20:00+08:00",
+      "summary": "按反馈计划 P0-1 的后半：给出真实的工具调用计数。RunSnapshot 新增 toolCalls（由 tool_result_recorded 折叠而来，可重放），相位块输出 tool_calls_used，与「enforced 的 Effect Journal 预算」并列显示——两者曾经被混为一谈。",
+      "branch": "fix/tool-call-count",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "domain/types.ts：RunSnapshot 新增可选 toolCalls，注释写明它是「折叠进来的工具结果数」、undefined 表示不知道（旧投影被尾部折叠时早期工具结果不在 fold 里），调用方必须省略而不是把下界当计数；control/reducer.ts 把 tool_result_recorded 从 no-op 分支移出并自增",
+        "domain/phase-budget.ts 暴露 toolCallsUsed（snapshot 不知道时不填）；context/compiler.ts 的相位块输出 tool_calls_used，与 journaled_effects_used/remaining 并列；GUI 侧 shared.ts、control-view.ts、App.tsx 同步显示「工具调用 N 次 · Journaled Effect x used」",
+        "为什么两条并存：max_tool_calls 强制的是 Effect Journal 条目（effect-journal.ts 的判定），而 bash/read/edit/write 与一等 MCP 工具不进 Journal。PR #250 把那个计数器改名成 journaled_effects_*，本项补上真正的调用数——反馈的原话是「当计数与事实差一个数量级时，预算就不该作为信号展示」",
+        "测试：新增 packages/materials/tests/tool-call-count.test.ts 两条——①追加 3 条 tool_result_recorded 后 snapshot.toolCalls=3、effects=0、phaseBudget.toolCallsUsed=3、提示里出现 tool_calls_used:3 且 journaled_effects_used:0；②未折叠任何工具结果的快照在提示里完全不出现 tool_calls_used（没有数据就不编数字）"
+      ],
+      "validation": [
+        "变异验证：把 reducer 的自增改回 break → 第一条用例 not ok（恢复后通过）",
+        "tool-call-count.test.ts 2 用例 + apps/gui/tests/control-view.test.ts 1 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过；check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
+        "边界：既有投影（写于本字段之前）被尾部折叠时 toolCalls 保持 undefined，提示里不显示该字段——这条边界写在 RunSnapshot.toolCalls 的注释里，而不是靠读者推断"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-010",
+      "occurredAt": "2026-09-23T06:00:00+08:00",
+      "summary": "按反馈计划 P1-2：实验预算提示不再把正常迭代误判为重复探测——先度量确实存在误判（该 run 15 次实验、15 个不同 repeatKey，却因 4 次「长命令」被判为重复），再让「长命令」分支要求真正的重复才提示。",
+      "branch": "fix/experiment-nudge-repeat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "度量（先做）：CHAT-1790096643438 的 15 条 experiment_recorded 有 15 个互不相同的 repeatKey，而模型收到的提示是 {count:4, key:'long-running', reason:'long_running'}——即计数来自 isLongRunningCommand 对命令文本的启发式（含 for/while 循环、timeout N、fuzzer 名），与「是否重复」无关。反馈所称的误判成立",
+        "runtime/tool-repeat-breaker.ts：ExperimentBudgetBreaker 记录每次长命令的指纹（复用本文件既有的 observationKey——输入+输出，优先用归档 artifact 哈希），maxLongRunning 触发时先判是否存在真正的重复；全部互不相同则返回 terminate:false、key:'long-running-distinct'（投影据此不发提示），存在重复才返回原来的 terminate:true、key:'long-running'。durable progress 与 reset() 一并清理该指纹表",
+        "保留的边界：maxExperimentCalls（总调用上限）仍在最前面无条件终止，所以「一直跑不同的慢命令」仍会被总量兜住；本次只去掉错误的「重复」指控",
+        "测试：packages/materials/tests/tool-repeat-breaker.test.ts 新增用例——四次互不相同的长命令全部 terminate:false 且第四次 key 为 long-running-distinct；同一长命令四次则 terminate:true、key 为 long-running，且 experimentBudgetNudge 文案含 is repeating（提示语在新触发条件下才成立）"
+      ],
+      "validation": [
+        "变异验证：把重复判定改成恒真（恢复旧的「四次长命令即提示」）→ 新用例 not ok（恢复后通过）",
+        "tool-repeat-breaker.test.ts 34 用例 fail 0；npx tsc -b exit 0；api:index / check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
+        "计划文档 §P1-2 的「先度量再改」至此完成：度量结论是「误判成立且根因是命令文本启发式」，不是「未复现」"
       ]
     }
   ],
