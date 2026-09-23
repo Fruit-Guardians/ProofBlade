@@ -84,7 +84,14 @@ export function evaluatePhaseGate(snapshot: RunSnapshot, phase: DomainPhase = sn
   } else if (phase === "RECON") {
     const reconRecord = currentDomainRecords.some((record) => ["web_baseline", "web_request", "pwn_binary_profile", "pwn_protocol_transcript"].includes(record.kind));
     add("current-generation-observation", currentObservations.length > 0 || reconRecord, oldObservations || oldDomainRecords);
-    add("target-model-or-hypothesis", currentHypothesis !== undefined, Object.keys(snapshot.hypotheses).length > 0);
+    // A Run that already produced a reproduced or accepted conclusion does not need
+    // to invent a hypothesis on its way out of RECON. CHAT-1790096643438 had solved
+    // and reproduced its task while the phase view still read
+    // `missing: ["target-model-or-hypothesis"]`, asking for a target model on work
+    // that was already finished. Real evidence advances this gate; the missing
+    // hypothesis only blocks while there is nothing reproduced to show.
+    const concluded = acceptedCompletion !== undefined || currentReproductionEvidence.length > 0;
+    add("target-model-or-hypothesis", currentHypothesis !== undefined || concluded, Object.keys(snapshot.hypotheses).length > 0);
     if (currentObservations.length > 0) {
       for (const observation of currentObservations) {
         const linked = currentEvidence.filter((evidence) => evidence.source.artifactId === observation.source.artifactId);

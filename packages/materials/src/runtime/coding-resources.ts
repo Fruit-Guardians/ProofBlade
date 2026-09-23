@@ -594,6 +594,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
           evidenceId: reproduction.evidenceId,
           completionId: reproduction.completionId,
           supportingEvidenceIds: reproduction.supportingEvidenceIds,
+          ...(reproduction.treeId ? { treeId: reproduction.treeId, treeReused: reproduction.treeReused } : {}),
           ...(reproduction.acceptance === "observation_only" ? { verifierFeedback: observationOnlyFeedback() } : {}),
         });
         return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
@@ -642,6 +643,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
       evidenceId: reproduction.evidenceId,
       completionId: reproduction.completionId,
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
+      ...(reproduction.treeId ? { treeId: reproduction.treeId, treeReused: reproduction.treeReused } : {}),
       output,
       ...(reproduction.acceptance === "observation_only" ? { verifierFeedback: observationOnlyFeedback() } : {}),
     });
