@@ -4,15 +4,15 @@
 {
   "id": "materials-tools",
   "name": "Tool Contracts and Runtime",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-09-19T07:35:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 6,
-    "securityAuditCount": 6,
-    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
-    "sourceHash": "87cb3c662b29fbb5974304e584237d2a5d3c37a90ee7dc0e15608aead459b0c5",
+    "bugAuditCount": 7,
+    "securityAuditCount": 7,
+    "lastBugAuditAt": "2026-09-19T07:35:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T07:35:00.000Z",
+    "sourceHash": "670c690381297256caa82c23b440f229711f3eaa2a1aac1d96c225aa38b766a8",
     "result": "passed"
   }
 }
@@ -26,6 +26,7 @@
 
 - `contracts.ts` 定义 Tool Contract。
 - `runtime.ts` 执行 journaled Tool；`errors.ts` 归一化失败和签名。
+- `runtime.ts` 的 `observeArtifact()` 接受可选 `content`：调用方若仍持有刚归档的字节，观察器就不再回读 Artifact 文件。观察器只检查有界 stdout 中的候选值与失败签名，因此把同样的字符从磁盘读回来纯属热路径开销。省略 `content` 时仍回读，保持既有调用点行为不变。
 - Runtime 组装 bundled 与 MCP Backend，但对模型保持稳定的 Discovery/Invoke 代理面；Discovery 只读取目录并按需返回 Schema，Invoke 在状态、Effect、Artifact 与 Job 投影中保留实现来源。
 - Runtime 同时装配可选本地 Rizin 与 MCP deep reverse Backend；模型不需要知道具体执行引擎。
 - `output-rewrite.ts` 实现配置驱动的 builtin/RTK adapter、版本门槛、同 Shell 探测、RTK tee 读取和确定性回落。

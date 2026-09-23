@@ -4,15 +4,15 @@
 {
   "id": "materials-control",
   "name": "Control Store and Reducer",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-09-19T15:40:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 5,
-    "securityAuditCount": 5,
-    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
-    "sourceHash": "1537621b06d101e36a1de3f92447524bc593c49559b2fb1db843d4b56540183a",
+    "bugAuditCount": 6,
+    "securityAuditCount": 6,
+    "lastBugAuditAt": "2026-09-19T15:40:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T15:40:00.000Z",
+    "sourceHash": "f96d96f50f4e5f5d65f39d46acae044f43396c84710d1cd017cd782597a2aa17",
     "result": "passed"
   }
 }
@@ -39,6 +39,7 @@
 - Verifier 结果端口允许精确重试已持久化的 Evidence/终态 Completion，但只做严格内容匹配后的 no-op；同一 ID 的内容、方向、引用或 Evidence 集合发生变化会拒绝，不能借幂等语义覆盖旧结论。
 - 依赖最新 RunSnapshot 的幂等写入必须通过 `dispatchTransaction` 完成；同步 prepare 中的读取、判重、ID 生成和命令构造与批量提交共享同一按 Run 串行的临界区，禁止在回调中重入 ControlStore。
 - 新 `job_queued` 命令在领域层强制携带 `backendId` 与 `backendVersion`；`job_queued_legacy` 只用于读取/迁移没有 Backend 绑定的历史事件，最终仍投影为 `job_queued`。
+- `flushProjection()` 先做**廉价**的"投影是否已是最新"判断，再决定是否付出全量校验：`loadProjection()` 会解析整条事件流并重算完整事件前缀哈希以重验封印（实测 100 事件 13ms、10,000 事件 328ms），而延后模式下答案几乎总是"非最新"，那笔开销就白花了。因此先问 `loadProjectionHint()`（只认证投影文件本身与小型 task 契约守卫，不解析事件），只有它返回同一 `lastSeq` 时才值得做全量重验——因为前缀一致必然要求 `lastSeq` 一致。**廉价检查必须 fail-closed**：投影缺失或篡改时返回"非最新"，从而走向写入而不是静默成功。
 - Evidence ID、Artifact ID、Effect ID 与 Completion ID 都是不可覆盖的；Evidence 必须绑定当前 run/generation 的既有 Artifact，并校验所有 `dependsOn/supports/refutes` 引用。`reproduction`、`negative`、`confidence: 1`、Completion 终态和成功 finish 只能经私有 Verifier capability 提交，伪造 `lane: "verifier"` 没有权限效果。
 - Verification request 的 `RECOVERY_REQUIRED/RECOVERED` 标记只能经 recovery-only capability 写入；它们是事件流中的审计状态，不授予模型或 GUI 任何完成权限，且恢复标记不能跨 generation 延续。
 - `evaluatePhaseGate(snapshot, phase)` 是可重放的阶段门禁纯函数；它只依据当前 generation 的 Observation/Evidence/Hypothesis/Experiment、Verifier verdict 和 Executor WorkItem 判断缺口，并把旧 generation 标为 `stale`。`SUBMIT` 的成功 finish 必须再次通过该门禁，GUI/Context 只读展示其缺口与 `phaseBudget` 的剩余额度，不能把展示值写回 Run。

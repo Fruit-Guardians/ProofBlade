@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialSnapshot } from "../src/control/reducer.js";
-import { evaluatePhaseGate } from "../src/domain/phase-gate.js";
+import { evaluatePhaseGate, verificationBindsRule } from "../src/domain/phase-gate.js";
 import type { ArtifactRef, CompletionProposal, Effect, Evidence, WorkItem } from "../src/domain/types.js";
 import { demoTask } from "../src/app/demo.js";
 
@@ -17,6 +17,38 @@ test("phase gates report bounded missing requirements and do not trust old-gener
   assert.equal(gate.status, "blocked");
   assert.ok(gate.missing.includes("current-generation-observation"));
   assert.ok(gate.stale.includes("current-generation-observation"));
+});
+
+test("a chat that binds no verification rule is not blocked on a reproduction it can never produce", () => {
+  // CHAT-1790093502899: the task is `{ kind: "reproduction", required_reproductions: 0 }`
+  // with no command, and nothing in the harness can accept a Completion for it. The
+  // REPRODUCE gate still reported `blocked` with `missing: ["accepted-completion-candidate",
+  // "verifier-owned-reproduction"]` -- that block is in the model's prompt -- so the model
+  // kept trying to verify and the turn ended paused after it had already printed the flag.
+  // The gate now passes with nothing required (output first, reproduce when the user asks),
+  // and the requirements come back the moment the task binds a rule.
+  const chat = snapshot();
+  chat.task.verification.required_reproductions = 0;
+  chat.task.verification.command = undefined;
+  assert.equal(verificationBindsRule(chat.task), false);
+  for (const phase of ["REPRODUCE", "REPORT", "SUBMIT"] as const) {
+    const gate = evaluatePhaseGate(chat, phase);
+    assert.equal(gate.status, "pass", `${phase} must not block a chat that cannot verify`);
+    assert.deepEqual(gate.required, [], `${phase} must not require an accepted Completion here`);
+    assert.deepEqual(gate.missing, []);
+  }
+
+  // The same shape with a task-owned rule still requires everything it did before.
+  const ruleBound = snapshot();
+  assert.equal(verificationBindsRule(ruleBound.task), true, "demoTask carries required_reproductions: 2");
+  assert.ok(evaluatePhaseGate(ruleBound, "REPRODUCE").missing.includes("accepted-completion-candidate"));
+  assert.ok(evaluatePhaseGate(ruleBound, "REPRODUCE").missing.includes("verifier-owned-reproduction"));
+  assert.ok(evaluatePhaseGate(ruleBound, "SUBMIT").missing.includes("accepted-completion"));
+  const withCommand = snapshot();
+  withCommand.task.verification.required_reproductions = 0;
+  withCommand.task.verification.command = "node solve.mjs";
+  assert.equal(verificationBindsRule(withCommand.task), true, "a task-bound command is a rule");
+  assert.ok(evaluatePhaseGate(withCommand, "REPRODUCE").missing.includes("accepted-completion-candidate"));
 });
 
 test("SUBMIT gate requires accepted verifier evidence and a completed executor WorkItem", () => {

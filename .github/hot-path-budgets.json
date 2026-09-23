@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "description": "Hot-path budgets for one ordinary `read`, as machine-readable numbers. The test that enforces them reads this file, so a budget cannot drift away from the document that justifies it without changing this file too.",
+  "source": "docs/PROOFBLADE_TOOL_HOT_PATH_COST_BREAKDOWN_ZH.md",
+  "measured": {
+    "events": 4,
+    "commits": 2,
+    "note": "Single `read` of a 1-byte file on a real ControlStore: 4 events across 2 logical commits (artifact registration, derived observation). The third public write entry point is `dispatch`, which delegates to `dispatchBatch`."
+  },
+  "target": {
+    "events": 4,
+    "commits": 1,
+    "note": "PLAN-240 §7.2.2 T1/T2: at most one synchronous ControlStore commit before an ordinary tool returns. Zero is not reachable -- the Artifact is the verifier's reference target, so its registration must be durable first. The event count does not shrink under a merge: the same four events are written, in one commit instead of two."
+  }
+}

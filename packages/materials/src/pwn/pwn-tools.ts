@@ -323,7 +323,7 @@ export class PwnToolHandler {
       if (workflow.retryBlocked) {
         throw new Error(pwnRequestRefusal(
           "the latest Pwn reproduction failed and no new material evidence has changed the path",
-          "call pwn_workflow, run one bounded experiment that records a new crash, leak, transcript, primitive, or experiment result, then retry",
+          "call pwn_workflow, run one bounded experiment that records a new current-generation crash, leak/base derivation, primitive, or binary profile, then retry",
         ));
       }
     }
@@ -408,6 +408,7 @@ export class PwnToolHandler {
     const snapshot = await this.controlStore.snapshot(this.runId);
     if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) throw new Error(pwnRequestRefusal(`Pwn primitive is not allowed for target kind ${snapshot.task.target_kind}`, "use the task's target-appropriate tools, or run this primitive on a pwn/mixed target"));
     assertCurrentReferences(snapshot, artifactIds, evidenceIds);
+    assertCurrentPreconditionRecords(snapshot, preconditionRecordIds);
     const recordId = id("PWN-PRIMITIVE");
     await this.controlStore.dispatch(this.runId, {
       type: "domain_record",
@@ -600,6 +601,7 @@ export class PwnToolHandler {
     const evidenceIds = uniqueIds(input.evidenceIds ?? []);
     if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error(pwnRequestRefusal("pwn leak requires supporting artifactIds or evidenceIds", "read or inspect the leak source first, then pass its A-* or EV-* id"));
     assertCurrentReferences(snapshot, artifactIds, evidenceIds);
+    if (leak.derivation) assertCurrentPreconditionRecords(snapshot, leak.derivation.sourceLeakIds.map((sourceId) => `PWN-LEAK-${sourceId}`));
     const result = await this.evidenceGraph.recordLeak({
       leak,
       tags: input.tags?.slice(0, 32),
@@ -671,6 +673,7 @@ export class PwnToolHandler {
         stageIndex: stage.index,
         stageName: stage.name,
         status: stage.ok ? "passed" : "failed",
+        attemptStatus: outcome.reproduced ? "passed" : "failed",
         inputArtifactId: artifact.id,
       },
       lane: this.ownerLane,
@@ -707,6 +710,23 @@ function assertCurrentReferences(snapshot: RunSnapshot, artifactIds: string[], e
     const evidence = snapshot.evidence[evidenceId];
     if (!evidence) throw new Error(pwnRequestRefusal(`unknown evidence ${evidenceId}`, "record or inspect the supporting Evidence before linking it"));
     if (evidence.provenance.runId !== snapshot.runId || evidence.provenance.generation !== snapshot.generation) throw new Error(pwnRequestRefusal(`evidence ${evidenceId} is stale`, "use Evidence from the current target generation"));
+  }
+}
+
+/**
+ * Precondition records anchor a primitive to earlier analysis, so they must
+ * belong to the current run AND the current fixture generation — otherwise a
+ * primitive created after a fixture reset could silently re-bind stale
+ * crash/leak/primitive records and the generation-bound workflow would treat
+ * cross-generation evidence as current.
+ */
+function assertCurrentPreconditionRecords(snapshot: RunSnapshot, preconditionRecordIds: string[]): void {
+  for (const recordId of preconditionRecordIds) {
+    const record = snapshot.domainRecords[recordId];
+    if (!record) throw new Error(pwnRequestRefusal(`unknown precondition record ${recordId}`, "record the precondition with the matching pwn tool first, then pass its current record id"));
+    if (record.runId !== snapshot.runId || record.generation !== snapshot.generation) {
+      throw new Error(pwnRequestRefusal(`precondition record ${recordId} belongs to generation ${record.generation}, current generation is ${snapshot.generation}`, "record a fresh precondition for the current target generation before linking it"));
+    }
   }
 }
 

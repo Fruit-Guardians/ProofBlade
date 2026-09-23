@@ -11,6 +11,7 @@ import {
   wrapPlaywrightContext,
   createPlaywrightBrowserVerifierFactory,
   type BrowserContextPort,
+  type BrowserVerifierContextHandle,
   type BrowserDriverResponse,
   type BrowserRuntimeCreatedContext,
   type BrowserRuntimeHost,
@@ -105,19 +106,36 @@ export function createBrowserRuntimeHost(options: PlaywrightBrowserRuntimeHostOp
   return createProcessLocalHost(factory, contexts);
 }
 
+/**
+ * This host drives a context directly, so it cannot accept a durable handle.
+ *
+ * `BrowserVerifierFactory.createContext()` returns `BrowserContextPort |
+ * BrowserVerifierContextHandle`: the handle is the shape a cross-process runtime
+ * broker returns, and it has no `goto`/`close`. The playwright factory built here
+ * always returns a port, but the union is what the interface promises, so the
+ * host narrows it and fails loudly instead of calling `goto` on a handle. This
+ * file used to be excluded from `tsconfig.scripts.json`, and that is exactly the
+ * defect the exclusion hid: the four call sites below were unchecked.
+ */
+function requireContextPort(value: BrowserContextPort | BrowserVerifierContextHandle): BrowserContextPort {
+  if (typeof (value as BrowserContextPort).goto !== "function") {
+    throw new Error("playwright browser host requires a BrowserContextPort; the factory returned a durable handle");
+  }
+  return value as BrowserContextPort;
+}
+
 function createProcessLocalHost(
   factory: ReturnType<typeof createPlaywrightBrowserVerifierFactory>,
   contexts: Map<string, BrowserContextPort>,
 ): BrowserRuntimeHost {
   const externalIdFor = (idempotencyKey: string): string => `browser-runtime-${idempotencyKey.slice(0, 48)}`;
   const sessionIdFor = (idempotencyKey: string): string => `browser-session-${idempotencyKey.slice(0, 48)}`;
-
   return {
     async create(request, idempotencyKey, signal): Promise<BrowserRuntimeCreatedContext> {
       const externalId = externalIdFor(idempotencyKey);
       const existing = contexts.get(externalId);
       if (existing) return await describe(existing, sessionIdFor(idempotencyKey), externalId);
-      const context = await factory.createContext(request, signal);
+      const context = requireContextPort(await factory.createContext(request, signal));
       try {
         await context.goto(request.target, signal);
         contexts.set(externalId, context);

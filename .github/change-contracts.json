@@ -2,6 +2,63 @@
   "schemaVersion": 1,
   "contracts": [
     {
+      "id": "hot-path-cost-budget",
+      "triggers": [
+        {
+          "path": "packages/materials/src/effects/artifact-store.ts",
+          "patterns": ["dispatch", "persistProjection", "putText"]
+        },
+        {
+          "path": "packages/materials/src/knowledge/observer.ts",
+          "patterns": ["dispatchTransaction", "annotation", "observation", "evidence"]
+        },
+        {
+          "path": "packages/materials/src/observability/pi-events.ts",
+          "patterns": ["ControlEventBatcher", "persistProjection", "snapshot", "resolve"]
+        },
+        {
+          "path": "packages/materials/src/runtime/coding-lane.ts",
+          "patterns": ["observerDiagnostics", "observingDiagnostics", "instrumentToolContext"]
+        },
+        {
+          "path": "packages/materials/src/skills/registry.ts",
+          "patterns": ["skillTreeRevision", "skillRegistryCache", "read"]
+        },
+        {
+          "path": ".github/hot-path-budgets.json"
+        }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:hot-path-event-budget",
+        "contract:hot-path-commit-budget",
+        "contract:hot-path-projection-budget",
+        "contract:hot-path-readback-budget",
+        "contract:skill-catalog-parse-budget",
+        "contract:observer-failure-is-diagnostic-only",
+        "contract:archival-failure-keeps-read-successful",
+        "contract:projection-hint-currency",
+        "contract:barrier-persists-deferred-projection",
+        "contract:read-path-parse-is-counted",
+        "contract:cold-read-parse-budget"
+      ]
+    },
+    {
+      "id": "gui-polling-idle-discipline",
+      "triggers": [
+        {
+          "path": "apps/gui/src/polling.ts",
+          "patterns": ["isPollingAllowed", "visibilityState", "SingleFlightPoller"]
+        },
+        {
+          "path": "apps/gui/src/App.tsx",
+          "patterns": ["isPollingAllowed", "visibilityState", "setInterval"]
+        }
+      ],
+      "testPaths": ["apps/gui/tests/"],
+      "scenarios": ["contract:polling-hidden-document-is-idle"]
+    },
+    {
       "id": "gui-shutdown-failure-cleanup",
       "triggers": [
         {
@@ -121,6 +178,18 @@
         "contract:fixture-runtime-gate",
         "contract:runtime-scenario-baseline",
         "contract:runtime-scenario-failure-isolation"
+      ]
+    },
+    {
+      "id": "read-path-parse-budget",
+      "triggers": [
+        { "path": "packages/materials/src/storage/jsonl-store.ts", "patterns": ["readStats", "loadEvents", "parsedEvent", "eventCache", "firstEvent"] },
+        { "path": "packages/materials/src/control/control-store.ts", "patterns": ["loadProjectionHint", "loadEvents"] }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:read-path-parse-is-counted",
+        "contract:cold-read-parse-budget"
       ]
     }
   ]

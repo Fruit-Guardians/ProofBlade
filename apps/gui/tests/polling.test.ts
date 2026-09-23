@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
-import { SingleFlightPoller } from "../src/polling.js";
+import { SingleFlightPoller, isPollingAllowed } from "../src/polling.js";
 
 test("[contract:polling-run-switch-single-flight] run switches coalesce behind the active refresh", async () => {
   let selectedRun = "RUN-A";
@@ -114,6 +116,34 @@ test("[contract:polling-failed-background-retries-interactive] a queued interact
   assert.equal(await interactive, false);
   assert.equal(attempts, 2);
   assert.deepEqual(modes, ["background", "interactive"]);
+});
+
+test("[contract:polling-hidden-document-is-idle] a hidden document permits no polling tick", () => {
+  // Item I, first half. Each tick costs a full Run detail payload, so a tab
+  // nobody is looking at must not schedule that work.
+  assert.equal(isPollingAllowed("visible"), true);
+  assert.equal(isPollingAllowed("hidden"), false);
+  assert.equal(isPollingAllowed("prerender"), false);
+});
+
+test("the background timer enforces the visibility rule through the tested predicate", async () => {
+  // The predicate above is only meaningful if the tick actually consults it.
+  // App.tsx runs a React component and cannot be mounted here, so this asserts
+  // the wiring exists instead of claiming behavioural coverage it does not have:
+  // if someone inlines the check again or drops it, this fails and points at the
+  // test that should be extended.
+  const source = await readFile(join(import.meta.dirname, "..", "src", "App.tsx"), "utf8");
+  assert.match(source, /isPollingAllowed\(document\.visibilityState\)/, "the background timer must gate on the visibility predicate");
+  assert.doesNotMatch(source, /visibilityState\s*!==\s*"visible"/, "the guard must not be re-inlined, or the predicate stops being the single rule");
+});
+
+test("the incremental events endpoint stays available for the chat poll to adopt", async () => {
+  // Item I, second half: the server side already supports `afterSeq`, but no
+  // client calls it, so every poll still transfers the whole event stream. The
+  // client change needs browser verification and is deliberately not made here.
+  // This keeps the endpoint from being removed as "unused" while that is pending.
+  const source = await readFile(join(import.meta.dirname, "..", "src", "server.ts"), "utf8");
+  assert.match(source, /afterSeq/, "the events endpoint must keep supporting incremental reads");
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {

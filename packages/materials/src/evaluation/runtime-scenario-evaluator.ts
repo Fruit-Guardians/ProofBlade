@@ -419,6 +419,9 @@ async function evaluatePauseResumeReplay(context: RuntimeScenarioContext): Promi
   await coordinator.setDomainPhase(runId, "HYPOTHESIS");
   requireCondition((await services.control.snapshot(runId)).status === "PAUSED", "phase transition implicitly resumed a paused run");
   await services.control.dispatch(runId, { type: "resume" });
+  // Force the barrier before comparing: the hot path defers `projection.json`,
+  // so a lagging file is the expected state rather than divergence.
+  await services.control.flushProjection(runId).catch(() => undefined);
   const replayed = await services.control.replay(runId);
   const persisted = await services.control.loadProjection(runId);
   requireCondition(replayed.status === "RUNNING", "explicit resume did not restore RUNNING status");

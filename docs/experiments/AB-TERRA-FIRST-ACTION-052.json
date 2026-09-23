@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "AB-TERRA-FIRST-ACTION-052",
+  "name": "Terra 首步软建议对 off 三次配对消融",
+  "question": "在同一 Terra Responses 通道和 verifier-ready 任务上，firstAction 的软建议是否减少无效首步而不阻塞合法探索？",
+  "hypothesis": "soft_advice 相比 off 能保持或提前首个有效观察；若建议不匹配任务，模型仍应能够回退，而不是被 Harness 拒绝。",
+  "corpus": {
+    "path": "tmp/terra-ablation-017/manifest.json"
+  },
+  "model": {
+    "profileId": "aihub-terra-first-action-052",
+    "model": "gpt-5.6-terra",
+    "thinkingLevel": "max",
+    "contextWindow": 32768,
+    "maxTokens": 4096
+  },
+  "budget": {
+    "attempts": 3,
+    "maxTurns": 2,
+    "maxCostUsd": 6,
+    "deadlineMs": 900000
+  },
+  "variants": [
+    {
+      "id": "baseline",
+      "name": "默认 soft_advice",
+      "baseline": true,
+      "changedFactor": "none"
+    },
+    {
+      "id": "candidate",
+      "name": "firstAction off",
+      "changedFactor": "first_action",
+      "policy": {
+        "firstAction": "off"
+      }
+    }
+  ],
+  "runOrder": {
+    "mode": "interleaved",
+    "seed": 52
+  }
+}

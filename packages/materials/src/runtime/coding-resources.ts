@@ -25,6 +25,8 @@ import type { DomainPhase, Lane, RawEffectResult, TargetKind } from "../domain/t
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
+import { withToolTimingOnTools, type ToolTimingRecorder } from "../observability/tool-timing.js";
+import type { ObserverDiagnostics } from "../observability/observer-diagnostics.js";
 import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
@@ -119,6 +121,14 @@ export interface CodingResourceContext extends ExecutionToolContext {
   runtime: ProofBladeToolRuntime;
   /** Durable per-run gate for repeated process/network experiments. */
   experimentGate?: ExperimentGate;
+  /**
+   * Optional sink for observation-path failures.
+   *
+   * Present so a best-effort observation that fails leaves a trace instead of
+   * vanishing. Absent in lightweight test/offline contexts, where there is no
+   * operator to inform and the failure is already covered by the assertions.
+   */
+  observerDiagnostics?: ObserverDiagnostics;
   webReproduce?: (recipe: WebExploitRecipe, signal?: AbortSignal) => Promise<unknown>;
   /**
    * Present only when the task has a resolvable web target. Drives interactive
@@ -187,10 +197,19 @@ export interface CodingToolOptions {
   externalSubmissionEnabled?: boolean;
   webReproductionEnabled?: boolean;
   webSessionEnabled?: boolean;
+  /**
+   * Opt-in stage-timing sink for tool calls.
+   *
+   * Absent by default so the shipped tool list is byte-identical to the
+   * unwrapped one; the tool contract hash depends on that list. Supplying a
+   * recorder wraps every tool in {@link withToolTiming}, which forwards
+   * behaviour unchanged and only appends an in-memory sample.
+   */
+  timingRecorder?: ToolTimingRecorder;
 }
 
 export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
-  return [
+  return withToolTimingOnTools([
     ...builtinTools(),
     updatePhaseTool,
     verifyResultTool,
@@ -206,7 +225,7 @@ export function createCodingTools(options: CodingToolOptions = {}): AgentHarness
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
     // Registered only when a trusted destination is configured.
     ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool] : []),
-  ];
+  ], options.timingRecorder);
 }
 
 /** First-class tool name for an MCP server tool: mcp__<server>__<tool>. */
@@ -575,6 +594,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
           evidenceId: reproduction.evidenceId,
           completionId: reproduction.completionId,
           supportingEvidenceIds: reproduction.supportingEvidenceIds,
+          ...(reproduction.acceptance === "observation_only" ? { verifierFeedback: observationOnlyFeedback() } : {}),
         });
         return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
       } catch (error) {
@@ -623,6 +643,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
       completionId: reproduction.completionId,
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
+      ...(reproduction.acceptance === "observation_only" ? { verifierFeedback: observationOnlyFeedback() } : {}),
     });
     return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
   },
@@ -1801,27 +1822,53 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
         return result;
       }
       const previousComplete = context.completedReads?.get(pathKey);
-      const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
-        filename: `read-${toolCallId}.txt`,
-        mime: "text/plain",
-        sensitivity: "public",
-        semantic: {
-          name: `文件读取 · ${pathTitle(input.path)}`,
-          summary: `读取 ${input.path}${readRange(input)} 的文本结果，${Buffer.byteLength(visible)} bytes。`,
-          tags: ["read", "file-content", pathTitle(input.path)],
-          role: "intermediate",
-          relatedIds: [],
-          annotatedBy: "harness",
-        },
-        persistProjection: false,
-      });
-      const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
+      let write: Awaited<ReturnType<typeof pipeline.artifactStore.putTextWithContent>>;
+      try {
+        write = await pipeline.artifactStore.putTextWithContent(pipeline.runId, visible, {
+          filename: `read-${toolCallId}.txt`,
+          mime: "text/plain",
+          sensitivity: "public",
+          semantic: {
+            name: `文件读取 · ${pathTitle(input.path)}`,
+            summary: `读取 ${input.path}${readRange(input)} 的文本结果，${Buffer.byteLength(visible)} bytes。`,
+            tags: ["read", "file-content", pathTitle(input.path)],
+            role: "intermediate",
+            relatedIds: [],
+            annotatedBy: "harness",
+          },
+          persistProjection: false,
+        });
+      } catch (error) {
+        // Archival is the transport for a large result, not a precondition for
+        // reading a file. When it fails the model already holds the content, so
+        // the read must stay successful rather than turning a completed file read
+        // into a failed solve.
+        //
+        // What the failure leaves behind, stated precisely so nobody has to infer
+        // it: the model gets the content plus `UNARCHIVED_READ_NOTICE`, and the
+        // tool result carries `details.archivalFailed` so the failure is visible
+        // in the session record and the debug view. What it does NOT get is a
+        // ControlStore event — deliberately. An Observation is a claim about a
+        // registered Artifact, and there is no Artifact here; recording one would
+        // mean an observation that cites nothing. The event log therefore shows
+        // the read's effect but no observation for it, and the diagnostic sink
+        // (in-memory, per lane) is the operator-facing record of why.
+        const sink = context.observerDiagnostics;
+        if (sink) sink.record("artifact-observation", pipeline.runId, error);
+        if (complete && context.completedReads) context.completedReads.set(pathKey, { artifactId: "", contentHash, bytes: Buffer.byteLength(visible) });
+        return {
+          ...result,
+          content: [...result.content, { type: "text" as const, text: UNARCHIVED_READ_NOTICE }],
+          details: { ...(result.details ?? {}), complete, contentHash, archivalFailed: true },
+        };
+      }
+      const observation = await observeCodingArtifact(context, write.artifact.id, write.artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"], write.storedText);
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
-      const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, artifact.id, isBoundedReadResult(result));
+      const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, write.artifact.id, isBoundedReadResult(result));
       const repeatedComplete = previousComplete && previousComplete.contentHash === contentHash;
       if (complete && context.completedReads) {
-        context.completedReads.set(pathKey, { artifactId: artifact.id, contentHash, bytes: Buffer.byteLength(visible) });
+        context.completedReads.set(pathKey, { artifactId: write.artifact.id, contentHash, bytes: Buffer.byteLength(visible) });
       }
       const readStatus = repeatedComplete
         ? `[ProofBlade read complete: ${input.path} is unchanged from the previous complete read; do not page through it again.]`
@@ -1831,7 +1878,7 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       return {
         ...result,
         content: [...(repeatedComplete ? [{ type: "text" as const, text: readStatus! }] : observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(readStatus && !repeatedComplete ? [{ type: "text" as const, text: readStatus }] : []), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
-        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, complete, contentHash, ...observation },
+        details: { ...(result.details ?? {}), artifactId: write.artifact.id, artifactHash: write.artifact.sha256, complete, contentHash, ...observation },
       };
     },
   };
@@ -2012,8 +2059,9 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
         const failure = shellFailureDetails(visible);
-        const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
-        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
+        const archived = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
+        const outputRewrite = archived.projection;
+        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"], archived.storedText);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
         const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0), "error");
         await context.experimentGate?.record({
@@ -2042,8 +2090,12 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outsideWorkspace = sourceScope.status === "outside_workspace";
-      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, outsideWorkspace ? "debug" : "intermediate");
-      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), outsideWorkspace ? "bash:outside-workspace" : "bash", 0, `${outsideWorkspace ? "外部环境" : "命令"}输出 · ${commandTitle(input.command)}`, outsideWorkspace ? "输出包含任务工作区之外的运行环境数据，仅可用于诊断，不能作为任务结果的权威来源。" : "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", outsideWorkspace ? "debug" : "intermediate", ["bash", "command-output", ...(outsideWorkspace ? ["outside-workspace"] : [])]);
+      const archived = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, outsideWorkspace ? "debug" : "intermediate");
+      // `details` gets `archived.projection` only. The archived text lives in a
+      // sibling field, so it is never persisted with the session or rendered in
+      // the debug view; the observer is its only consumer and has it here.
+      const outputRewrite = archived.projection;
+      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), outsideWorkspace ? "bash:outside-workspace" : "bash", 0, `${outsideWorkspace ? "外部环境" : "命令"}输出 · ${commandTitle(input.command)}`, outsideWorkspace ? "输出包含任务工作区之外的运行环境数据，仅可用于诊断，不能作为任务结果的权威来源。" : "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", outsideWorkspace ? "debug" : "intermediate", ["bash", "command-output", ...(outsideWorkspace ? ["outside-workspace"] : [])], archived.storedText);
       const receipt = await artifactReceipt(context, toolCallId, `命令输出 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
@@ -2191,8 +2243,29 @@ async function observeCodingArtifact(
   summary: string,
   role: "intermediate" | "debug",
   tags: string[],
+  /**
+   * The text the Artifact holds, when the caller already has it.
+   *
+   * The observer only inspects bounded output for candidate and failure
+   * signatures, so reading the artifact back from disk to hand it the same
+   * characters is pure overhead on the tool hot path.
+   *
+   * This must be the **stored** (post-redaction) text — the value an
+   * `ArtifactWrite.storedText` carries — never the caller's pre-write input.
+   * It is verified against `artifactHash` below, so passing the unredacted
+   * original fails instead of quietly classifying bytes the Artifact does not
+   * contain.
+   */
+  content?: string,
 ): Promise<AutomaticArtifactDetails> {
   const details: AutomaticArtifactDetails = {};
+  if (content !== undefined && sha256(content) !== artifactHash) {
+    // The read-back path got this guarantee for free: FileArtifactRepository.read
+    // refuses an Artifact whose bytes do not match its hash. Skipping the read
+    // must not also skip the check, or the Observation would cite an Artifact
+    // whose provenance was never established.
+    throw new Error(`Artifact hash mismatch: ${artifactId}`);
+  }
   const previous = artifactHash ? context.artifactOutputRefs?.get(artifactHash) : undefined;
   if (artifactHash && context.artifactOutputRefs) {
     const next = { artifactId: previous?.artifactId ?? artifactId, count: (previous?.count ?? 0) + 1 };
@@ -2217,6 +2290,7 @@ async function observeCodingArtifact(
         artifactId,
         exitCode,
         persistProjection: false,
+        ...(content === undefined ? {} : { content }),
         annotation: { name, summary, role, tags: [...tags, "auto-reviewed"] },
       });
       // Automatic observations are bookkeeping, not solver milestones.
@@ -2225,9 +2299,15 @@ async function observeCodingArtifact(
       details.evidenceId = observed.evidenceId;
       details.candidateKinds = observed.candidateKinds;
       details.progressKey ??= observed.progressKey;
-    } catch {
+    } catch (error) {
       // Automatic observation is best-effort; the raw Artifact remains the
-      // durable source if the control store is temporarily unavailable.
+      // durable source if the control store is temporarily unavailable. Record
+      // it rather than swallowing silently: otherwise "no observations" and
+      // "observations all failed" are indistinguishable to an operator.
+      // Guarded rather than optional-chained on the call: with no sink the
+      // message text is work nobody consumes, on the tool hot path.
+      const sink = context.observerDiagnostics;
+      if (sink) sink.record("artifact-observation", context.runtime.runId, error);
     }
   } else {
     try {
@@ -2236,9 +2316,11 @@ async function observeCodingArtifact(
       const review = await context.evidenceGraph.annotateArtifact({ artifactId, name, summary, role, tags: [...tags, "auto-reviewed"] });
       details.durableProgress = false;
       details.progressKey = review.progressKey;
-    } catch {
+    } catch (error) {
       // Artifact annotation is an observer side effect. A transient control-store
       // failure must not turn a completed bash/read call into a failed solve.
+      const sink = context.observerDiagnostics;
+      if (sink) sink.record("artifact-annotation", context.runtime?.runId ?? context.outputRewrite?.runId ?? "unknown", error);
     }
   }
   return details;
@@ -2258,6 +2340,22 @@ function repeatedArtifactNotice(artifactId: string, count: number): string {
 
 const MAX_ARTIFACT_REPLAY_KEYS = 512;
 
+/**
+ * Model-facing notice when a tool result could not be archived.
+ *
+ * Says what happened and what it costs the model (no citable id), so it does not
+ * have to guess whether the missing artifact id means the read failed.
+ */
+const UNARCHIVED_READ_NOTICE = "[ProofBlade read unarchived: artifact storage was unavailable, so this content was returned inline and has no artifact id to cite. Re-read the file if you need a citable copy.]";
+
+/**
+ * Archive an oversized bash result and split the two things callers need.
+ *
+ * `projection` is what lands in `details`; `storedText` is the archived text and
+ * is returned separately *by construction* so the raw output cannot reach
+ * `details` through a spread. `details` is persisted with the session and
+ * rendered in the debug view, so the full raw output must never be a field of it.
+ */
 async function finalizeAndArchive(
   pipeline: NonNullable<CodingResourceContext["outputRewrite"]>,
   ticket: OutputRewriteTicket,
@@ -2265,9 +2363,9 @@ async function finalizeAndArchive(
   toolCallId: string,
   command: string,
   role: "intermediate" | "debug",
-): Promise<Record<string, unknown>> {
+): Promise<{ projection: Record<string, unknown>; storedText: string }> {
   const finalized = await pipeline.port.finalize(ticket, visibleOutput);
-  const artifact = await pipeline.artifactStore.putText(pipeline.runId, finalized.rawOutput, {
+  const write = await pipeline.artifactStore.putTextWithContent(pipeline.runId, finalized.rawOutput, {
     filename: `bash-${toolCallId}-raw.txt`,
     mime: "text/plain",
     sensitivity: "public",
@@ -2284,21 +2382,27 @@ async function finalizeAndArchive(
   });
   const savedBytes = Math.max(0, finalized.rawBytes - finalized.visibleBytes);
   return {
-    requestedProvider: ticket.requestedProvider,
-    provider: ticket.provider,
-    providerVersion: ticket.providerVersion,
-    applied: ticket.applied,
-    fallbackReason: ticket.fallbackReason,
-    originalCommandHash: ticket.originalCommandHash,
-    rewrittenCommandHash: ticket.rewrittenCommandHash,
-    rawCapture: finalized.rawCapture,
-    rawBytes: finalized.rawBytes,
-    visibleBytes: finalized.visibleBytes,
-    savedBytes,
-    savingsRate: finalized.rawBytes > 0 ? Number((savedBytes / finalized.rawBytes).toFixed(4)) : 0,
-    rawTruncated: finalized.rawTruncated,
-    artifactId: artifact.id,
-    artifactHash: artifact.sha256,
+    projection: {
+      requestedProvider: ticket.requestedProvider,
+      provider: ticket.provider,
+      providerVersion: ticket.providerVersion,
+      applied: ticket.applied,
+      fallbackReason: ticket.fallbackReason,
+      originalCommandHash: ticket.originalCommandHash,
+      rewrittenCommandHash: ticket.rewrittenCommandHash,
+      rawCapture: finalized.rawCapture,
+      rawBytes: finalized.rawBytes,
+      visibleBytes: finalized.visibleBytes,
+      savedBytes,
+      savingsRate: finalized.rawBytes > 0 ? Number((savedBytes / finalized.rawBytes).toFixed(4)) : 0,
+      rawTruncated: finalized.rawTruncated,
+      artifactId: write.artifact.id,
+      artifactHash: write.artifact.sha256,
+    },
+    // The exact text written to the artifact, so the observer can classify it
+    // without reading the file back. Returned beside the projection rather than
+    // inside it: `details` gets the projection, and the raw output stays out.
+    storedText: write.storedText,
   };
 }
 
@@ -2657,6 +2761,30 @@ function toolResult(details: unknown, isError = false, maxChars?: number): Retur
     details,
     isError,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+/**
+ * Feedback for a reproduction the harness ran and could not turn into an accepted
+ * Completion, because the task binds no verification rule.
+ *
+ * Without this the tool returned `verified: false` beside a fresh artifactId,
+ * evidenceId and completionId and said nothing else, so the model read it as a
+ * failed verification and retried with a different command -- which cannot change
+ * the outcome, because acceptance is decided by the task contract, not by the
+ * command. `retryable: false` is the honest answer here.
+ */
+function observationOnlyFeedback(): {
+  stage: "input" | "policy" | "execution" | "recovery";
+  reason: string;
+  retryable: boolean;
+  nextAction: string;
+} {
+  return {
+    stage: "policy",
+    reason: "This run's task declares no verification rule (no verification.command), so a claim can only be recorded as observed Evidence; no Completion can be accepted and retrying verify_result cannot change that.",
+    retryable: false,
+    nextAction: "Report the result to the user with the Evidence id. Do not call verify_result again unless the task contract is updated with a verification command.",
+  };
 }
 
 function verifierFailureFeedback(error: unknown): {

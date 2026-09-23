@@ -4,15 +4,15 @@
 {
   "id": "materials-storage",
   "name": "Materials JSONL Storage",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-09-19T16:20:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
-    "sourceHash": "d165dcf4f510ac4f1bf8f3a1ee8e8138e98b292646dd23975db7304215876ab1",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-09-19T16:20:00.000Z",
+    "lastSecurityAuditAt": "2026-09-19T16:20:00.000Z",
+    "sourceHash": "692a82820c3c54a1caa030486484f97685be0f770d55b3d68f4d207b5183f012",
     "result": "passed"
   }
 }
