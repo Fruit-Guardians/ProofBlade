@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T04:00:00+08:00",
+  "updatedAt": "2026-09-23T04:40:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2420,6 +2420,27 @@
         "变异验证：把满足条件改回「只看 currentHypothesis」→ 新用例 not ok 3（恢复后 4/4 通过）",
         "phase-gate.test.ts 4 用例 fail 0（含此前两条：old-generation 观察判 stale、SUBMIT 要求 accepted 证据与已完成工作项）；npx tsc -b exit 0",
         "边界：没有复现结论时 RECON 仍然 blocked——新用例先断言这一点，再注入 reproduction Evidence 后断言不再缺该条"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-008",
+      "occurredAt": "2026-09-23T04:40:00+08:00",
+      "summary": "按反馈计划 P0-3 的后半：同一个结论不再建第二棵树。verification 链在挂树前先检查「本次要挂的节点是否已被既有树覆盖」，覆盖则复用那棵树并把决定回报给调用方。",
+      "branch": "fix/single-tree-per-conclusion",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "verification/claim-verification.ts：新增 plannedNodeIds 与既有树的交集判定；命中则复用既有树（不再调用 createTree），ResultReproduction/ResultArtifactReproduction 增加 treeId/treeReused（可选字段，durable-recovery 两条返回路径在不掌握树时不填），工具响应把这两个字段带给调用方",
+        "证据（先量后改）：CHAT-1790096643438 的 TREE-b8f448bb（agent，3 节点，根是 fact）与 TREE-6254a5fe（verification 链，9 节点，根是永远无法 ACCEPT 的 C-af331919）**共享两个节点**：supporting Evidence EV-3a67f1b4 与它指向的 Artifact A-76a42d21。注意共享的不是 completion 自己的 artifactId（A-7e777dd3），所以判据取「节点集有交集」而不是「同一个候选」",
+        "复用而不是合并：图只有 createTree 一个写入口，没有给既有树追加节点的 API；verification 的溯源本来就走 reasoning edges（linkNodesBatch），树只是视图，因此复用既有树不丢信息",
+        "测试：packages/materials/tests/coding-resources.test.ts 新增用例，用真实链路构造重叠——先 CodingEvidenceGraph.recordEvidence（带 claim，否则不建树）造出含 supporting Evidence 的树，再 verify_result 带上该 evidenceId；断言 treeReused=true、treeId 等于既有树、且事后仍只有一棵树"
+      ],
+      "validation": [
+        "变异验证：把交集判定改成恒不命中（existingTree = undefined）→ 新用例 not ok（恢复后通过）",
+        "coding-resources.test.ts 44 用例 fail 0；claim-verification-recovery + verification-recovery + phase-gate + evidence-curation-gate 共 23 用例 fail 0；npx tsc -b exit 0",
+        "过程中的两次失败尝试已记录：evidence_record 工具在最小上下文里返回的是裁剪后的投影（无 treeId），改用图 API 后仍不建树——原因是 recordEvidence 需要 claim 字段才建树；用 claim 后才复现出重叠场景"
       ]
     }
   ],

@@ -950,7 +950,7 @@
 ### CodingClaimVerifier
 - Kind: `class`
 - Signature: `CodingClaimVerifier`
-- Source: [src/verification/claim-verification.ts:882](../../../packages/materials/src/verification/claim-verification.ts:882)
+- Source: [src/verification/claim-verification.ts:911](../../../packages/materials/src/verification/claim-verification.ts:911)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding claim verifier class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -960,7 +960,7 @@
 ### TaskResultVerifier
 - Kind: `class`
 - Signature: `TaskResultVerifier`
-- Source: [src/verification/claim-verification.ts:116](../../../packages/materials/src/verification/claim-verification.ts:116)
+- Source: [src/verification/claim-verification.ts:129](../../../packages/materials/src/verification/claim-verification.ts:129)
 - Export: `@proofblade/materials`
 - Summary: Domain-neutral verifier facade for task results.
 - Summary source: `tsdoc`
@@ -1452,7 +1452,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1760](../../../packages/materials/src/runtime/coding-resources.ts:1760)
+- Source: [src/runtime/coding-resources.ts:1762](../../../packages/materials/src/runtime/coding-resources.ts:1762)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -3069,7 +3069,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1920](../../../packages/materials/src/runtime/coding-resources.ts:1920)
+- Source: [src/runtime/coding-resources.ts:1922](../../../packages/materials/src/runtime/coding-resources.ts:1922)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -3078,7 +3078,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:1646](../../../packages/materials/src/runtime/coding-resources.ts:1646)
+- Source: [src/runtime/coding-resources.ts:1648](../../../packages/materials/src/runtime/coding-resources.ts:1648)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3087,7 +3087,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(options?: CodingToolOptions): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:1667](../../../packages/materials/src/runtime/coding-resources.ts:1667)
+- Source: [src/runtime/coding-resources.ts:1669](../../../packages/materials/src/runtime/coding-resources.ts:1669)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -3140,7 +3140,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1774](../../../packages/materials/src/runtime/coding-resources.ts:1774)
+- Source: [src/runtime/coding-resources.ts:1776](../../../packages/materials/src/runtime/coding-resources.ts:1776)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -3149,7 +3149,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1904](../../../packages/materials/src/runtime/coding-resources.ts:1904)
+- Source: [src/runtime/coding-resources.ts:1906](../../../packages/materials/src/runtime/coding-resources.ts:1906)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -3158,7 +3158,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1894](../../../packages/materials/src/runtime/coding-resources.ts:1894)
+- Source: [src/runtime/coding-resources.ts:1896](../../../packages/materials/src/runtime/coding-resources.ts:1896)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -3184,7 +3184,7 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:1528](../../../packages/materials/src/runtime/coding-resources.ts:1528)
+- Source: [src/runtime/coding-resources.ts:1530](../../../packages/materials/src/runtime/coding-resources.ts:1530)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
@@ -3740,7 +3740,7 @@
 ### requiresClaimVerification
 - Kind: `function`
 - Signature: `(userPrompt: string, assistantText?: string): boolean`
-- Source: [src/verification/claim-verification.ts:899](../../../packages/materials/src/verification/claim-verification.ts:899)
+- Source: [src/verification/claim-verification.ts:928](../../../packages/materials/src/verification/claim-verification.ts:928)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: requires claim verification operation used to read or inspect state.
 - Summary source: `inferred`
@@ -3749,7 +3749,7 @@
 ### rewriteUnverifiedClaimText
 - Kind: `function`
 - Signature: `(assistantText: string, reason?: string): string`
-- Source: [src/verification/claim-verification.ts:82](../../../packages/materials/src/verification/claim-verification.ts:82)
+- Source: [src/verification/claim-verification.ts:95](../../../packages/materials/src/verification/claim-verification.ts:95)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: rewrite unverified claim text operation used to perform a durable write.
 - Summary source: `inferred`
@@ -3758,7 +3758,7 @@
 ### rewriteUnverifiedResultText
 - Kind: `function`
 - Signature: `(assistantText: string, reason?: string): string`
-- Source: [src/verification/claim-verification.ts:75](../../../packages/materials/src/verification/claim-verification.ts:75)
+- Source: [src/verification/claim-verification.ts:88](../../../packages/materials/src/verification/claim-verification.ts:88)
 - Export: `@proofblade/materials`
 - Summary: Keep result-shaped output visibly non-authoritative until projection verifies it.
 - Summary source: `tsdoc`
@@ -8204,7 +8204,7 @@
 ### ResultArtifactReproduction
 - Kind: `interface`
 - Signature: `ResultArtifactReproduction`
-- Source: [src/verification/claim-verification.ts:39](../../../packages/materials/src/verification/claim-verification.ts:39)
+- Source: [src/verification/claim-verification.ts:49](../../../packages/materials/src/verification/claim-verification.ts:49)
 - Export: `@proofblade/materials`
 - Summary: A verifier result bound to an existing durable Artifact rather than text.
 - Summary source: `tsdoc`
@@ -8220,7 +8220,7 @@
 ### ResultVerificationProjection
 - Kind: `interface`
 - Signature: `ResultVerificationProjection`
-- Source: [src/verification/claim-verification.ts:58](../../../packages/materials/src/verification/claim-verification.ts:58)
+- Source: [src/verification/claim-verification.ts:71](../../../packages/materials/src/verification/claim-verification.ts:71)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: result verification projection type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11315,7 +11315,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record evidence operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CodingEvidenceGraph.recordLeak
 - Kind: `method`
@@ -14072,7 +14072,7 @@
 ### TaskResultVerifier.executeBrowserReproductionEffect
 - Kind: `method`
 - Signature: `(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>`
-- Source: [src/verification/claim-verification.ts:187](../../../packages/materials/src/verification/claim-verification.ts:187)
+- Source: [src/verification/claim-verification.ts:200](../../../packages/materials/src/verification/claim-verification.ts:200)
 - Export: `@proofblade/materials`
 - Summary: Execute a verifier-owned browser clean-context attestation.
 - Summary source: `tsdoc`
@@ -14081,7 +14081,7 @@
 ### TaskResultVerifier.executePwnReproductionEffect
 - Kind: `method`
 - Signature: `(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>`
-- Source: [src/verification/claim-verification.ts:221](../../../packages/materials/src/verification/claim-verification.ts:221)
+- Source: [src/verification/claim-verification.ts:234](../../../packages/materials/src/verification/claim-verification.ts:234)
 - Export: `@proofblade/materials`
 - Summary: Execute a verifier-owned Pwn attestation over a fresh session transcript.
 - Summary source: `tsdoc`
@@ -14090,7 +14090,7 @@
 ### TaskResultVerifier.executeWebReproductionEffect
 - Kind: `method`
 - Signature: `(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>`
-- Source: [src/verification/claim-verification.ts:153](../../../packages/materials/src/verification/claim-verification.ts:153)
+- Source: [src/verification/claim-verification.ts:166](../../../packages/materials/src/verification/claim-verification.ts:166)
 - Export: `@proofblade/materials`
 - Summary: Execute a verifier-owned web attestation without exposing the verifier port to the lane.
 - Summary source: `tsdoc`
@@ -14099,7 +14099,7 @@
 ### TaskResultVerifier.finalizeBrowserReproduction
 - Kind: `method`
 - Signature: `(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>`
-- Source: [src/verification/claim-verification.ts:266](../../../packages/materials/src/verification/claim-verification.ts:266)
+- Source: [src/verification/claim-verification.ts:279](../../../packages/materials/src/verification/claim-verification.ts:279)
 - Export: `@proofblade/materials`
 - Summary: Mark a browser verifier Completion accepted/rejected after its Evidence is recorded.
 - Summary source: `tsdoc`
@@ -14108,7 +14108,7 @@
 ### TaskResultVerifier.finalizePwnReproduction
 - Kind: `method`
 - Signature: `(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>`
-- Source: [src/verification/claim-verification.ts:271](../../../packages/materials/src/verification/claim-verification.ts:271)
+- Source: [src/verification/claim-verification.ts:284](../../../packages/materials/src/verification/claim-verification.ts:284)
 - Export: `@proofblade/materials`
 - Summary: Mark a Pwn verifier Completion accepted/rejected after its bound Evidence.
 - Summary source: `tsdoc`
@@ -14117,7 +14117,7 @@
 ### TaskResultVerifier.finalizeWebReproduction
 - Kind: `method`
 - Signature: `(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>`
-- Source: [src/verification/claim-verification.ts:261](../../../packages/materials/src/verification/claim-verification.ts:261)
+- Source: [src/verification/claim-verification.ts:274](../../../packages/materials/src/verification/claim-verification.ts:274)
 - Export: `@proofblade/materials`
 - Summary: Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded.
 - Summary source: `tsdoc`
@@ -14126,7 +14126,7 @@
 ### TaskResultVerifier.finishReplay
 - Kind: `method`
 - Signature: `(effectId: string, result: RawEffectResult): Promise<{ effectId: string; artifactId: string; }>`
-- Source: [src/verification/claim-verification.ts:148](../../../packages/materials/src/verification/claim-verification.ts:148)
+- Source: [src/verification/claim-verification.ts:161](../../../packages/materials/src/verification/claim-verification.ts:161)
 - Export: `@proofblade/materials`
 - Summary: Persist a replay result without claiming a candidate verdict.
 - Summary source: `tsdoc`
@@ -14135,7 +14135,7 @@
 ### TaskResultVerifier.prepareReplay
 - Kind: `method`
 - Signature: `(input: VerifierReplayInput): Promise<VerifierReplayHandle>`
-- Source: [src/verification/claim-verification.ts:138](../../../packages/materials/src/verification/claim-verification.ts:138)
+- Source: [src/verification/claim-verification.ts:151](../../../packages/materials/src/verification/claim-verification.ts:151)
 - Export: `@proofblade/materials`
 - Summary: Persist an external verifier replay before opening its clean resource.
 - Summary source: `tsdoc`
@@ -14144,7 +14144,7 @@
 ### TaskResultVerifier.project
 - Kind: `method`
 - Signature: `(userPrompt: string, assistantText: string): Promise<ResultVerificationProjection>`
-- Source: [src/verification/claim-verification.ts:688](../../../packages/materials/src/verification/claim-verification.ts:688)
+- Source: [src/verification/claim-verification.ts:717](../../../packages/materials/src/verification/claim-verification.ts:717)
 - Export: `@proofblade/materials`
 - Summary: Rebuild verification exclusively from durable current-generation state.
 - Summary source: `tsdoc`
@@ -14153,7 +14153,7 @@
 ### TaskResultVerifier.record
 - Kind: `method`
 - Signature: `(input: { candidate?: string; resultArtifactId?: string; command: string; cwd: string; toolCallId: string; completionPurpose?: "claim_reproduction" | "harness_verification"; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ResultReproduction>`
-- Source: [src/verification/claim-verification.ts:323](../../../packages/materials/src/verification/claim-verification.ts:323)
+- Source: [src/verification/claim-verification.ts:337](../../../packages/materials/src/verification/claim-verification.ts:337)
 - Export: `@proofblade/materials`
 - Summary: Execute and attest a legacy claim through a journaled verifier Effect.
 - Summary source: `tsdoc`
@@ -14162,7 +14162,7 @@
 ### TaskResultVerifier.recordArtifactResult
 - Kind: `method`
 - Signature: `(input: { resultArtifactId: string; command: string; cwd: string; toolCallId: string; supportingEvidenceIds?: string[]; signal?: AbortSignal; }): Promise<ResultArtifactReproduction>`
-- Source: [src/verification/claim-verification.ts:289](../../../packages/materials/src/verification/claim-verification.ts:289)
+- Source: [src/verification/claim-verification.ts:302](../../../packages/materials/src/verification/claim-verification.ts:302)
 - Export: `@proofblade/materials`
 - Summary: Verify an arbitrary result Artifact with the immutable task command.
 - Summary source: `tsdoc`
@@ -14170,7 +14170,7 @@
 ### TaskResultVerifier.recordResult
 - Kind: `method`
 - Signature: `(input: { result: string; command: string; cwd: string; toolCallId: string; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ResultReproduction>`
-- Source: [src/verification/claim-verification.ts:276](../../../packages/materials/src/verification/claim-verification.ts:276)
+- Source: [src/verification/claim-verification.ts:289](../../../packages/materials/src/verification/claim-verification.ts:289)
 - Export: `@proofblade/materials`
 - Summary: Execute and attest a claim through a journaled verifier Effect.
 - Summary source: `tsdoc`
@@ -14179,7 +14179,7 @@
 ### TaskResultVerifier.recordVerifierDomainRecords
 - Kind: `method`
 - Signature: `(records: DomainRecordInput[]): Promise<void>`
-- Source: [src/verification/claim-verification.ts:132](../../../packages/materials/src/verification/claim-verification.ts:132)
+- Source: [src/verification/claim-verification.ts:145](../../../packages/materials/src/verification/claim-verification.ts:145)
 - Export: `@proofblade/materials`
 - Summary: Commit verifier-owned Web/Pwn domain records after their Evidence is durable.
 - Summary source: `tsdoc`
@@ -14188,7 +14188,7 @@
 ### TaskResultVerifier.recordVerifierEvidence
 - Kind: `method`
 - Signature: `(evidence: Omit<Evidence, "createdSeq" | "provenance">): Promise<void>`
-- Source: [src/verification/claim-verification.ts:127](../../../packages/materials/src/verification/claim-verification.ts:127)
+- Source: [src/verification/claim-verification.ts:140](../../../packages/materials/src/verification/claim-verification.ts:140)
 - Export: `@proofblade/materials`
 - Summary: Commit verifier-owned Evidence without exposing the verifier port to the lane.
 - Summary source: `tsdoc`
@@ -14197,7 +14197,7 @@
 ### TaskResultVerifier.startReplay
 - Kind: `method`
 - Signature: `(effectId: string, sessionId: string, externalId?: string): Promise<void>`
-- Source: [src/verification/claim-verification.ts:143](../../../packages/materials/src/verification/claim-verification.ts:143)
+- Source: [src/verification/claim-verification.ts:156](../../../packages/materials/src/verification/claim-verification.ts:156)
 - Export: `@proofblade/materials`
 - Summary: Bind a clean session to a prepared verifier replay.
 - Summary source: `tsdoc`
@@ -16262,7 +16262,7 @@
 ### ClaimReproduction
 - Kind: `type`
 - Signature: `ResultReproduction`
-- Source: [src/verification/claim-verification.ts:56](../../../packages/materials/src/verification/claim-verification.ts:56)
+- Source: [src/verification/claim-verification.ts:69](../../../packages/materials/src/verification/claim-verification.ts:69)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: claim reproduction type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -16271,7 +16271,7 @@
 ### ClaimVerificationProjection
 - Kind: `type`
 - Signature: `ResultVerificationProjection`
-- Source: [src/verification/claim-verification.ts:72](../../../packages/materials/src/verification/claim-verification.ts:72)
+- Source: [src/verification/claim-verification.ts:85](../../../packages/materials/src/verification/claim-verification.ts:85)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: claim verification projection type contract used to provide a reusable operation.
 - Summary source: `inferred`
