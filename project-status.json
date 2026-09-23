@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T02:30:00+08:00",
+  "updatedAt": "2026-09-23T03:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2360,6 +2360,25 @@
         "变异验证：把提示里的键名改回 run_tool_calls_used / run_tool_calls_remaining → context.test.ts not ok（恢复后通过）",
         "context.test.ts 与 control-view.test.ts 共 20 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过",
         "全仓 grep：旧名只剩 phase-budget.ts 注释里的一句历史说明"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-005",
+      "occurredAt": "2026-09-23T03:00:00+08:00",
+      "summary": "按反馈计划 P0-2：skill 自动路由在只有泛 CTF 信号时弃权——该信号此前能单独把 ctf-misc 整个拉进来（pyjail / bash jail / HISTFILE / SECCOMP 高位 fd / rvim 逃逸），而触发它的只是一个『题目』或『CTF』字样。",
+      "branch": "fix/skill-routing-abstain",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "runtime/skill-routing.ts：ctf-misc 那条泛信号标记为 corroborating，不再参与选择，只在一个领域信号已经命中时作为佐证加入；若领域先验与具体信号都没有命中（scores 为空），直接返回空选择而不是兜底",
+        "理由与证据：CHAT-1790096643438 的 target_kind=unknown、目标是一个『固件补丁链 + 密钥派生』任务，objective 里的『题目』字样让泛信号以 12 分把 ctf-misc 选中并注入整块无关内容",
+        "保留：durable target_kind 的先验（如 target_kind=misc → ctf-misc）不受影响——那是任务声明的领域，不是猜测"
+      ],
+      "validation": [
+        "变异验证：去掉 corroborating 标记让泛信号重新参与选择 → 新用例 not ok 4 与 not ok 5（恢复后 6/6 通过）",
+        "skill-routing.test.ts 6 用例 fail 0（含原有 4 条：forensics 优先、durable prior、不可用技能不选、有界确定性）；npx tsc -b exit 0；api:index 重新生成"
       ]
     }
   ],
