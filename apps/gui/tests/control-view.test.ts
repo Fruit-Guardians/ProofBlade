@@ -25,7 +25,7 @@ test("GUI control projection is read-only and exposes blocked gate plus budgets"
   assert.equal(view.domainPhase, "INTAKE");
   assert.equal(view.gate.status, "blocked");
   assert.deepEqual(view.gate.missing, ["current-generation-tool-preparation"]);
-  assert.equal(view.budget.runToolCallsRemaining, 5);
+  assert.equal(view.budget.journaledEffectsRemaining, 5, "the cap counts Effect Journal entries, not tool calls");
   assert.equal(view.budget.submissionsRemaining, 1);
   assert.equal(view.budget.replansUsed, 0);
   assert.equal(view.budget.replanLimit, 2);
