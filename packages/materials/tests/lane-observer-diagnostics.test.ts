@@ -117,6 +117,7 @@ test("a real tool failure reaches the lane's diagnostics, not /dev/null", async 
 
     assert.ok(seen, "the lane must build a tool context");
     assert.ok(seen.observerDiagnostics, "the lane must supply the diagnostics sink to its tools");
+    assert.equal(seen.bashTimeoutSecondsMax, 180, "interactive bash must have a bounded default");
 
     // Drive the archived-read path directly through the lane's own context.
     const readTool = createCodingTools().find((tool) => tool.name === "read");

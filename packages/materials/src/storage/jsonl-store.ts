@@ -25,6 +25,10 @@ export interface JsonlRunRevision {
   /** Event-stream identity. */
   readonly size: number;
   readonly mtimeMs: number;
+  /** Device/inode identify an append stream across renames and rewrites. */
+  readonly dev?: number;
+  readonly ino?: number;
+  readonly ctimeMs?: number;
   /** Persisted task-contract identity. */
   readonly taskSize: number;
   readonly taskMtimeMs: number;
@@ -114,6 +118,9 @@ export class JsonlControlStore {
       return {
         size: events.size,
         mtimeMs: events.mtimeMs,
+        dev: events.dev,
+        ino: events.ino,
+        ctimeMs: events.ctimeMs,
         taskSize: task?.size ?? -1,
         taskMtimeMs: task?.mtimeMs ?? -1,
       };
@@ -176,6 +183,14 @@ export class JsonlControlStore {
       this.eventCache.set(runId, cached);
       return cached.events.slice();
     }
+    // The normal hot path for an active Run is an append. Read only the new
+    // byte range and extend the already parsed event array; a rewrite,
+    // truncation, inode change, or malformed middle record falls back to the
+    // authoritative full parse below.
+    if (cached && canAppendEventRevision(cached.revision, revision)) {
+      const appended = await this.#loadAppendedEvents(runId, cached, revision);
+      if (appended !== undefined) return appended.slice();
+    }
     const inFlight = this.eventLoads.get(runId);
     if (inFlight) return (await inFlight).slice();
     const load = this.#loadEvents(runId, revision);
@@ -184,6 +199,52 @@ export class JsonlControlStore {
       return (await load).slice();
     } finally {
       if (this.eventLoads.get(runId) === load) this.eventLoads.delete(runId);
+    }
+  }
+
+  async #loadAppendedEvents(runId: string, cached: EventCacheEntry, revision: JsonlRunRevision): Promise<HarnessEvent[] | undefined> {
+    const length = revision.size - cached.revision.size;
+    if (length <= 0) return undefined;
+    const handle = await open(this.runPath(runId), "r");
+    try {
+      const buffer = Buffer.alloc(length);
+      const result = await handle.read(buffer, 0, length, cached.revision.size);
+      if (result.bytesRead !== length) return undefined;
+      const content = buffer.toString("utf8");
+      const lines = content.split(/\r?\n/);
+      const appended: HarnessEvent[] = [];
+      for (let index = 0; index < lines.length; index += 1) {
+        if (index === lines.length - 1 && !content.endsWith("\n")) continue;
+        const line = lines[index];
+        if (!line) continue;
+        try {
+          const event = JSON.parse(line) as HarnessEvent;
+          const expectedSeq = (cached.events.at(-1)?.seq ?? 0) + appended.length + 1;
+          if (event.seq !== expectedSeq || event.runId !== runId || event.streamId !== runId) return undefined;
+          appended.push(event);
+          parsedEventCount += 1;
+          parsedEventBytes += Buffer.byteLength(line, "utf8");
+        } catch {
+          // An unterminated final record is repaired on the next append. Any
+          // malformed complete record is treated as a rewrite/corruption and
+          // sent through the full parser so the existing error semantics win.
+          if (index === lines.length - 1 && !content.endsWith("\n")) continue;
+          return undefined;
+        }
+      }
+      const finalRevision = await this.revision(runId);
+      if (!sameEventRevision(finalRevision, revision)) return undefined;
+      const events = [...cached.events, ...appended];
+      this.eventCache.delete(runId);
+      this.eventCache.set(runId, { revision, events });
+      while (this.eventCache.size > EVENT_CACHE_LIMIT) {
+        const oldest = this.eventCache.keys().next().value as string | undefined;
+        if (oldest === undefined) break;
+        this.eventCache.delete(oldest);
+      }
+      return events;
+    } finally {
+      await handle.close().catch(() => undefined);
     }
   }
 
@@ -742,7 +803,16 @@ export class JsonlControlStore {
 }
 
 function sameEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
-  return left.size === right.size && left.mtimeMs === right.mtimeMs;
+  return left.size === right.size && left.mtimeMs === right.mtimeMs
+    && (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
+    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino)
+    && (left.ctimeMs === undefined || right.ctimeMs === undefined || left.ctimeMs === right.ctimeMs);
+}
+
+function canAppendEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
+  return right.size > left.size
+    && (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
+    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino);
 }
 
 /**

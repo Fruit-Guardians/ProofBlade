@@ -596,7 +596,10 @@ export class PiCodingLane implements AgentLanePort {
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
       ...(externalSubmit ? { externalSubmit } : {}),
-      ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
+      // Foreground commands are interactive probes. Keep them bounded so a
+      // forgotten parser or blocking debugger cannot occupy the whole lane;
+      // callers that need longer work should use shell_background.
+      bashTimeoutSecondsMax: options.bashTimeoutSecondsMax ?? 180,
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
       artifactOutputRefs: new Map(),
       completedReads: new Map(),

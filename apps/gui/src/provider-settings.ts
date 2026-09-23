@@ -80,7 +80,7 @@ export class ProviderSettingsStore {
       thinkingLevel: level,
       cacheRetention: profile.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
       supportsLongCacheRetention: profile.api === "openai-responses" && profile.supportsLongCacheRetention === true,
-      maxConcurrentRequests: profile.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
+      maxConcurrentRequests: profile.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 4,
       ...(profile.endpointMode ? { endpointMode: profile.endpointMode } : {}),
       apiKeyEnv,
       reasoning: reasoningEnabled || (this.baseProfile.reasoning ?? false),
@@ -105,7 +105,7 @@ export class ProviderSettingsStore {
       cacheRetention: active.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
       supportsLongCacheRetention: active.api === "openai-responses" && active.supportsLongCacheRetention === true,
       effectiveCacheRetention: effectiveRetention(active),
-      maxConcurrentRequests: active.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
+      maxConcurrentRequests: active.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 4,
       hasApiKey: Boolean(active.apiKey),
     };
   }
@@ -116,7 +116,7 @@ export class ProviderSettingsStore {
       ...input,
       cacheRetention: input.cacheRetention ?? existing?.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
       supportsLongCacheRetention: input.supportsLongCacheRetention ?? existing?.supportsLongCacheRetention ?? false,
-      maxConcurrentRequests: input.maxConcurrentRequests ?? existing?.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
+      maxConcurrentRequests: input.maxConcurrentRequests ?? existing?.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 4,
     }, this.baseProfile.api);
     const id = existing?.id ?? uniqueId(validated.name, new Set(this.profiles.map((profile) => profile.id)));
     const apiKey = input.clearApiKey ? undefined : input.apiKey?.trim() || existing?.apiKey;
@@ -210,7 +210,7 @@ export class ProviderSettingsStore {
           thinkingLevel: legacy.thinkingLevel,
           cacheRetention: legacy.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
           supportsLongCacheRetention: this.baseProfile.api === "openai-responses" && this.baseProfile.supportsLongCacheRetention === true,
-          maxConcurrentRequests: legacy.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
+        maxConcurrentRequests: legacy.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 4,
         }, this.baseProfile.api);
         this.profiles = [{ id: "default", ...validated, ...(legacy.apiKey?.trim() ? { apiKey: legacy.apiKey.trim() } : {}) }];
         this.activeProfileId = "default";
@@ -235,7 +235,7 @@ export class ProviderSettingsStore {
         thinkingLevel: this.baseProfile.thinkingLevel ?? "off",
         cacheRetention: this.baseProfile.cacheRetention ?? "short",
         supportsLongCacheRetention: this.baseProfile.api === "openai-responses" && this.baseProfile.supportsLongCacheRetention === true,
-        maxConcurrentRequests: this.baseProfile.maxConcurrentRequests ?? 1,
+          maxConcurrentRequests: this.baseProfile.maxConcurrentRequests ?? 4,
         ...(apiKey ? { apiKey } : {}),
       }];
       this.activeProfileId = "default";
@@ -269,7 +269,7 @@ function publicProfile(profile: LocalProviderProfile): ProviderProfile {
     cacheRetention: profile.cacheRetention ?? "short",
     supportsLongCacheRetention: profile.api === "openai-responses" && profile.supportsLongCacheRetention === true,
     effectiveCacheRetention: effectiveRetention(profile),
-    maxConcurrentRequests: profile.maxConcurrentRequests ?? 1,
+    maxConcurrentRequests: profile.maxConcurrentRequests ?? 4,
     hasApiKey: Boolean(profile.apiKey),
   };
 }
@@ -310,7 +310,7 @@ function validateInput(input: ProviderSettingsInput, fallbackApi: ProviderApi): 
   if (!cacheRetentions.has(cacheRetention)) throw new Error(`不支持的缓存保留策略：${String(cacheRetention)}`);
   if (input.supportsLongCacheRetention !== undefined && typeof input.supportsLongCacheRetention !== "boolean") throw new Error("长期缓存能力必须为布尔值");
   const supportsLongCacheRetention = api === "openai-responses" && input.supportsLongCacheRetention === true;
-  const maxConcurrentRequests = input.maxConcurrentRequests ?? 1;
+  const maxConcurrentRequests = input.maxConcurrentRequests ?? 4;
   if (!Number.isInteger(maxConcurrentRequests) || maxConcurrentRequests < 1 || maxConcurrentRequests > 32) throw new Error(`并发请求上限必须是 1 到 32 的整数：${String(maxConcurrentRequests)}`);
   const models = [...new Set((input.models ?? []).filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
   if (model !== "auto" && !models.includes(model)) models.unshift(model);

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRunUpdates, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller, isPollingAllowed } from "./polling.js";
@@ -86,6 +86,8 @@ export function App() {
   const [rightOpen, setRightOpen] = useState(false);
   const runIdRef = useRef(runId);
   runIdRef.current = runId;
+  const detailRef = useRef(detail);
+  detailRef.current = detail;
 
   const refreshRuns = useCallback(async (selectPreferred = false) => {
     const next = await getRuns();
@@ -115,12 +117,40 @@ export function App() {
     }
   }, []);
 
+  const refreshUpdates = useCallback(async (selected: string) => {
+    const current = detailRef.current;
+    if (!current || current.snapshot.runId !== selected) return;
+    const update = await getRunUpdates(selected, current.snapshot.lastSeq, current.sessionVersion);
+    if (runIdRef.current !== selected) return;
+    if (update.reloadDetail) {
+      await refreshDetail(selected, true);
+      return;
+    }
+    setDetail((existing) => {
+      if (!existing || existing.snapshot.runId !== selected) return existing;
+      const bySeq = new Map(existing.events.map((event) => [event.seq, event]));
+      for (const event of update.events) bySeq.set(event.seq, event);
+      const events = [...bySeq.values()].sort((left, right) => left.seq - right.seq).slice(-600);
+      return {
+        ...existing,
+        snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase },
+        events,
+        active: update.active,
+        updatedAt: update.updatedAt,
+        sessionVersion: update.sessionVersion,
+      };
+    });
+  }, [refreshDetail]);
+
   const refreshPollerRef = useRef<SingleFlightPoller | undefined>(undefined);
   if (!refreshPollerRef.current) {
     refreshPollerRef.current = new SingleFlightPoller(async (mode) => {
       await refreshRuns();
       const selected = runIdRef.current;
-      if (selected) await refreshDetail(selected, mode === "background");
+      if (selected) {
+        if (mode === "background") await refreshUpdates(selected);
+        else await refreshDetail(selected);
+      }
     });
   }
   const refreshPoller = refreshPollerRef.current;
@@ -150,9 +180,8 @@ export function App() {
   useEffect(() => {
     if (!bootstrap) return;
     const timer = window.setInterval(() => {
-      // A hidden tab must not poll at all: each tick costs a full Run detail
-      // payload, and nobody is looking at it. The rule lives in isPollingAllowed
-      // so it is tested rather than inlined here.
+      // A hidden tab must not poll at all. The rule lives in
+      // isPollingAllowed so it is tested rather than inlined here.
       if (!isPollingAllowed(document.visibilityState)) return;
       void refreshPoller.poll(false).catch((caught) => setError(message(caught)));
     }, bootstrap.refreshIntervalMs);
