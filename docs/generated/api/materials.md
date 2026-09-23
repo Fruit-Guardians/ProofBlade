@@ -754,7 +754,7 @@
 ### SandboxClaimRecoveryAdapter
 - Kind: `class`
 - Signature: `SandboxClaimRecoveryAdapter`
-- Source: [src/recovery/verification-recovery.ts:89](../../../packages/materials/src/recovery/verification-recovery.ts:89)
+- Source: [src/recovery/verification-recovery.ts:101](../../../packages/materials/src/recovery/verification-recovery.ts:101)
 - Export: `@proofblade/materials`
 - Summary: Recovery adapter for task-defined local claim commands.
 - Summary source: `tsdoc`
@@ -762,7 +762,7 @@
 ### VerificationRecoveryAdapterRegistry
 - Kind: `class`
 - Signature: `VerificationRecoveryAdapterRegistry`
-- Source: [src/recovery/verification-recovery.ts:117](../../../packages/materials/src/recovery/verification-recovery.ts:117)
+- Source: [src/recovery/verification-recovery.ts:129](../../../packages/materials/src/recovery/verification-recovery.ts:129)
 - Export: `@proofblade/materials`
 - Summary: Deterministic lookup table for verifier recovery backends.
 - Summary source: `tsdoc`
@@ -771,7 +771,7 @@
 ### VerificationRecoveryService
 - Kind: `class`
 - Signature: `VerificationRecoveryService`
-- Source: [src/recovery/verification-recovery.ts:162](../../../packages/materials/src/recovery/verification-recovery.ts:162)
+- Source: [src/recovery/verification-recovery.ts:174](../../../packages/materials/src/recovery/verification-recovery.ts:174)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: verification recovery service class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3016,7 +3016,7 @@
 ### resolveVerificationRecoveryAdapters
 - Kind: `function`
 - Signature: `(source: VerificationRecoveryAdapterSource | undefined, context: VerificationRecoveryAdapterContext): Promise<VerificationRecoveryAdapterRegistry>`
-- Source: [src/recovery/verification-recovery.ts:143](../../../packages/materials/src/recovery/verification-recovery.ts:143)
+- Source: [src/recovery/verification-recovery.ts:155](../../../packages/materials/src/recovery/verification-recovery.ts:155)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resolve verification recovery adapters operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7547,7 +7547,7 @@
 ### VerificationRecoveryAdapter
 - Kind: `interface`
 - Signature: `VerificationRecoveryAdapter`
-- Source: [src/recovery/verification-recovery.ts:69](../../../packages/materials/src/recovery/verification-recovery.ts:69)
+- Source: [src/recovery/verification-recovery.ts:81](../../../packages/materials/src/recovery/verification-recovery.ts:81)
 - Export: `@proofblade/materials`
 - Summary: Backend-owned recovery contract. `resumeProposed` is allowed to execute
 - Summary source: `tsdoc`
@@ -7556,7 +7556,7 @@
 ### VerificationRecoveryAdapterContext
 - Kind: `interface`
 - Signature: `VerificationRecoveryAdapterContext`
-- Source: [src/recovery/verification-recovery.ts:56](../../../packages/materials/src/recovery/verification-recovery.ts:56)
+- Source: [src/recovery/verification-recovery.ts:68](../../../packages/materials/src/recovery/verification-recovery.ts:68)
 - Export: `@proofblade/materials`
 - Summary: Context supplied when a recovery adapter is constructed for one Run.
 - Summary source: `tsdoc`
@@ -7564,7 +7564,7 @@
 ### VerificationRecoveryItem
 - Kind: `interface`
 - Signature: `VerificationRecoveryItem`
-- Source: [src/recovery/verification-recovery.ts:24](../../../packages/materials/src/recovery/verification-recovery.ts:24)
+- Source: [src/recovery/verification-recovery.ts:36](../../../packages/materials/src/recovery/verification-recovery.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: verification recovery item type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7572,7 +7572,7 @@
 ### VerificationRecoveryReport
 - Kind: `interface`
 - Signature: `VerificationRecoveryReport`
-- Source: [src/recovery/verification-recovery.ts:37](../../../packages/materials/src/recovery/verification-recovery.ts:37)
+- Source: [src/recovery/verification-recovery.ts:49](../../../packages/materials/src/recovery/verification-recovery.ts:49)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: verification recovery report type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9264,7 +9264,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: bind operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CapabilityLifecycleRegistry.bindingsSnapshot
 - Kind: `method`
@@ -11359,7 +11359,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: observe operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dispatch-transaction-batch.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/lane-observer-diagnostics.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/observer-diagnostics.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/tool-timing.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dispatch-transaction-batch.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/lane-observer-diagnostics.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/observer-diagnostics.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/tool-timing.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### McpProjectRegistry.binaryReverse
 - Kind: `method`
@@ -12976,7 +12976,7 @@
 ### SandboxClaimRecoveryAdapter.reconcileStarted
 - Kind: `method`
 - Signature: `(input: { request: VerificationRequest; completion?: CompletionProposal; effect: Effect; }, _signal: AbortSignal): Promise<VerificationExternalResolution>`
-- Source: [src/recovery/verification-recovery.ts:105](../../../packages/materials/src/recovery/verification-recovery.ts:105)
+- Source: [src/recovery/verification-recovery.ts:117](../../../packages/materials/src/recovery/verification-recovery.ts:117)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reconcile started operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12985,7 +12985,7 @@
 ### SandboxClaimRecoveryAdapter.resumeProposed
 - Kind: `method`
 - Signature: `(request: EffectRequest, signal: AbortSignal): Promise<RawEffectResult>`
-- Source: [src/recovery/verification-recovery.ts:98](../../../packages/materials/src/recovery/verification-recovery.ts:98)
+- Source: [src/recovery/verification-recovery.ts:110](../../../packages/materials/src/recovery/verification-recovery.ts:110)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resume proposed operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12994,7 +12994,7 @@
 ### SandboxClaimRecoveryAdapter.supports
 - Kind: `method`
 - Signature: `(operation: string): boolean`
-- Source: [src/recovery/verification-recovery.ts:94](../../../packages/materials/src/recovery/verification-recovery.ts:94)
+- Source: [src/recovery/verification-recovery.ts:106](../../../packages/materials/src/recovery/verification-recovery.ts:106)
 - Export: `@proofblade/materials`
 - Summary: Restrict an adapter to operations it can safely resume/reconcile.
 - Summary source: `tsdoc`
@@ -13003,7 +13003,7 @@
 ### VerificationRecoveryAdapterRegistry.get
 - Kind: `method`
 - Signature: `(kind: VerificationRequestKind): VerificationRecoveryAdapter | undefined`
-- Source: [src/recovery/verification-recovery.ts:129](../../../packages/materials/src/recovery/verification-recovery.ts:129)
+- Source: [src/recovery/verification-recovery.ts:141](../../../packages/materials/src/recovery/verification-recovery.ts:141)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: get operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13012,7 +13012,7 @@
 ### VerificationRecoveryAdapterRegistry.list
 - Kind: `method`
 - Signature: `(): readonly VerificationRecoveryAdapter[]`
-- Source: [src/recovery/verification-recovery.ts:133](../../../packages/materials/src/recovery/verification-recovery.ts:133)
+- Source: [src/recovery/verification-recovery.ts:145](../../../packages/materials/src/recovery/verification-recovery.ts:145)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13021,7 +13021,7 @@
 ### VerificationRecoveryService.inspect
 - Kind: `method`
 - Signature: `(runId: string): Promise<VerificationRecoveryReport>`
-- Source: [src/recovery/verification-recovery.ts:184](../../../packages/materials/src/recovery/verification-recovery.ts:184)
+- Source: [src/recovery/verification-recovery.ts:196](../../../packages/materials/src/recovery/verification-recovery.ts:196)
 - Export: `@proofblade/materials`
 - Summary: Inspect every stable VerificationRequest in a Run.
 - Summary source: `tsdoc`
@@ -13030,7 +13030,7 @@
 ### VerificationRecoveryService.reconcile
 - Kind: `method`
 - Signature: `(runId: string, signal?: AbortSignal): Promise<VerificationRecoveryReport>`
-- Source: [src/recovery/verification-recovery.ts:210](../../../packages/materials/src/recovery/verification-recovery.ts:210)
+- Source: [src/recovery/verification-recovery.ts:222](../../../packages/materials/src/recovery/verification-recovery.ts:222)
 - Export: `@proofblade/materials`
 - Summary: Reconcile only evidence that is already durable.  A verifier result
 - Summary source: `tsdoc`
@@ -13039,7 +13039,7 @@
 ### VerificationRecoveryService.resumeProposed
 - Kind: `method`
 - Signature: `(runId: string, requestId: string, executor: (request: EffectRequest, signal: AbortSignal) => Promise<RawEffectResult>, signal?: AbortSignal): Promise<{ effectId: string; result: RawEffectResult; artifactId: string; }>`
-- Source: [src/recovery/verification-recovery.ts:274](../../../packages/materials/src/recovery/verification-recovery.ts:274)
+- Source: [src/recovery/verification-recovery.ts:286](../../../packages/materials/src/recovery/verification-recovery.ts:286)
 - Export: `@proofblade/materials`
 - Summary: Resume a proposed verifier Effect using its persisted arguments. This is
 - Summary source: `tsdoc`
@@ -13232,7 +13232,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: use operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/barrier-projection.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/experiment-gate-projection.test.ts`, `packages/materials/tests/failure-policy.test.ts`, `packages/materials/tests/general-task-contract.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/lane-observer-diagnostics.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/projection-hint-currency.test.ts`, `packages/materials/tests/projection-read-bound.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-responses-cache.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/read-path-parse-budget.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/security-tool-profile.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skill-registry-cache.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/tool-scheduler.test.ts`, `packages/materials/tests/tool-timing.test.ts`, `packages/materials/tests/version-cache.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/barrier-projection.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/experiment-gate-projection.test.ts`, `packages/materials/tests/failure-policy.test.ts`, `packages/materials/tests/general-task-contract.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/lane-observer-diagnostics.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/projection-hint-currency.test.ts`, `packages/materials/tests/projection-read-bound.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-responses-cache.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/read-path-parse-budget.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/security-tool-profile.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skill-registry-cache.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/tool-scheduler.test.ts`, `packages/materials/tests/tool-timing.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/version-cache.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ToolPreflightService.prepare
 - Kind: `method`
@@ -14326,7 +14326,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in a remote runtime.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeContextPort.click
 - Kind: `method`
@@ -14425,7 +14425,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in the remote broker.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeBroker.bindWireResource
 - Kind: `method`
@@ -14530,7 +14530,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in the service ledger.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/archival-failure-semantics.test.ts`, `packages/materials/tests/artifact-readback.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/hot-path-budget.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/telemetry-lazy-payload.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DurableBrowserRuntimeService.create
 - Kind: `method`
@@ -16125,7 +16125,7 @@
 ### VerificationExternalResolution
 - Kind: `type`
 - Signature: `VerificationExternalResolution`
-- Source: [src/recovery/verification-recovery.ts:50](../../../packages/materials/src/recovery/verification-recovery.ts:50)
+- Source: [src/recovery/verification-recovery.ts:62](../../../packages/materials/src/recovery/verification-recovery.ts:62)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: verification external resolution type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -16133,7 +16133,7 @@
 ### VerificationRecoveryAdapterSource
 - Kind: `type`
 - Signature: `VerificationRecoveryAdapterSource`
-- Source: [src/recovery/verification-recovery.ts:139](../../../packages/materials/src/recovery/verification-recovery.ts:139)
+- Source: [src/recovery/verification-recovery.ts:151](../../../packages/materials/src/recovery/verification-recovery.ts:151)
 - Export: `@proofblade/materials`
 - Summary: Static adapters or a factory that can bind adapters to the recovered fixture.
 - Summary source: `tsdoc`
@@ -16141,7 +16141,7 @@
 ### VerificationRecoveryStatus
 - Kind: `type`
 - Signature: `VerificationRecoveryStatus`
-- Source: [src/recovery/verification-recovery.ts:15](../../../packages/materials/src/recovery/verification-recovery.ts:15)
+- Source: [src/recovery/verification-recovery.ts:16](../../../packages/materials/src/recovery/verification-recovery.ts:16)
 - Export: `@proofblade/materials`
 - Summary: Durable disposition of one verifier request after a process restart.
 - Summary source: `tsdoc`

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T03:00:00+08:00",
+  "updatedAt": "2026-09-23T03:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2379,6 +2379,27 @@
       "validation": [
         "变异验证：去掉 corroborating 标记让泛信号重新参与选择 → 新用例 not ok 4 与 not ok 5（恢复后 6/6 通过）",
         "skill-routing.test.ts 6 用例 fail 0（含原有 4 条：forensics 优先、durable prior、不可用技能不选、有界确定性）；npx tsc -b exit 0；api:index 重新生成"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-006",
+      "occurredAt": "2026-09-23T03:30:00+08:00",
+      "summary": "按反馈计划 P0-3 的前半：无 verifier 规则的任务里，proposed Completion 不再被当成「等待 verifier Effect」的恢复义务——那条债永远还不清，因为该契约不可能产出 verifier Effect。新增 OBSERVED_ONLY 终态。",
+      "branch": "fix/observed-only-recovery",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "recovery/verification-recovery.ts：VerificationRecoveryStatus 新增 OBSERVED_ONLY；evaluate 在「Completion 已提议且没有任何 verifier Effect」时先判 verificationBindsRule(snapshot.task)，为假则返回 OBSERVED_ONLY（reason 写明该契约绑定不了验证规则、重试也改不了），不再返回 PENDING",
+        "效果：reconcile 的 required 判定只把 PENDING/PROPOSED_EFFECT/IN_FLIGHT_EFFECT/AMBIGUOUS 计为待恢复，OBSERVED_ONLY 不在其中，因此不再产生 verification_recovery_required，也不再让恢复预算长期非零",
+        "证据：CHAT-1790096643438 的 VR-1e0de02d 与 VR-de190718 在 #339/#340 都以 \"Completion is proposed but no verifier Effect is durable yet.\" 进入 RECOVERY_REQUIRED，而该任务的 verification 是 {kind: reproduction, required_reproductions: 0} 且无 command——harness 里没有任何路径能兑现这两条",
+        "未做（P0-3 的剩余一半）：同一结论的第二棵树（TREE-6254a5fe 与 TREE-b8f448bb）仍会生成，已记在计划文档里"
+      ],
+      "validation": [
+        "变异验证：把 OBSERVED_ONLY 守卫改成恒假 → 新用例 not ok（恢复后通过）",
+        "verification-recovery.test.ts 与 claim-verification-recovery.test.ts 共 13 用例 fail 0；npx tsc -b exit 0",
+        "边界：有规则的任务（含 demoTask 的 required_reproductions=2）行为不变——既有 PENDING/RECOVERY_REQUIRED 用例仍绿"
       ]
     }
   ],
