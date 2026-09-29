@@ -2,6 +2,7 @@ import type { ControlStore, VerificationRecoveryControlPort } from "../control/c
 import type { CompletionProposal, Effect, EffectRequest, RawEffectResult, RunSnapshot, TaskContract, VerificationRequest, VerificationRequestKind } from "../domain/types.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef, SandboxPort } from "../sandbox/fixture.js";
+import { verificationBindsRule } from "../domain/phase-gate.js";
 
 /**
  * Durable disposition of one verifier request after a process restart.
@@ -15,6 +16,17 @@ import type { FixtureRef, SandboxPort } from "../sandbox/fixture.js";
 export type VerificationRecoveryStatus =
   | "TERMINAL"
   | "PENDING"
+  /**
+   * The candidate is as verified as this task's contract allows.
+   *
+   * A Run whose task binds no verification rule can never produce a verifier
+   * Effect, so "waiting for one" is an obligation nothing can discharge. It used
+   * to be reported as PENDING: CHAT-1790096643438 collected
+   * `VR-1e0de02d` and `VR-de190718` with "Completion is proposed but no verifier
+   * Effect is durable yet" and no way to pay either. Observed-only is terminal for
+   * recovery purposes and is never counted as required work.
+   */
+  | "OBSERVED_ONLY"
   | "PROPOSED_EFFECT"
   | "IN_FLIGHT_EFFECT"
   | "AMBIGUOUS"
@@ -321,6 +333,15 @@ function inspectRequest(snapshot: RunSnapshot, request: VerificationRequest): Ve
       : { ...base, status: "TERMINAL", completionId: completion.id, effectIds, reason: `Completion ${completion.id} has a complete durable verifier chain.` };
   }
   if (effects.length === 0 && replayEffects.length === 0) {
+    if (!verificationBindsRule(snapshot.task)) {
+      return {
+        ...base,
+        status: "OBSERVED_ONLY",
+        completionId: completion.id,
+        effectIds,
+        reason: "Completion is an observed candidate: this task contract binds no verification rule, so no verifier Effect can ever be durable. Nothing to recover, and retrying verification cannot change it.",
+      };
+    }
     return { ...base, status: "PENDING", completionId: completion.id, effectIds, reason: "Completion is proposed but no verifier Effect is durable yet." };
   }
   if (replayEffects.some((effect) => effect.status === "PROPOSED")) {

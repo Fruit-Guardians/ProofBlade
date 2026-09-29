@@ -103,6 +103,37 @@ test("TaskResultVerifier records generic result verification with a domain-neutr
   }
 });
 
+test("a task with no verification rule is observed-only, not an unpayable recovery obligation", async () => {
+  // CHAT-1790096643438 accumulated VR-1e0de02d and VR-de190718 with "Completion is
+  // proposed but no verifier Effect is durable yet" -- and no way to pay either,
+  // because the task binds no verification rule and so can never produce a verifier
+  // Effect. The candidate is as verified as that contract allows; calling it
+  // recovery work invents an obligation the harness cannot discharge.
+  const root = await mkdtemp(join(tmpdir(), "pb-verification-observed-only-"));
+  try {
+    const runId = "VERIFICATION-OBSERVED-ONLY";
+    const services = createServices(root, config);
+    const chat = demoTask(runId, root, config);
+    chat.verification.required_reproductions = 0;
+    chat.verification.command = undefined;
+    await services.control.createRun(runId, chat);
+    const request = await beginVerificationRequest(services.control, runId, { kind: "claim", policyHash: sha256("policy-observed"), recipeHash: sha256("recipe-observed") });
+    const candidate = await services.artifacts.putText(runId, "PB{observed_only_candidate}", { filename: "candidate.txt" });
+    const completion = { id: "C-OBSERVED", purpose: "harness_verification" as const, candidateHash: sha256("PB{observed_only_candidate}"), artifactId: candidate.id, verificationKey: request.request.key };
+    await services.control.dispatch(runId, { type: "completion_proposed", completion });
+
+    const reconciled = await new VerificationRecoveryService(services.control, undefined, [], services.verificationRecovery).reconcile(runId);
+    const observed = reconciled.items.find((item) => item.completionId === "C-OBSERVED");
+    assert.equal(observed?.status, "OBSERVED_ONLY", "a rule-less completion is observed, not pending recovery");
+    assert.match(String(observed?.reason), /binds no verification rule/);
+    assert.equal(reconciled.recoveryRequired, 0, "nothing can be recovered, so nothing may be demanded");
+    const after = await services.control.snapshot(runId);
+    assert.notEqual(after.verificationRequests[request.request.id]?.recoveryState, "RECOVERY_REQUIRED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("verification recovery persists RECOVERY_REQUIRED for a request with no durable Effect", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-verification-recovery-required-"));
   try {
