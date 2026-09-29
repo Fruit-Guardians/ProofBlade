@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T04:40:00+08:00",
+  "updatedAt": "2026-09-23T08:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2441,6 +2441,27 @@
         "变异验证：把交集判定改成恒不命中（existingTree = undefined）→ 新用例 not ok（恢复后通过）",
         "coding-resources.test.ts 44 用例 fail 0；claim-verification-recovery + verification-recovery + phase-gate + evidence-curation-gate 共 23 用例 fail 0；npx tsc -b exit 0",
         "过程中的两次失败尝试已记录：evidence_record 工具在最小上下文里返回的是裁剪后的投影（无 treeId），改用图 API 后仍不建树——原因是 recordEvidence 需要 claim 字段才建树；用 claim 后才复现出重叠场景"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-012",
+      "occurredAt": "2026-09-23T08:00:00+08:00",
+      "summary": "按审查意见重做 PR #254 的树复用判据：原来「计划节点与既有树有交集就复用」是错的——共享一个 supporting Evidence 不能证明两个候选是同一个结论，而且复用只返回旧树 id、不并入本次的 Completion/结果 Artifact/验证 Evidence，导致 inspectTree 与推理森林看不到这条验证链。现改为按候选身份（候选哈希标签）判定，命中即用 updateTree 合并新节点。",
+      "branch": "fix/single-tree-per-conclusion",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "verification/claim-verification.ts：结论身份改为本方法自己写入的树标签 candidate:<候选哈希前 24 位十六进制>（标签上限 40 字符，故取 96 位；碰撞的后果只是把共享 96 位的两个候选归到同一棵树，而 locallyJudged 在选树之前就已决定，不构成验证结论的晋升）；命中则 graph.updateTree 合并 nodeIds（旧节点 ∪ 本次 plannedNodeIds）与 relatedTreeIds，并按本次是否本地判定更新 status；未命中才 createTree 并写入该标签",
+        "两处实现约束是被测试逼出来的、并已写进注释：①合并时 relatedTreeIds 必须排除自身，否则 validateReasoningTree 抛 'Reasoning tree related ids must be unique and exclude itself'（本次的 supporting Evidence 本来就在被并入的树里，重算结果必然含它）；②标签必须 ≤40 字符，用完整 sha256（74 字符）会让 createTree 直接抛错并被工具吞成 execution 阶段的反馈",
+        "测试重写（原用例断言的是被否决的语义，因此按新语义重写并改名）：同一候选验证两次 → 第二次 treeReused=true、treeId 等于第一次的树、该树同时含两次的 Completion 与本次收据 Artifact、树数仍为 2；不同候选（即使复用同一 supporting Evidence）→ treeReused=false、独立成树、且不含第一个候选的 Completion",
+        "三条变异全部命中：把身份判据换回「节点有交集」（即被否决的版本）、把 updateTree 换成只返回旧 id、以及不写候选标签，都会让用例转红"
+      ],
+      "validation": [
+        "coding-resources + evidence-curation-gate + reasoning-forest + knowledge-read-bounds 共 55 用例 fail 0；npx tsc -b exit 0",
+        "api:index 重新生成；check:components（26 组件）与 check:change-contracts（11 契约）通过",
+        "边界：第三个候选的首次失败并非代码问题——测试脚本 flag-only.mjs 打印的是第一个候选，复现校验按规则拒绝（'did not print the exact candidate on its own line'），补一个 other-flag.mjs 后通过；这条也说明复现校验本身工作正常"
       ]
     }
   ],
