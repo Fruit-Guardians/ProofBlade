@@ -708,6 +708,68 @@ test("a chat with no task-bound verifier rule says why verify_result cannot pass
   }
 });
 
+test("verification reuses the tree that already covers its supporting evidence", async () => {
+  // CHAT-1790096643438 ended with two trees over one conclusion: TREE-6254a5fe (the
+  // verification chain, rooted at a Completion that could never be accepted) beside
+  // TREE-b8f448bb (the agent's own), sharing the supporting Evidence and the
+  // Artifact it points at. The verification reuses Evidence a tree already covers,
+  // so the second view adds nothing and hangs off a dead node. One tree per
+  // conclusion; the provenance rides on the reasoning edges.
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-tree-reuse-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "CODING-TREE-REUSE";
+  const chat = demoTask(runId, dir, config);
+  chat.mode = "coding_assistant";
+  chat.scope.allowed_workspace = dir;
+  chat.verification.required_reproductions = 0;
+  chat.verification.command = undefined;
+  await services.control.createRun(runId, chat);
+  const candidate = "PB{tree_reuse_candidate}";
+  await writeFile(join(dir, "flag-only.mjs"), `process.stdout.write('${candidate}\\n');\n`, "utf8");
+  const env = new NodeExecutionEnv({ cwd: dir });
+  const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+  const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
+  const context = {
+    env,
+    skills: {},
+    mcp: {},
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+    claimVerifier: verifier,
+    evidenceGraph,
+  } as unknown as CodingResourceContext;
+  try {
+    const supporting = await services.artifacts.putText(runId, "supporting observation for the tree-reuse case", { filename: "supporting.txt" });
+    // Recorded through the graph API rather than the `evidence_record` tool: the tool
+    // returns a trimmed projection, and this case is about the tree, not the tool.
+    const recorded = await evidenceGraph.recordEvidence({ name: "supporting evidence", summary: "supporting observation", artifactIds: [supporting.id], tags: ["supporting"], claim: "The supporting observation holds for this run." });
+    const evidenceId = recorded.evidenceId;
+    const treeId = recorded.treeId;
+    assert.ok(evidenceId && treeId, "recording evidence must produce an evidence id and a tree");
+    const before = await services.control.snapshot(runId);
+    assert.deepEqual(Object.keys(before.reasoningTrees), [treeId], "the agent's own record created exactly one tree");
+    assert.ok(before.reasoningTrees[treeId]!.nodeIds.includes(evidenceId), "and that tree covers the supporting evidence");
+
+    const verified = await executeTool("verify_result", { result: candidate, command: "node flag-only.mjs", evidenceIds: [evidenceId] }, context);
+    const details = verified.details as Record<string, unknown>;
+    assert.equal(details.treeReused, true, "the verification must not open a second tree over the same conclusion");
+    assert.equal(details.treeId, treeId, "it reports the tree it reused");
+    const after = await services.control.snapshot(runId);
+    assert.deepEqual(Object.keys(after.reasoningTrees), [treeId], "still exactly one tree after verification");
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test("coding bash is blocked after the durable evidence curation threshold", async () => {
   const root = resolve(import.meta.dirname, "../../..", "tmp");
   await mkdir(root, { recursive: true });

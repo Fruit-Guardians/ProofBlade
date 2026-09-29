@@ -21,6 +21,11 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     domainPhase: "INTAKE",
     generation: 0,
     lastSeq: 0,
+    // Known from the start, so every projection this build writes carries a definite
+    // count. Without it, a projection written before the first tool result would be
+    // indistinguishable from one written before the field existed, and `applyTail`
+    // would have to report the count as unknown for the rest of the Run.
+    toolCalls: 0,
     facts: {},
     observations: {},
     evidence: {},
@@ -824,7 +829,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "provider_request_inter_event_idle":
     case "provider_request_stalled":
     case "tool_call_recorded":
+      break;
     case "tool_result_recorded":
+      // The real tool-call count. Telemetry otherwise, but the prompt needs a number
+      // that matches what the model actually did -- see `RunSnapshot.toolCalls`.
+      next.toolCalls = (next.toolCalls ?? 0) + 1;
+      break;
     case "consolidate_started":
     case "consolidate_summary":
     case "consolidate_finished":
