@@ -103,6 +103,88 @@ test("TaskResultVerifier records generic result verification with a domain-neutr
   }
 });
 
+test("a task with no verification rule is observed-only, not an unpayable recovery obligation", async () => {
+  // CHAT-1790096643438 accumulated VR-1e0de02d and VR-de190718 with "Completion is
+  // proposed but no verifier Effect is durable yet" -- and no way to pay either,
+  // because the task binds no verification rule and so can never produce a verifier
+  // Effect. The candidate is as verified as that contract allows; calling it
+  // recovery work invents an obligation the harness cannot discharge.
+  const root = await mkdtemp(join(tmpdir(), "pb-verification-observed-only-"));
+  try {
+    const runId = "VERIFICATION-OBSERVED-ONLY";
+    const services = createServices(root, config);
+    const chat = demoTask(runId, root, config);
+    chat.verification.required_reproductions = 0;
+    chat.verification.command = undefined;
+    await services.control.createRun(runId, chat);
+    const request = await beginVerificationRequest(services.control, runId, { kind: "claim", policyHash: sha256("policy-observed"), recipeHash: sha256("recipe-observed") });
+    const candidate = await services.artifacts.putText(runId, "PB{observed_only_candidate}", { filename: "candidate.txt" });
+    const completion = { id: "C-OBSERVED", purpose: "harness_verification" as const, candidateHash: sha256("PB{observed_only_candidate}"), artifactId: candidate.id, verificationKey: request.request.key };
+    await services.control.dispatch(runId, { type: "completion_proposed", completion });
+
+    const reconciled = await new VerificationRecoveryService(services.control, undefined, [], services.verificationRecovery).reconcile(runId);
+    const observed = reconciled.items.find((item) => item.completionId === "C-OBSERVED");
+    assert.equal(observed?.status, "OBSERVED_ONLY", "a rule-less completion is observed, not pending recovery");
+    assert.match(String(observed?.reason), /binds no verification rule/);
+    assert.equal(reconciled.recoveryRequired, 0, "nothing can be recovered, so nothing may be demanded");
+    assert.equal(reconciled.observedOnly, 1, "and the summary says so instead of leaving every count at zero");
+    assert.equal(reconciled.terminal, 0, "an observation is not a finished verifier chain");
+    assert.equal(reconciled.requiresRecovery, 0);
+    const after = await services.control.snapshot(runId);
+    assert.notEqual(after.verificationRequests[request.request.id]?.recoveryState, "RECOVERY_REQUIRED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("reconcile clears recovery debt that an observed-only request can never pay", async () => {
+  // The Run persisted the debt before this status existed -- exactly the state
+  // CHAT-1790096643438 sits in. Inspecting it must not count the request as owed, and
+  // reconciling must clear the durable state rather than leave the GUI and the model
+  // context showing work nobody can do.
+  const root = await mkdtemp(join(tmpdir(), "pb-verification-observed-legacy-"));
+  try {
+    const runId = "VERIFICATION-OBSERVED-LEGACY";
+    const services = createServices(root, config);
+    const chat = demoTask(runId, root, config);
+    chat.verification.required_reproductions = 0;
+    chat.verification.command = undefined;
+    await services.control.createRun(runId, chat);
+    const request = await beginVerificationRequest(services.control, runId, { kind: "claim", policyHash: sha256("policy-legacy"), recipeHash: sha256("recipe-legacy") });
+    const candidate = await services.artifacts.putText(runId, "PB{observed_legacy_candidate}", { filename: "candidate.txt" });
+    await services.control.dispatch(runId, { type: "completion_proposed", completion: { id: "C-LEGACY", purpose: "harness_verification" as const, candidateHash: sha256("PB{observed_legacy_candidate}"), artifactId: candidate.id, verificationKey: request.request.key } });
+    await services.verificationRecovery.markRequired(runId, { requestId: request.request.id, reason: "Completion is proposed but no verifier Effect is durable yet." });
+
+    const service = new VerificationRecoveryService(services.control, undefined, [], services.verificationRecovery);
+    const before = await service.inspect(runId);
+    assert.equal(before.observedOnly, 1);
+    assert.equal(before.recoveryRequired, 0, "a request nothing can satisfy is not outstanding work");
+    assert.equal(before.requiresRecovery, 0);
+
+    const reconciled = await service.reconcile(runId);
+    assert.equal(reconciled.recoveryRequired, 0);
+    const after = await services.control.snapshot(runId);
+    assert.equal(after.verificationRequests[request.request.id]?.recoveryState, "RECOVERED", "the stale debt is resolved, not left standing");
+    assert.match(String(after.verificationRequests[request.request.id]?.recoveryReason), /observed-only/);
+
+    // The guard the fix relaxes keeps its full strength elsewhere: a task that binds a
+    // rule still cannot have a request resolved while its Completion is only PROPOSED.
+    const boundRunId = "VERIFICATION-RESOLVE-GUARD";
+    await services.control.createRun(boundRunId, demoTask(boundRunId, root, config));
+    const bound = await beginVerificationRequest(services.control, boundRunId, { kind: "claim", policyHash: sha256("policy-bound"), recipeHash: sha256("recipe-bound") });
+    const boundCandidate = await services.artifacts.putText(boundRunId, "PB{bound_candidate}", { filename: "candidate.txt" });
+    await services.control.dispatch(boundRunId, { type: "completion_proposed", completion: { id: "C-BOUND", purpose: "harness_verification" as const, candidateHash: sha256("PB{bound_candidate}"), artifactId: boundCandidate.id, verificationKey: bound.request.key } });
+    await services.verificationRecovery.markRequired(boundRunId, { requestId: bound.request.id, reason: "Completion is proposed but no verifier Effect is durable yet." });
+    await assert.rejects(
+      () => services.verificationRecovery.markResolved(boundRunId, { requestId: bound.request.id, reason: "trying to close an open chain" }),
+      /has no terminal Completion/,
+      "a rule-bound request with a PROPOSED Completion stays unresolved",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("verification recovery persists RECOVERY_REQUIRED for a request with no durable Effect", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-verification-recovery-required-"));
   try {

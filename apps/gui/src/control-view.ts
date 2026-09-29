@@ -1,4 +1,4 @@
-import { evaluatePhaseGate, phaseBudget, type RunSnapshot } from "@proofblade/materials";
+import { evaluatePhaseGate, phaseBudget, verificationBindsRule, type RunSnapshot } from "@proofblade/materials";
 import type { RunControlView } from "./shared.js";
 
 /** Build the bounded, read-only control projection shown by the GUI. */
@@ -6,8 +6,13 @@ export function buildRunControlView(snapshot: RunSnapshot): RunControlView {
   const gate = evaluatePhaseGate(snapshot, snapshot.domainPhase);
   const budget = phaseBudget(snapshot);
   const actionBundle = budget.actionBundle;
+  // A request can still carry RECOVERY_REQUIRED from before the task contract was
+  // understood to bind no verification rule. Nothing can satisfy it, so the panel must
+  // not present it as outstanding work -- the same rule the context compiler applies.
+  const recoverable = verificationBindsRule(snapshot.task);
   const recoveryItems = Object.values(snapshot.verificationRequests)
     .filter((request) => (request.recoveryState ?? "READY") !== "READY")
+    .filter((request) => recoverable || request.recoveryState !== "RECOVERY_REQUIRED")
     .sort((left, right) => left.createdSeq - right.createdSeq || left.id.localeCompare(right.id))
     .slice(0, 16)
     .map((request) => ({
@@ -22,8 +27,8 @@ export function buildRunControlView(snapshot: RunSnapshot): RunControlView {
     budget: {
       phaseActionsUsed: budget.phaseActionsUsed,
       phaseActionsRemaining: budget.phaseActionsRemaining,
-      runToolCallsUsed: budget.runToolCallsUsed,
-      runToolCallsRemaining: budget.runToolCallsRemaining,
+      journaledEffectsUsed: budget.journaledEffectsUsed,
+      journaledEffectsRemaining: budget.journaledEffectsRemaining,
       submissionsUsed: budget.submissionsUsed,
       submissionsRemaining: budget.submissionsRemaining,
       replansUsed: budget.replansUsed,

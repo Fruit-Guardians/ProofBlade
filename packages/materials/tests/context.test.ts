@@ -22,6 +22,35 @@ const task: TaskContract = {
   constraints: { deadline_ms: 1000, max_cost_usd: 0, max_tool_calls: 5, max_submissions: 1 },
 };
 
+test("a task that binds no verification rule does not show recovery debt it cannot pay", () => {
+  // The request can still carry RECOVERY_REQUIRED from before the contract was
+  // understood to bind no rule. Telling the model to recover is telling it to retry
+  // something the contract makes impossible, so the projection reports nothing owed.
+  const ruleLess: TaskContract = { ...task, task_id: "CTX-NO-RULE", verification: { kind: "reproduction", required_reproductions: 0 } };
+  const snapshot = createInitialSnapshot("CTX-NO-RULE", ruleLess);
+  snapshot.verificationRequests["VR-1"] = {
+    id: "VR-1",
+    runId: snapshot.runId,
+    generation: 0,
+    kind: "claim",
+    key: "k",
+    createdSeq: 1,
+    recoveryState: "RECOVERY_REQUIRED",
+    recoveryReason: "Completion is proposed but no verifier Effect is durable yet.",
+  } as never;
+
+  const view = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task: ruleLess, snapshot });
+  assert.match(contextText(view), /"recovery":\{"required":0/, "no obligation is projected");
+  assert.match(contextText(view), /"state":"READY"/, "and the request is not shown as owing recovery");
+
+  // The same persisted state under a task that does bind a rule stays visible.
+  const bound: TaskContract = { ...task, task_id: "CTX-RULE" };
+  const boundSnapshot = createInitialSnapshot("CTX-RULE", bound);
+  boundSnapshot.verificationRequests["VR-1"] = { ...snapshot.verificationRequests["VR-1"]!, runId: boundSnapshot.runId } as never;
+  const boundView = new ContextCompiler().build({ runId: boundSnapshot.runId, lane: "main", phase: boundSnapshot.phase, task: bound, snapshot: boundSnapshot });
+  assert.match(contextText(boundView), /"recovery":\{"required":1/, "a recoverable task still shows its debt");
+});
+
 test("context manifest is deterministic and labels target data as untrusted", () => {
   const snapshot = createInitialSnapshot("CTX-001", task);
   snapshot.status = "RUNNING";
@@ -64,7 +93,13 @@ test("context manifest is deterministic and labels target data as untrusted", ()
   assert.deepEqual(first.manifest.domainRecordIds, ["WEB-BASELINE-CTX"]);
   const rendered = first.messages.map((message) => message.content).join("\n");
   assert.match(rendered, /control_view/);
-  assert.match(rendered, /run_tool_calls_remaining/);
+  // The phase block names the budget for what it measures. It said
+  // `run_tool_calls_remaining` while counting Effect Journal entries, and a run
+  // that made ten tool calls read "2 used, 998 remaining" and reported the budget
+  // as untrustworthy (CHAT-1790096643438). Both halves are asserted: the truthful
+  // key is present and the misleading one is gone.
+  assert.match(rendered, /journaled_effects_remaining/);
+  assert.doesNotMatch(rendered, /run_tool_calls_(?:used|remaining)/);
   assert.match(rendered, /baseline route is recorded/);
   assert.ok(["stable", "notice", "snip", "prune", "compact"].includes(first.manifest.maintenance.stage));
   assert.match(first.messages[0]!.content, /untrusted observation/i);

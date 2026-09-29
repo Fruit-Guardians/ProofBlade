@@ -46,6 +46,7 @@ import { resolveControlAuthority } from "../storage/control-authority.js";
 import { projectionHash, reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
 import { assertPhaseTransition } from "./phase-machine.js";
+import { verificationBindsRule } from "../domain/phase-gate.js";
 import { isAbsolute, relative, resolve } from "node:path";
 import { completedWorkItemForCompletion } from "../domain/work-item.js";
 import { maxReplansFor, phaseBudget } from "../domain/phase-budget.js";
@@ -1422,7 +1423,16 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (command.type === "verification_recovery_resolved") {
       if (request.recoveryState !== "RECOVERY_REQUIRED") throw new Error(`Verification request ${request.id} is not awaiting recovery`);
       const completion = request.completionId ? snapshot.completions[request.completionId] : undefined;
-      if (!completion || (completion.status !== "ACCEPTED" && completion.status !== "REJECTED")) throw new Error(`Verification request ${request.id} has no terminal Completion`);
+      // A terminal Completion is the evidence that the verifier chain really finished.
+      // A task that binds no verification rule can never produce one -- its Completion
+      // stays PROPOSED forever by construction -- so requiring it there would keep
+      // `RECOVERY_REQUIRED` standing on requests nothing can ever satisfy, which is the
+      // debt this resolves. The guard keeps its full strength for every task that
+      // binds a rule.
+      const clearableWithoutTerminalCompletion = !verificationBindsRule(snapshot.task);
+      if (!clearableWithoutTerminalCompletion && (!completion || (completion.status !== "ACCEPTED" && completion.status !== "REJECTED"))) {
+        throw new Error(`Verification request ${request.id} has no terminal Completion`);
+      }
     }
   }
   if (command.type === "evidence") validateEvidence(snapshot, command.evidence, command.lane ?? "main", references, trustedVerifier);

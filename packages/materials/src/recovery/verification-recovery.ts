@@ -2,6 +2,7 @@ import type { ControlStore, VerificationRecoveryControlPort } from "../control/c
 import type { CompletionProposal, Effect, EffectRequest, RawEffectResult, RunSnapshot, TaskContract, VerificationRequest, VerificationRequestKind } from "../domain/types.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef, SandboxPort } from "../sandbox/fixture.js";
+import { verificationBindsRule } from "../domain/phase-gate.js";
 
 /**
  * Durable disposition of one verifier request after a process restart.
@@ -15,6 +16,17 @@ import type { FixtureRef, SandboxPort } from "../sandbox/fixture.js";
 export type VerificationRecoveryStatus =
   | "TERMINAL"
   | "PENDING"
+  /**
+   * The candidate is as verified as this task's contract allows.
+   *
+   * A Run whose task binds no verification rule can never produce a verifier
+   * Effect, so "waiting for one" is an obligation nothing can discharge. It used
+   * to be reported as PENDING: CHAT-1790096643438 collected
+   * `VR-1e0de02d` and `VR-de190718` with "Completion is proposed but no verifier
+   * Effect is durable yet" and no way to pay either. Observed-only is terminal for
+   * recovery purposes and is never counted as required work.
+   */
+  | "OBSERVED_ONLY"
   | "PROPOSED_EFFECT"
   | "IN_FLIGHT_EFFECT"
   | "AMBIGUOUS"
@@ -40,6 +52,15 @@ export interface VerificationRecoveryReport {
   projectionHash?: string;
   items: VerificationRecoveryItem[];
   terminal: number;
+  /**
+   * Requests disposed as observed-only: the task contract binds no verification rule,
+   * so the Completion is a recorded observation and no recovery can change that.
+   *
+   * Separate from {@link terminal} on purpose -- "the verifier chain finished" and
+   * "there is no verifier chain to finish" are different results for whoever is
+   * displaying them.
+   */
+  observedOnly: number;
   pending: number;
   requiresRecovery: number;
   stale: number;
@@ -192,11 +213,19 @@ export class VerificationRecoveryService {
       projectionHash: snapshot.projectionHash,
       items,
       terminal: items.filter((item) => item.status === "TERMINAL").length,
+      // Counted on its own rather than folded into `terminal`: OBSERVED_ONLY is a
+      // final disposition ("this contract cannot verify it") and not a finished
+      // verifier chain, and a caller showing "recovered" numbers must be able to tell
+      // the two apart. Without this the items appeared with every summary at zero.
+      observedOnly: items.filter((item) => item.status === "OBSERVED_ONLY").length,
       pending: items.filter((item) => item.status === "PENDING").length,
-      requiresRecovery: items.filter((item) => item.recoveryState === "RECOVERY_REQUIRED" || ["PROPOSED_EFFECT", "IN_FLIGHT_EFFECT", "AMBIGUOUS"].includes(item.status)).length,
+      // An observed-only request is not outstanding work even if its persisted
+      // `recoveryState` still says RECOVERY_REQUIRED: no recovery can satisfy it, so
+      // it must not be counted as an obligation before the next reconcile clears it.
+      requiresRecovery: items.filter((item) => item.status !== "OBSERVED_ONLY" && (item.recoveryState === "RECOVERY_REQUIRED" || ["PROPOSED_EFFECT", "IN_FLIGHT_EFFECT", "AMBIGUOUS"].includes(item.status))).length,
       stale: items.filter((item) => item.status === "STALE").length,
       invalid: items.filter((item) => item.status === "INVALID").length,
-      recoveryRequired: items.filter((item) => item.recoveryState === "RECOVERY_REQUIRED").length,
+      recoveryRequired: items.filter((item) => item.status !== "OBSERVED_ONLY" && item.recoveryState === "RECOVERY_REQUIRED").length,
     };
   }
 
@@ -254,8 +283,17 @@ export class VerificationRecoveryService {
       for (const item of reconciled.items) {
         const request = (await this.controlStore.snapshot(runId)).verificationRequests[item.requestId];
         if (!request) continue;
-        if (item.status === "TERMINAL" && request.recoveryState === "RECOVERY_REQUIRED") {
-          await this.recoveryControl.markResolved(runId, { requestId: item.requestId, reason: "Durable verifier chain is terminal and replayable." });
+        if ((item.status === "TERMINAL" || item.status === "OBSERVED_ONLY") && request.recoveryState === "RECOVERY_REQUIRED") {
+          // OBSERVED_ONLY belongs here as much as TERMINAL does. A Run that persisted
+          // `RECOVERY_REQUIRED` before this status existed keeps asking for recovery the
+          // contract cannot provide; resolving it is what clears the debt. Only the
+          // reason differs -- nothing was replayed, the task simply binds no rule.
+          await this.recoveryControl.markResolved(runId, {
+            requestId: item.requestId,
+            reason: item.status === "OBSERVED_ONLY"
+              ? "The task contract binds no verification rule, so this request is observed-only and no recovery can satisfy it."
+              : "Durable verifier chain is terminal and replayable.",
+          });
         } else if (["PENDING", "PROPOSED_EFFECT", "IN_FLIGHT_EFFECT", "AMBIGUOUS"].includes(item.status)
           && request.recoveryState !== "RECOVERY_REQUIRED" && request.recoveryState !== "RECOVERED") {
           await this.recoveryControl.markRequired(runId, { requestId: item.requestId, reason: item.reason });
@@ -321,6 +359,15 @@ function inspectRequest(snapshot: RunSnapshot, request: VerificationRequest): Ve
       : { ...base, status: "TERMINAL", completionId: completion.id, effectIds, reason: `Completion ${completion.id} has a complete durable verifier chain.` };
   }
   if (effects.length === 0 && replayEffects.length === 0) {
+    if (!verificationBindsRule(snapshot.task)) {
+      return {
+        ...base,
+        status: "OBSERVED_ONLY",
+        completionId: completion.id,
+        effectIds,
+        reason: "Completion is an observed candidate: this task contract binds no verification rule, so no verifier Effect can ever be durable. Nothing to recover, and retrying verification cannot change it.",
+      };
+    }
     return { ...base, status: "PENDING", completionId: completion.id, effectIds, reason: "Completion is proposed but no verifier Effect is durable yet." };
   }
   if (replayEffects.some((effect) => effect.status === "PROPOSED")) {
