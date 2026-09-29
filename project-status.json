@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T08:00:00+08:00",
+  "updatedAt": "2026-09-23T09:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2462,6 +2462,27 @@
         "coding-resources + evidence-curation-gate + reasoning-forest + knowledge-read-bounds 共 55 用例 fail 0；npx tsc -b exit 0",
         "api:index 重新生成；check:components（26 组件）与 check:change-contracts（11 契约）通过",
         "边界：第三个候选的首次失败并非代码问题——测试脚本 flag-only.mjs 打印的是第一个候选，复现校验按规则拒绝（'did not print the exact candidate on its own line'），补一个 other-flag.mjs 后通过；这条也说明复现校验本身工作正常"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-015",
+      "occurredAt": "2026-09-23T09:20:00+08:00",
+      "summary": "修 PR #254 合并路径上的一个真实回归（CI 的 fast 阶段捕获）：把第二次验证的节点并入既有树后，两簇节点之间没有任何边，validateReasoningTree 的连通性检查判定「Reasoning tree contains disconnected nodes」，平台运行直接失败。合并前补一条 supports 边把新老结论连起来。",
+      "branch": "fix/single-tree-per-conclusion",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "verification/claim-verification.ts：命中候选标签时，先 linkNodesBatch 一条 { from: 本次 completionId, to: 既有树 rootNodeId, relation: 'supports' }，再 updateTree 合并节点",
+        "为什么必须连：连通性由 domain/reasoning.ts 的双向遍历计算（rootNodeId 出发沿 edges 两个方向扩散），而本次的 Completion/Artifact/Evidence 自成一群、与上次的结论之间本来没有边——合并只加节点不加边，结果就是两簇",
+        "方向与语义：completion → completion 的 supports，说明「同一候选的第二次验证支持树里已记录的结论」；validateReasoningEdge 的环检查通过（既有边都指向 C1，不存在 C1 → C2 的路径），且 linkNodesBatch 自身对 (from,to,relation) 去重，重复合并幂等",
+        "变异验证：把这条边去掉 → competition-solver 的平台用例转红，报错正是 'Reasoning tree contains disconnected nodes: A-…, EV-…, F-…, C-…'（与 CI 里的失败一致）"
+      ],
+      "validation": [
+        "competition-solver.test.ts 与 coding-resources.test.ts 共 75 用例 fail 0；npx tsc -b exit 0",
+        "CI 的 fast 阶段此前红在 'not ok 319 - verify_claim calls cannot exhaust the platform submission budget'，本地在该分支上稳定复现同一断言，修复后通过",
+        "过程记录：本地此前的四个定向套件都没有覆盖这条平台连通性检查，所以第一次提交时漏掉了——这也说明单跑受影响套件不足，本轮以 CI 的 fast 阶段为准"
       ]
     }
   ],

@@ -707,6 +707,22 @@ export class TaskResultVerifier {
     // not a verification claim: `locallyJudged` is decided before the tree is chosen.
     const conclusionTag = `candidate:${candidateHash.slice(0, 24)}`;
     const conclusionTree = Object.values(graphSnapshot.reasoningTrees).find((tree) => tree.tags.includes(conclusionTag));
+    if (conclusionTree) {
+      // A tree must be connected from its root (`validateReasoningTree` walks edges in
+      // both directions), and this attempt is a separate cluster: its own Completion,
+      // Artifacts and Evidence hang off each other, and nothing links them to the
+      // earlier conclusion. Without this edge the merge produces exactly what the
+      // platform run reported -- "Reasoning tree contains disconnected nodes:
+      // A-1db773a1..., C-8454dfb4..." -- so record what the second attempt is: the same
+      // candidate, verified again, supporting the conclusion already in the tree.
+      await graph.linkNodesBatch([{
+        from: completionId,
+        to: conclusionTree.rootNodeId,
+        relation: "supports",
+        explanation: `Second verification of candidate ${candidateHash.slice(0, 12)}... supports the conclusion this tree already records.`,
+        confidence: 1,
+      }]);
+    }
     const createdTree = conclusionTree
       ? (await graph.updateTree({
         treeId: conclusionTree.id,

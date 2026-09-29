@@ -158,7 +158,7 @@
     "src/tools/output-rewrite.ts": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
     "src/tools/runtime.ts": "0600e14ac60dead0fa8432de5654e6fd70a445ed11c723aac8b240018754cbc7",
     "src/verification/browser-reproducer.ts": "d342fabacc36244352902bdd1205b15f070f683fddf0cfa04ffa874fc58a5637",
-    "src/verification/claim-verification.ts": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+    "src/verification/claim-verification.ts": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
     "src/verification/outcome-envelope.ts": "b436f6fea396edcc72623b63061193eeeeb9f0c5276ec39b255dd44af205e144",
     "src/verification/pwn-replay-recovery.ts": "f1cedc20c4d53e992659c4b80cf970c3bf2ac917e68c7da5bd89fcd4fb7c6213",
     "src/verification/pwn-reproducer.ts": "56578671a8a249cda6a80af971a32b9f5779e889535713203c638e9a886b77b5",
@@ -2040,8 +2040,8 @@
       ],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 938,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "line": 954,
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/archival-failure-semantics.test.ts",
         "packages/materials/tests/artifact-readback.test.ts",
@@ -2070,7 +2070,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 129,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
@@ -7250,8 +7250,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 955,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "line": 971,
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -7272,7 +7272,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 95,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -7286,7 +7286,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 88,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -15403,7 +15403,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 49,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -15417,7 +15417,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 11,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -15431,7 +15431,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 71,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -37537,7 +37537,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 200,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -37554,7 +37554,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 234,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -37570,7 +37570,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 166,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -37586,7 +37586,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 279,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -37603,7 +37603,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 284,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -37619,7 +37619,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 274,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -37635,7 +37635,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 161,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -37653,7 +37653,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 151,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -37670,8 +37670,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 744,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "line": 760,
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/archival-failure-semantics.test.ts",
@@ -37728,7 +37728,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 337,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
@@ -37806,7 +37806,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 302,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -37820,7 +37820,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 289,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
@@ -37837,7 +37837,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 145,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -37854,7 +37854,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 140,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -37870,7 +37870,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 156,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -43460,7 +43460,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 69,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
@@ -43479,7 +43479,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 85,
-      "moduleHash": "7c681faee8a47d7e739660f9adfbcee8ad08a57381716e90fec084c224a2dbf8",
+      "moduleHash": "8269e8fe8d4d606425501165d361909db3cdcaba7959775e5956fa93db66aa20",
       "testRefs": []
     },
     {
