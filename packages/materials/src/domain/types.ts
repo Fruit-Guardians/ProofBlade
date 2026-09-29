@@ -1046,11 +1046,11 @@ export interface RunSnapshot {
    * remaining". PR #250 renamed that counter to what it measures; this one counts
    * the real thing.
    *
-   * Undefined means "not known", which is the honest answer for a snapshot loaded
-   * from a projection written before this field existed and then extended by a tail
-   * fold -- those earlier tool results are not in the fold. Callers must omit the
-   * number rather than print a lower bound as if it were the count; a full
-   * `replay()` is exact.
+   * Undefined means "not known": a Run whose durable projection was written before
+   * this field existed, then extended by a tail fold, cannot see its own earlier tool
+   * results. Callers must omit the number rather than print a lower bound as if it were
+   * the count; a full `replay()` is exact, and `createInitialSnapshot` starts the
+   * counter at 0 so every projection written from now on carries a definite value.
    */
   toolCalls?: number;
   startedAt?: string;
