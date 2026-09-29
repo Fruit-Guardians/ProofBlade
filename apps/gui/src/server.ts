@@ -258,6 +258,9 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
+    if (method === "GET" && parts[3] === "updates") {
+      return sendJson(response, 200, await data.updates(runId, boundedQueryInteger(url, "afterSeq", 0, 0, Number.MAX_SAFE_INTEGER), url.searchParams.get("sessionVersion") ?? undefined));
+    }
     if (method === "GET" && parts[3] === "prompt") return sendJson(response, 200, await data.promptSnapshot(runId));
     if (method === "GET" && parts[3] === "artifacts" && parts[4]) {
       return sendJson(response, 200, await data.artifact(runId, parts[4], boundedQueryInteger(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER), boundedQueryInteger(url, "limit", 64 * 1024, 1, 64 * 1024)));

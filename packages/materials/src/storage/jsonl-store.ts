@@ -25,6 +25,10 @@ export interface JsonlRunRevision {
   /** Event-stream identity. */
   readonly size: number;
   readonly mtimeMs: number;
+  /** Device/inode identify an append stream across renames and rewrites. */
+  readonly dev?: number;
+  readonly ino?: number;
+  readonly ctimeMs?: number;
   /** Persisted task-contract identity. */
   readonly taskSize: number;
   readonly taskMtimeMs: number;
@@ -114,6 +118,9 @@ export class JsonlControlStore {
       return {
         size: events.size,
         mtimeMs: events.mtimeMs,
+        dev: events.dev,
+        ino: events.ino,
+        ctimeMs: events.ctimeMs,
         taskSize: task?.size ?? -1,
         taskMtimeMs: task?.mtimeMs ?? -1,
       };
@@ -176,6 +183,12 @@ export class JsonlControlStore {
       this.eventCache.set(runId, cached);
       return cached.events.slice();
     }
+    // A cache entry does not witness the bytes it contains. A different
+    // process may have rewritten an earlier record and then appended a valid
+    // suffix while preserving dev/ino and sequence numbers. Therefore every
+    // externally observed revision change is reparsed in full. The writer
+    // below extends this instance's cache directly after its own durable
+    // append, which preserves the safe hot path without trusting unseen bytes.
     const inFlight = this.eventLoads.get(runId);
     if (inFlight) return (await inFlight).slice();
     const load = this.#loadEvents(runId, revision);
@@ -742,7 +755,10 @@ export class JsonlControlStore {
 }
 
 function sameEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
-  return left.size === right.size && left.mtimeMs === right.mtimeMs;
+  return left.size === right.size && left.mtimeMs === right.mtimeMs
+    && (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
+    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino)
+    && (left.ctimeMs === undefined || right.ctimeMs === undefined || left.ctimeMs === right.ctimeMs);
 }
 
 /**

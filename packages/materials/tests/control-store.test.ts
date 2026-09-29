@@ -110,6 +110,43 @@ test("ControlStore folds from the durable projection and only replays a telemetr
   }
 });
 
+test("a cross-process append after a rewrite reparses the complete JSONL stream", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-jsonl-tail-"));
+  try {
+    const runsRoot = join(root, "runs");
+    const runId = "JSONL-TAIL-001";
+    const creator = new ControlStore(new JsonlControlStore(runsRoot), undefined, "jsonl-tail-secret-0123456789abcdef");
+    await creator.createRun(runId, demoTask(runId, root, config));
+    const reader = new JsonlControlStore(runsRoot);
+    const initial = await reader.events(runId);
+    const before = reader.readStats();
+    const eventPath = join(runsRoot, runId, "events.jsonl");
+    const originalContent = await readFile(eventPath, "utf8");
+    const rewritten = originalContent.replace(/"generation"\s*:\s*0/, '"generation":1');
+    assert.notEqual(rewritten, await readFile(eventPath, "utf8"));
+    await writeFile(eventPath, rewritten, "utf8");
+    await creator.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      actor: "model",
+      correlationId: "jsonl-tail",
+      type: "model_usage",
+      payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    const appended = await reader.events(runId);
+    const after = reader.readStats();
+    assert.equal(appended.length, initial.length + 1);
+    // Counters are process-wide (the creator may also need to reread the
+    // rewritten stream), so at least one complete stream parse must be visible.
+    assert.ok(after.parsedEvents - before.parsedEvents >= appended.length);
+    const finalContent = await readFile(eventPath, "utf8");
+    assert.ok(after.parsedBytes - before.parsedBytes >= Buffer.byteLength(finalContent, "utf8") - appended.length);
+    assert.equal(appended[0]?.envelope?.generation, 1, "the rewritten prefix must be visible after the append");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("ControlStore rejects a self-hashed projection that is not sealed to the event prefix", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-projection-seal-"));
   try {
