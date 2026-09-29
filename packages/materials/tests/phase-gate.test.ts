@@ -51,6 +51,36 @@ test("a chat that binds no verification rule is not blocked on a reproduction it
   assert.ok(evaluatePhaseGate(withCommand, "REPRODUCE").missing.includes("accepted-completion-candidate"));
 });
 
+test("RECON stops demanding a hypothesis once the run has a reproduced conclusion", () => {
+  // CHAT-1790096643438 solved its task and still read
+  // `gate: { status: blocked, missing: ["target-model-or-hypothesis"] }` -- the phase
+  // view asked it to build a target model for work that was already reproduced.
+  // Evidence advances the gate; the hypothesis is only required while nothing has
+  // been reproduced.
+  const run = snapshot();
+  run.observations["OBS-1"] = { id: "OBS-1", runId: run.runId, generation: run.generation, summary: "recon", source: { operation: "read", artifactId: "A-1", generation: run.generation }, candidateKinds: [], createdSeq: 1 } as never;
+  assert.equal(evaluatePhaseGate(run, "RECON").status, "blocked", "with nothing reproduced, RECON still needs a hypothesis");
+  assert.ok(evaluatePhaseGate(run, "RECON").missing.includes("target-model-or-hypothesis"));
+
+  const effect = { id: "EF-1", runId: run.runId, generation: run.generation, producerLane: "verifier", operation: "claim_observation", status: "FINISHED", outcome: "success" } as never;
+  run.effects["EF-1"] = effect;
+  run.evidence["EV-REPRO"] = {
+    id: "EV-REPRO",
+    runId: run.runId,
+    generation: run.generation,
+    kind: "reproduction",
+    summary: "reproduced",
+    source: { tool: "verify_result", effectId: "EF-1", artifactId: "A-1", generation: run.generation },
+    provenance: { schemaVersion: 1, runId: run.runId, generation: run.generation, recordedBy: "verifier", artifactIds: ["A-1"], effect: { id: "EF-1", operation: "claim_observation", status: "FINISHED", outcome: "success", exitCode: 0 } },
+    confidence: 1,
+    supports: [],
+    refutes: [],
+    createdSeq: 2,
+  } as never;
+  const concluded = evaluatePhaseGate(run, "RECON");
+  assert.ok(!concluded.missing.includes("target-model-or-hypothesis"), "a reproduced conclusion satisfies the RECON gate");
+});
+
 test("SUBMIT gate requires accepted verifier evidence and a completed executor WorkItem", () => {
   const run = snapshot();
   const artifact = { id: "A-CANDIDATE", runId: run.runId, generation: run.generation, path: "candidate.txt", sha256: "candidate-hash", bytes: 10, mime: "text/plain", sensitivity: "flag_candidate", origin: { schemaVersion: 1, registeredBy: "agent", tags: [] } } as ArtifactRef;

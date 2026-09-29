@@ -64,7 +64,13 @@ test("context manifest is deterministic and labels target data as untrusted", ()
   assert.deepEqual(first.manifest.domainRecordIds, ["WEB-BASELINE-CTX"]);
   const rendered = first.messages.map((message) => message.content).join("\n");
   assert.match(rendered, /control_view/);
-  assert.match(rendered, /run_tool_calls_remaining/);
+  // The phase block names the budget for what it measures. It said
+  // `run_tool_calls_remaining` while counting Effect Journal entries, and a run
+  // that made ten tool calls read "2 used, 998 remaining" and reported the budget
+  // as untrustworthy (CHAT-1790096643438). Both halves are asserted: the truthful
+  // key is present and the misleading one is gone.
+  assert.match(rendered, /journaled_effects_remaining/);
+  assert.doesNotMatch(rendered, /run_tool_calls_(?:used|remaining)/);
   assert.match(rendered, /baseline route is recorded/);
   assert.ok(["stable", "notice", "snip", "prune", "compact"].includes(first.manifest.maintenance.stage));
   assert.match(first.messages[0]!.content, /untrusted observation/i);

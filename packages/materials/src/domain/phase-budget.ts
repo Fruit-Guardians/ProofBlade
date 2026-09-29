@@ -5,8 +5,32 @@ export interface PhaseBudgetView {
   actionBundle?: ActionBundle;
   phaseActionsUsed: number;
   phaseActionsRemaining?: number;
-  runToolCallsUsed: number;
-  runToolCallsRemaining: number;
+  /**
+   * What `max_tool_calls` actually caps, and it is NOT the number of tool calls.
+   *
+   * `max_tool_calls` bounds entries in the Effect Journal
+   * (`effects/effect-journal.ts`: "Tool budget exhausted" when
+   * `Object.keys(snapshot.effects).length >= max_tool_calls`), and the coding
+   * lane's `bash`/`read`/`edit`/`write` plus first-class MCP tools never enter
+   * that journal -- see `competition/COMPONENT.md`. So a Run can make dozens of
+   * tool calls while this counter says two.
+   *
+   * These fields used to be named `runToolCallsUsed`/`runToolCallsRemaining`, which
+   * is what the prompt and the GUI showed the model. CHAT-1790096643438 read
+   * "2 used, 998 remaining" after ten tool calls and correctly reported the budget
+   * as untrustworthy; the count was right and the name was wrong. A true tool-call
+   * counter needs event-level plumbing (`tool_result_recorded`), which this view
+   * does not have -- tracked in
+   * `docs/PROOFBLADE_HARNESS_FEEDBACK_UPDATE_PLAN_ZH.md` §P0-1.
+   */
+  journaledEffectsUsed: number;
+  journaledEffectsRemaining: number;
+  /**
+   * Tool results folded into the snapshot: how many tools were actually called.
+   * Undefined when the snapshot does not know (see RunSnapshot.toolCalls), in
+   * which case callers must omit it instead of showing a lower bound.
+   */
+  toolCallsUsed?: number;
   submissionsUsed: number;
   submissionsRemaining: number;
   replansUsed: number;
@@ -24,8 +48,9 @@ export interface PhaseBudgetView {
 export function phaseBudget(snapshot: RunSnapshot, now?: number): PhaseBudgetView {
   const actionBundle = snapshot.toolPreparation?.actionBundles?.find((bundle) => bundle.domainPhase === snapshot.domainPhase);
   const phaseActionsUsed = Object.values(snapshot.experiments).filter((experiment) => experiment.generation === snapshot.generation && experiment.domainPhase === snapshot.domainPhase).length;
-  const runToolCallsUsed = Object.keys(snapshot.effects).length;
-  const runToolCallsRemaining = Math.max(0, snapshot.task.constraints.max_tool_calls - runToolCallsUsed);
+  const toolCallsUsed = snapshot.toolCalls;
+  const journaledEffectsUsed = Object.keys(snapshot.effects).length;
+  const journaledEffectsRemaining = Math.max(0, snapshot.task.constraints.max_tool_calls - journaledEffectsUsed);
   const submissionsUsed = Object.values(snapshot.effects).filter((effect) => effect.operation === "fixture_score").length;
   const submissionsRemaining = Math.max(0, snapshot.task.constraints.max_submissions - submissionsUsed);
   const replansUsed = snapshot.replanCount ?? Object.keys(snapshot.replans ?? {}).length;
@@ -41,15 +66,16 @@ export function phaseBudget(snapshot: RunSnapshot, now?: number): PhaseBudgetVie
     ...(actionBundle ? { actionBundle: structuredClone(actionBundle) } : {}),
     phaseActionsUsed,
     ...(phaseActionsRemaining === undefined ? {} : { phaseActionsRemaining }),
-    runToolCallsUsed,
-    runToolCallsRemaining,
+    ...(toolCallsUsed === undefined ? {} : { toolCallsUsed }),
+    journaledEffectsUsed,
+    journaledEffectsRemaining,
     submissionsUsed,
     submissionsRemaining,
     replansUsed,
     replanLimit,
     replansRemaining,
     ...(deadlineRemainingMs === undefined ? {} : { deadlineRemainingMs }),
-    exhausted: runToolCallsRemaining === 0 || submissionsRemaining === 0 || replansRemaining === 0 || phaseActionsRemaining === 0 || deadlineRemainingMs === 0,
+    exhausted: journaledEffectsRemaining === 0 || submissionsRemaining === 0 || replansRemaining === 0 || phaseActionsRemaining === 0 || deadlineRemainingMs === 0,
   };
 }
 

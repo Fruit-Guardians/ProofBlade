@@ -95,8 +95,15 @@ export class ContextCompiler {
         budget: {
           phase_actions_used: budgetView.phaseActionsUsed,
           phase_actions_remaining: budgetView.phaseActionsRemaining,
-          run_tool_calls_used: budgetView.runToolCallsUsed,
-          run_tool_calls_remaining: budgetView.runToolCallsRemaining,
+          // Journaled Effects, not tool calls: bash/read/edit/write never enter
+          // the Effect Journal. Named `run_tool_calls_*` until a run reported the
+          // budget as untrustworthy after seeing 2 next to ten tool calls.
+          // How many tools the model actually called (durable tool results). Omitted
+          // rather than faked when the fold cannot know. The Effect Journal counter
+          // below is the enforced cap, not the call count.
+          ...(budgetView.toolCallsUsed === undefined ? {} : { tool_calls_used: budgetView.toolCallsUsed }),
+          journaled_effects_used: budgetView.journaledEffectsUsed,
+          journaled_effects_remaining: budgetView.journaledEffectsRemaining,
           submissions_used: budgetView.submissionsUsed,
           submissions_remaining: budgetView.submissionsRemaining,
           replans_used: budgetView.replansUsed,
