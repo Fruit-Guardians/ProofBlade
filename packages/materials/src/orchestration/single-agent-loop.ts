@@ -360,8 +360,13 @@ export class SingleAgentLoop {
     } finally {
       removeAbortListener?.();
       const results: Array<{ resource: string; result: PromiseSettledResult<void> }> = [];
-      if (abortPromise) results.push({ resource: "coding_lane_abort", result: await settleWithTimeout(abortPromise, "coding lane abort") });
-      if (abortFailure !== undefined) results.push({ resource: "coding_lane_abort", result: { status: "rejected", reason: abortFailure } });
+      if (abortPromise) {
+        const abortResult = await settleWithTimeout(abortPromise, "coding lane abort");
+        results.push({
+          resource: "coding_lane_abort",
+          result: abortFailure === undefined ? abortResult : { status: "rejected", reason: abortFailure },
+        });
+      }
       if (lane) results.push({ resource: "coding_lane_close", result: await settleWithTimeout(Promise.resolve().then(() => lane!.close()), "coding lane close") });
       results.push({ resource: "tool_runtime_close", result: await settleWithTimeout(Promise.resolve().then(() => runtime.close()), "tool runtime close") });
       const timedOutResources = results.flatMap(({ resource, result }) => result.status === "rejected" && isCleanupTimeout(result.reason) ? [resource] : []);

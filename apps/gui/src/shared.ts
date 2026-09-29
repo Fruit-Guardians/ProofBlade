@@ -307,6 +307,7 @@ export interface RunDetail {
   telemetry: RunTelemetryReport;
   sessions: PiSessionDebug[];
   controlView: RunControlView;
+  counts?: RunListItem["counts"];
   active?: ActiveRunInfo;
   updatedAt: string;
   sessionVersion?: string;
@@ -322,6 +323,9 @@ export interface RunUpdates {
   phase: RunSnapshot["phase"];
   active?: ActiveRunInfo;
   events: HarnessEvent[];
+  counts: RunListItem["counts"];
+  controlView: RunControlView;
+  observationQueue: ObservationQueueProjection;
   updatedAt: string;
   sessionVersion?: string;
   reloadDetail: boolean;

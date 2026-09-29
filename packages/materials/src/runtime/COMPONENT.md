@@ -53,7 +53,7 @@
 
 ## 开发规则与验证
 
-模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 1；排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。顶层 Tool schema 只能由不可变 `TaskContract` 能力声明决定；每轮安全画像、Preflight 和准备后的工作流必须进入最后一条 `proofblade-context` 动态消息，不能拼接用户原文或回写 System/Developer 消息。Pi 升级必须更新锁定快照与适配测试。
+模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 4；这是为了让同一 Provider/model 的多个 GUI 会话不会互相串行等待，同时仍以 32 作为硬上限。排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放；超过配置并发数的请求继续排队，保持背压。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。顶层 Tool schema 只能由不可变 `TaskContract` 能力声明决定；每轮安全画像、Preflight 和准备后的工作流必须进入最后一条 `proofblade-context` 动态消息，不能拼接用户原文或回写 System/Developer 消息。Pi 升级必须更新锁定快照与适配测试。
 
 Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 

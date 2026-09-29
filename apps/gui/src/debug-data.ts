@@ -108,6 +108,8 @@ export class DebugDataService {
   private readonly chatTasks = new Set<Promise<void>>();
   private readonly chatRuns = new Map<string, AbortController>();
   private readonly chatCleanupFailures = new Map<string, unknown>();
+  private readonly taskCleanupFailures = new Map<string, unknown>();
+  private readonly laneCleanupFailures = new Map<string, unknown>();
   private readonly taskRuns = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
@@ -191,6 +193,14 @@ export class DebugDataService {
     const failures = [...abortResults, ...taskResults, ...sandboxResult]
       .flatMap((result) => result.status === "rejected" ? [result.reason] : []);
     for (const failure of this.chatCleanupFailures.values()) {
+      if (failure instanceof AggregateError) failures.push(...failure.errors);
+      else failures.push(failure);
+    }
+    for (const failure of this.taskCleanupFailures.values()) {
+      if (failure instanceof AggregateError) failures.push(...failure.errors);
+      else failures.push(failure);
+    }
+    for (const failure of this.laneCleanupFailures.values()) {
       if (failure instanceof AggregateError) failures.push(...failure.errors);
       else failures.push(failure);
     }
@@ -342,10 +352,11 @@ export class DebugDataService {
     if (!Number.isInteger(afterSeq) || afterSeq < 0) throw new Error("afterSeq must be a non-negative integer");
     const sessionsVersion = await filesystemVersion(join(this.services.runsRoot, runId, "pi-sessions"));
     const sessionVersionToken = hashFilesystemVersion(sessionsVersion);
-    const [events, items, eventsStat] = await Promise.all([
+    const [events, items, eventsStat, snapshot] = await Promise.all([
       this.services.control.events(runId),
       this.listRuns(),
       stat(join(this.services.runsRoot, runId, "events.jsonl")),
+      this.services.control.snapshot(runId),
     ]);
     const item = items.find((candidate) => candidate.runId === runId);
     if (!item) throw new Error(`Run not found: ${runId}`);
@@ -361,6 +372,9 @@ export class DebugDataService {
       phase: item.phase,
       active: this.active.get(runId),
       events: suffix.length > clientEventLimit ? suffix.slice(-clientEventLimit) : suffix,
+      counts: item.counts,
+      controlView: buildRunControlView(snapshot),
+      observationQueue: projectObservationQueue(events, snapshot),
       updatedAt: eventsStat.mtime.toISOString(),
       sessionVersion: sessionVersionToken,
       reloadDetail,
@@ -378,7 +392,7 @@ export class DebugDataService {
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const clientEvents = events.length > clientEventLimit ? events.slice(-clientEventLimit) : events;
-    const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), sessionVersion: hashFilesystemVersion(loadedSessionsVersion), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events: clientEvents, telemetry, sessions, controlView: buildRunControlView(snapshot), counts: { evidence: Object.keys(snapshot.evidence).length, artifacts: Object.keys(snapshot.artifacts).length, effects: Object.keys(snapshot.effects).length }, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), sessionVersion: hashFilesystemVersion(loadedSessionsVersion), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsVersion, sessionsRoot, loadedSessionsVersion);
     // `detail` contains the raw session entries plus derived message/tool
     // projections that intentionally repeat parts of that data. Walking the
@@ -499,7 +513,9 @@ export class DebugDataService {
         this.activeLanes.set(task.task_id, lane);
         if (this.pauseRequests.has(task.task_id)) {
           await this.ensurePaused(task.task_id, "Paused by user");
-          void lane.abort("Paused by user").catch(() => undefined);
+          void lane.abort("Paused by user").catch((error: unknown) => {
+            this.taskCleanupFailures.set(task.task_id, error);
+          });
         }
       },
     }).then(() => {
@@ -693,7 +709,9 @@ export class DebugDataService {
           this.activeLanes.set(runId, activeLane);
           if (this.pauseRequests.has(runId)) {
             await this.ensurePaused(runId, "Paused by user");
-            void activeLane.abort("Paused by user").catch(() => undefined);
+            void activeLane.abort("Paused by user").catch((error: unknown) => {
+              this.chatCleanupFailures.set(runId, error);
+            });
           }
         },
       });
@@ -749,7 +767,9 @@ export class DebugDataService {
     const chatRun = this.chatRuns.get(runId);
     if (taskRun) taskRun.controller.abort(reason);
     else if (chatRun) chatRun.abort(reason);
-    else void this.activeLanes.get(runId)?.abort(reason).catch(() => undefined);
+    else void this.activeLanes.get(runId)?.abort(reason).catch((error: unknown) => {
+      this.laneCleanupFailures.set(runId, error);
+    });
     return paused;
   }
 

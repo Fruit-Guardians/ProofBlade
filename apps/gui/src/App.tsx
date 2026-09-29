@@ -133,11 +133,16 @@ export function App() {
       const events = [...bySeq.values()].sort((left, right) => left.seq - right.seq).slice(-600);
       return {
         ...existing,
-        snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase },
         events,
+        controlView: update.controlView,
+        observationQueue: update.observationQueue,
+        snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase },
         active: update.active,
         updatedAt: update.updatedAt,
         sessionVersion: update.sessionVersion,
+        // Sidebar counts are derived from the same lightweight projection as
+        // the updates response, so the active Run does not display stale totals.
+        counts: update.counts,
       };
     });
   }, [refreshDetail]);
@@ -972,7 +977,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
   const [cacheRetention, setCacheRetention] = useState<ProviderCacheRetention>("short");
   const [supportsLongCacheRetention, setSupportsLongCacheRetention] = useState(false);
-  const [maxConcurrentRequests, setMaxConcurrentRequests] = useState(1);
+  const [maxConcurrentRequests, setMaxConcurrentRequests] = useState(4);
   const [models, setModels] = useState<string[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [clearApiKey, setClearApiKey] = useState(false);
@@ -993,7 +998,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   };
 
   const createNew = () => {
-    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setSupportsLongCacheRetention(false); setMaxConcurrentRequests(1); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setSupportsLongCacheRetention(false); setMaxConcurrentRequests(4); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const discover = async () => {

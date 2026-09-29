@@ -210,7 +210,7 @@ export class ProviderSettingsStore {
           thinkingLevel: legacy.thinkingLevel,
           cacheRetention: legacy.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
           supportsLongCacheRetention: this.baseProfile.api === "openai-responses" && this.baseProfile.supportsLongCacheRetention === true,
-        maxConcurrentRequests: legacy.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 4,
+          maxConcurrentRequests: legacy.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 4,
         }, this.baseProfile.api);
         this.profiles = [{ id: "default", ...validated, ...(legacy.apiKey?.trim() ? { apiKey: legacy.apiKey.trim() } : {}) }];
         this.activeProfileId = "default";
@@ -235,7 +235,7 @@ export class ProviderSettingsStore {
         thinkingLevel: this.baseProfile.thinkingLevel ?? "off",
         cacheRetention: this.baseProfile.cacheRetention ?? "short",
         supportsLongCacheRetention: this.baseProfile.api === "openai-responses" && this.baseProfile.supportsLongCacheRetention === true,
-          maxConcurrentRequests: this.baseProfile.maxConcurrentRequests ?? 4,
+        maxConcurrentRequests: this.baseProfile.maxConcurrentRequests ?? 4,
         ...(apiKey ? { apiKey } : {}),
       }];
       this.activeProfileId = "default";

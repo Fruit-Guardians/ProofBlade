@@ -110,7 +110,7 @@ test("ControlStore folds from the durable projection and only replays a telemetr
   }
 });
 
-test("a warm JSONL reader parses only an appended event suffix", async () => {
+test("a cross-process append after a rewrite reparses the complete JSONL stream", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-jsonl-tail-"));
   try {
     const runsRoot = join(root, "runs");
@@ -120,6 +120,11 @@ test("a warm JSONL reader parses only an appended event suffix", async () => {
     const reader = new JsonlControlStore(runsRoot);
     const initial = await reader.events(runId);
     const before = reader.readStats();
+    const eventPath = join(runsRoot, runId, "events.jsonl");
+    const originalContent = await readFile(eventPath, "utf8");
+    const rewritten = originalContent.replace(/"generation"\s*:\s*0/, '"generation":1');
+    assert.notEqual(rewritten, await readFile(eventPath, "utf8"));
+    await writeFile(eventPath, rewritten, "utf8");
     await creator.append(runId, [{
       schemaVersion: 1,
       lane: "executor",
@@ -131,8 +136,12 @@ test("a warm JSONL reader parses only an appended event suffix", async () => {
     const appended = await reader.events(runId);
     const after = reader.readStats();
     assert.equal(appended.length, initial.length + 1);
-    assert.equal(after.parsedEvents - before.parsedEvents, 1);
-    assert.equal(after.parsedBytes - before.parsedBytes, Buffer.byteLength(canonicalJson(appended.at(-1)), "utf8"));
+    // Counters are process-wide (the creator may also need to reread the
+    // rewritten stream), so at least one complete stream parse must be visible.
+    assert.ok(after.parsedEvents - before.parsedEvents >= appended.length);
+    const finalContent = await readFile(eventPath, "utf8");
+    assert.ok(after.parsedBytes - before.parsedBytes >= Buffer.byteLength(finalContent, "utf8") - appended.length);
+    assert.equal(appended[0]?.envelope?.generation, 1, "the rewritten prefix must be visible after the append");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
