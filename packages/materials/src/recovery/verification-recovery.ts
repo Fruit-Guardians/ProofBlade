@@ -52,6 +52,15 @@ export interface VerificationRecoveryReport {
   projectionHash?: string;
   items: VerificationRecoveryItem[];
   terminal: number;
+  /**
+   * Requests disposed as observed-only: the task contract binds no verification rule,
+   * so the Completion is a recorded observation and no recovery can change that.
+   *
+   * Separate from {@link terminal} on purpose -- "the verifier chain finished" and
+   * "there is no verifier chain to finish" are different results for whoever is
+   * displaying them.
+   */
+  observedOnly: number;
   pending: number;
   requiresRecovery: number;
   stale: number;
@@ -204,11 +213,19 @@ export class VerificationRecoveryService {
       projectionHash: snapshot.projectionHash,
       items,
       terminal: items.filter((item) => item.status === "TERMINAL").length,
+      // Counted on its own rather than folded into `terminal`: OBSERVED_ONLY is a
+      // final disposition ("this contract cannot verify it") and not a finished
+      // verifier chain, and a caller showing "recovered" numbers must be able to tell
+      // the two apart. Without this the items appeared with every summary at zero.
+      observedOnly: items.filter((item) => item.status === "OBSERVED_ONLY").length,
       pending: items.filter((item) => item.status === "PENDING").length,
-      requiresRecovery: items.filter((item) => item.recoveryState === "RECOVERY_REQUIRED" || ["PROPOSED_EFFECT", "IN_FLIGHT_EFFECT", "AMBIGUOUS"].includes(item.status)).length,
+      // An observed-only request is not outstanding work even if its persisted
+      // `recoveryState` still says RECOVERY_REQUIRED: no recovery can satisfy it, so
+      // it must not be counted as an obligation before the next reconcile clears it.
+      requiresRecovery: items.filter((item) => item.status !== "OBSERVED_ONLY" && (item.recoveryState === "RECOVERY_REQUIRED" || ["PROPOSED_EFFECT", "IN_FLIGHT_EFFECT", "AMBIGUOUS"].includes(item.status))).length,
       stale: items.filter((item) => item.status === "STALE").length,
       invalid: items.filter((item) => item.status === "INVALID").length,
-      recoveryRequired: items.filter((item) => item.recoveryState === "RECOVERY_REQUIRED").length,
+      recoveryRequired: items.filter((item) => item.status !== "OBSERVED_ONLY" && item.recoveryState === "RECOVERY_REQUIRED").length,
     };
   }
 
@@ -266,8 +283,17 @@ export class VerificationRecoveryService {
       for (const item of reconciled.items) {
         const request = (await this.controlStore.snapshot(runId)).verificationRequests[item.requestId];
         if (!request) continue;
-        if (item.status === "TERMINAL" && request.recoveryState === "RECOVERY_REQUIRED") {
-          await this.recoveryControl.markResolved(runId, { requestId: item.requestId, reason: "Durable verifier chain is terminal and replayable." });
+        if ((item.status === "TERMINAL" || item.status === "OBSERVED_ONLY") && request.recoveryState === "RECOVERY_REQUIRED") {
+          // OBSERVED_ONLY belongs here as much as TERMINAL does. A Run that persisted
+          // `RECOVERY_REQUIRED` before this status existed keeps asking for recovery the
+          // contract cannot provide; resolving it is what clears the debt. Only the
+          // reason differs -- nothing was replayed, the task simply binds no rule.
+          await this.recoveryControl.markResolved(runId, {
+            requestId: item.requestId,
+            reason: item.status === "OBSERVED_ONLY"
+              ? "The task contract binds no verification rule, so this request is observed-only and no recovery can satisfy it."
+              : "Durable verifier chain is terminal and replayable.",
+          });
         } else if (["PENDING", "PROPOSED_EFFECT", "IN_FLIGHT_EFFECT", "AMBIGUOUS"].includes(item.status)
           && request.recoveryState !== "RECOVERY_REQUIRED" && request.recoveryState !== "RECOVERED") {
           await this.recoveryControl.markRequired(runId, { requestId: item.requestId, reason: item.reason });

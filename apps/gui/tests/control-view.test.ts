@@ -19,6 +19,33 @@ const task: TaskContract = {
   constraints: { deadline_ms: 1000, max_cost_usd: 0, max_tool_calls: 5, max_submissions: 1 },
 };
 
+test("the GUI does not show recovery debt a rule-less task can never pay", () => {
+  // The request keeps RECOVERY_REQUIRED from before the contract was understood to
+  // bind no verification rule, and the panel used to list it as outstanding work
+  // forever (reconcile clears the durable state, but a read-only view must not depend
+  // on someone having run it).
+  const ruleLess: TaskContract = { ...task, task_id: "GUI-CONTROL-NO-RULE", verification: { kind: "reproduction", required_reproductions: 0 } };
+  const snapshot = createInitialSnapshot(ruleLess.task_id, ruleLess);
+  snapshot.verificationRequests["VR-1"] = {
+    id: "VR-1",
+    runId: snapshot.runId,
+    generation: 0,
+    kind: "claim",
+    key: "k",
+    createdSeq: 1,
+    recoveryState: "RECOVERY_REQUIRED",
+    recoveryReason: "Completion is proposed but no verifier Effect is durable yet.",
+  } as never;
+  assert.deepEqual(buildRunControlView(snapshot).recovery, { required: 0, items: [] });
+
+  // With a rule-bound task the same persisted state is real work and stays visible.
+  const boundSnapshot = createInitialSnapshot(task.task_id, task);
+  boundSnapshot.verificationRequests["VR-1"] = { ...snapshot.verificationRequests["VR-1"]!, runId: boundSnapshot.runId } as never;
+  const bound = buildRunControlView(boundSnapshot).recovery;
+  assert.equal(bound.required, 1);
+  assert.equal(bound.items.length, 1);
+});
+
 test("GUI control projection is read-only and exposes blocked gate plus budgets", () => {
   const snapshot = createInitialSnapshot(task.task_id, task);
   const view = buildRunControlView(snapshot);

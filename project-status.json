@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T03:30:00+08:00",
+  "updatedAt": "2026-09-23T07:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2400,6 +2400,27 @@
         "变异验证：把 OBSERVED_ONLY 守卫改成恒假 → 新用例 not ok（恢复后通过）",
         "verification-recovery.test.ts 与 claim-verification-recovery.test.ts 共 13 用例 fail 0；npx tsc -b exit 0",
         "边界：有规则的任务（含 demoTask 的 required_reproductions=2）行为不变——既有 PENDING/RECOVERY_REQUIRED 用例仍绿"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-011",
+      "occurredAt": "2026-09-23T07:00:00+08:00",
+      "summary": "按审查意见修 PR #252 的两条：①旧 Run 上已经持久化的恢复债（recoveryState=RECOVERY_REQUIRED）在 OBSERVED_ONLY 判定下必须被清除，否则 GUI 与模型上下文一直显示有待恢复任务；②OBSERVED_ONLY 单独计入终态统计，不再出现「items 里有、所有汇总计数都是 0」。",
+      "branch": "fix/observed-only-recovery",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "recovery/verification-recovery.ts：reconcile() 的清除分支由「仅 TERMINAL」扩为「TERMINAL 或 OBSERVED_ONLY」，两者各用自己的 reason（observed-only 的说明是「该契约绑定不了验证规则，没有任何恢复能满足它」）；inspect() 新增 observedOnly 计数，并把 OBSERVED_ONLY 从 requiresRecovery/recoveryRequired 中排除——即使持久化状态还没被 reconcile 清掉，汇总也不再把它算作欠账",
+        "control/control-store.ts：verify 命令校验放宽一处——verification_recovery_resolved 原本要求 Completion 处于 ACCEPTED/REJECTED，而绑定不了验证规则的任务其 Completion 按构造永远停在 PROPOSED，于是这条「清除」在真实场景里会直接抛错。现在仅对「任务不绑定验证规则」豁免该前置条件，其余任务保持原强度（新用例在规则任务 + PROPOSED Completion 上断言仍然拒绝）",
+        "context/compiler.ts 与 apps/gui/src/control-view.ts：投影侧按同一判据（verificationBindsRule）不再把不可偿付的 RECOVERY_REQUIRED 呈现为待恢复（模型上下文 required=0、request state 归一为 READY；GUI 列表与计数同样过滤），这样即使没人跑过 reconcile，界面与提示也不会显示假债务",
+        "五条守卫逐一做了变异验证：inspect 排除、reconcile 清除、校验豁免、compiler 过滤、GUI 过滤各自被撤销时，对应用例转红"
+      ],
+      "validation": [
+        "verification-recovery + claim-verification-recovery + context + control-store + gui/control-view 共 55 用例 fail 0；npx tsc -b exit 0",
+        "api:index 重新生成；check:components（26 组件）与 check:change-contracts（11 契约）通过",
+        "发现并记录的实现约束：markResolved 的前置条件使「清除」在无规则任务上必然抛错（而不是静默失败），这正是需要同时改校验的原因；该豁免只作用于 !verificationBindsRule(snapshot.task)"
       ]
     }
   ],

@@ -22,6 +22,35 @@ const task: TaskContract = {
   constraints: { deadline_ms: 1000, max_cost_usd: 0, max_tool_calls: 5, max_submissions: 1 },
 };
 
+test("a task that binds no verification rule does not show recovery debt it cannot pay", () => {
+  // The request can still carry RECOVERY_REQUIRED from before the contract was
+  // understood to bind no rule. Telling the model to recover is telling it to retry
+  // something the contract makes impossible, so the projection reports nothing owed.
+  const ruleLess: TaskContract = { ...task, task_id: "CTX-NO-RULE", verification: { kind: "reproduction", required_reproductions: 0 } };
+  const snapshot = createInitialSnapshot("CTX-NO-RULE", ruleLess);
+  snapshot.verificationRequests["VR-1"] = {
+    id: "VR-1",
+    runId: snapshot.runId,
+    generation: 0,
+    kind: "claim",
+    key: "k",
+    createdSeq: 1,
+    recoveryState: "RECOVERY_REQUIRED",
+    recoveryReason: "Completion is proposed but no verifier Effect is durable yet.",
+  } as never;
+
+  const view = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task: ruleLess, snapshot });
+  assert.match(contextText(view), /"recovery":\{"required":0/, "no obligation is projected");
+  assert.match(contextText(view), /"state":"READY"/, "and the request is not shown as owing recovery");
+
+  // The same persisted state under a task that does bind a rule stays visible.
+  const bound: TaskContract = { ...task, task_id: "CTX-RULE" };
+  const boundSnapshot = createInitialSnapshot("CTX-RULE", bound);
+  boundSnapshot.verificationRequests["VR-1"] = { ...snapshot.verificationRequests["VR-1"]!, runId: boundSnapshot.runId } as never;
+  const boundView = new ContextCompiler().build({ runId: boundSnapshot.runId, lane: "main", phase: boundSnapshot.phase, task: bound, snapshot: boundSnapshot });
+  assert.match(contextText(boundView), /"recovery":\{"required":1/, "a recoverable task still shows its debt");
+});
+
 test("context manifest is deterministic and labels target data as untrusted", () => {
   const snapshot = createInitialSnapshot("CTX-001", task);
   snapshot.status = "RUNNING";
