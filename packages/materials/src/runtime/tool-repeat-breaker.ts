@@ -117,7 +117,12 @@ export class ExperimentBudgetBreaker {
     if (this.experimentCalls >= this.limits.maxExperimentCalls) {
       return { count: this.experimentCalls, terminate: true, key: "experiment-calls", reason: "tool_calls", ...(family ? { family } : {}) };
     }
-    if (this.longRunning >= this.limits.maxLongRunning) {
+    if (long && this.longRunning >= this.limits.maxLongRunning) {
+      // `long` matters. Without it this branch swallowed every later experiment once
+      // four slow commands had been seen -- returning before the timeout and family
+      // checks below, so those budgets could never fire short of the total-call
+      // ceiling. A quick command says nothing about the slow-command budget.
+      //
       // Four slow commands that all did something different is iteration: the model
       // is narrowing the problem, and the earlier advice ("reconstruct the logic as a
       // small script instead of probing again") is only right when the probes repeat.

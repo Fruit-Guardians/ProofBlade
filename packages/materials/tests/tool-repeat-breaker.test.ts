@@ -988,6 +988,50 @@ test("the experiment nudge needs a repeat, not four slow commands that each did 
   assert.match(experimentBudgetNudge(repeated[3]!), /is repeating/);
 });
 
+test("reaching the slow-command threshold must not mask the timeout and family budgets", () => {
+  // The long-running branch used to fire on every later experiment once four slow
+  // commands had been seen, returning before the timeout and family checks: those
+  // budgets became unreachable until the total-call ceiling. Retested here with a
+  // breaker whose other limits are small enough to trip.
+  const observation = (toolName: string, input: Record<string, unknown>, text: string, isError = false) => ({
+    toolName,
+    input,
+    isError,
+    content: [{ type: "text", text }],
+  });
+  const breaker = new ExperimentBudgetBreaker({ maxExperimentCalls: 50, maxLongRunning: 4, maxTimeouts: 2, maxFamily: 2 });
+
+  const slow = (name: string) => breaker.observe(observation("bash", { command: `for i in 1 2 3; do probe-${name}; done` }, `${name}: 0x${name.length}`));
+  const threshold = [slow("alpha"), slow("beta"), slow("gamma"), slow("delta")];
+  assert.deepEqual(threshold.map((decision) => decision.terminate), [false, false, false, false]);
+  assert.equal(threshold[3]?.key, "long-running-distinct");
+
+  // A quick command after the threshold is still just an experiment, not a repeat.
+  const quick = breaker.observe(observation("read", { path: "notes.txt" }, "notes"));
+  assert.equal(quick.terminate, false, "a quick command must not inherit the slow-command verdict");
+  assert.notEqual(quick.key, "long-running-distinct");
+
+  // And the timeout budget still fires: a killed command with no loop in its text.
+  const first = breaker.observe(observation("bash", { command: "python3 solve.py" }, "command timed out after 180s", true));
+  assert.equal(first.terminate, false, "one timeout is not yet the budget");
+  const second = breaker.observe(observation("bash", { command: "python3 solve.py --stage 2" }, "timed out again", true));
+  assert.equal(second.terminate, true, "the second timeout must reach its own budget, not the slow-command branch");
+  assert.equal(second.key, "timeouts");
+
+  // Same for the family budget: two members of one experiment family, neither of
+  // them slow, after the slow-command threshold has already been reached.
+  const familyBreaker = new ExperimentBudgetBreaker({ maxExperimentCalls: 50, maxLongRunning: 4, maxTimeouts: 9, maxFamily: 2 });
+  const familySlow = (name: string) => familyBreaker.observe(observation("bash", { command: `for i in 1 2 3; do probe-${name}; done` }, `${name}: 0x${name.length}`));
+  [familySlow("alpha"), familySlow("beta"), familySlow("gamma"), familySlow("delta")];
+  const familyDecisions = [
+    familyBreaker.observe(observation("bash", { command: "python3 probe.py --stage 1" }, "stage 1")),
+    familyBreaker.observe(observation("bash", { command: "python3 probe.py --stage 2" }, "stage 2")),
+  ];
+  assert.equal(familyDecisions[0]?.terminate, false, "the first member of a family is not yet a budget breach");
+  assert.equal(familyDecisions[1]?.terminate, true, "the family budget must still be reachable after the slow-command threshold");
+  assert.equal(familyDecisions[1]?.reason, "experiment_family");
+});
+
 test("tool-call budget blocks and terminates the next inner turn", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-tool-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });
