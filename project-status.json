@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T06:00:00+08:00",
+  "updatedAt": "2026-09-23T08:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2483,6 +2483,26 @@
         "变异验证：把重复判定改成恒真（恢复旧的「四次长命令即提示」）→ 新用例 not ok（恢复后通过）",
         "tool-repeat-breaker.test.ts 34 用例 fail 0；npx tsc -b exit 0；api:index / check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
         "计划文档 §P1-2 的「先度量再改」至此完成：度量结论是「误判成立且根因是命令文本启发式」，不是「未复现」"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-013",
+      "occurredAt": "2026-09-23T08:20:00+08:00",
+      "summary": "按审查意见修 PR #256：上一版的 long-running 分支条件没有判断「当前事件是否长命令」，于是慢命令阈值一旦达到，后续普通实验与 timeout/family 检查都被这层提前返回挡住，后两个预算实际上不可达。",
+      "branch": "fix/experiment-nudge-repeat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "runtime/tool-repeat-breaker.ts：条件改为 if (long && this.longRunning >= this.limits.maxLongRunning)——只有又一次长命令才交给慢命令预算裁决；普通命令继续走到 maxTimeouts / maxFamily 判断，总调用上限 maxExperimentCalls 仍在最前无条件终止",
+        "测试新增一条「达到慢命令阈值不得掩盖 timeout 与 family 预算」：4 条互不相同的慢命令（阈值达成、仍不提示）→ 一条快速命令（不得继承慢命令裁决）→ 两条超时观察（命令文本里没有循环，第二条以 key=timeouts 终止）→ 同一 family 的两条非慢命令（第二条以 reason=experiment_family 终止）",
+        "过程中的一次测试修正已记录：最初用 strings | grep 构造 family 重复，但 isExperimentObservation 对这类命令返回 false（不计入实验），换成 python3 probe.py --stage N 才真正命中 family 计数"
+      ],
+      "validation": [
+        "变异验证：把 `long &&` 去掉（恢复上一版条件）→ 新用例 not ok（恢复后通过）",
+        "tool-repeat-breaker.test.ts 35 用例 fail 0；npx tsc -b exit 0",
+        "边界：超时观察若同时满足长命令启发式（命令文本里带 timeout N），仍由慢命令分支优先裁决——这是有意的顺序，长命令预算是更强信号；测试因此用「命令文本无循环、因工具超时而失败」的形态验证 timeout 分支"
       ]
     }
   ],
