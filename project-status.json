@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T01:05:00+08:00",
+  "updatedAt": "2026-09-23T09:45:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2318,6 +2318,27 @@
         "变异验证：把门禁条件改回恒真 → 新用例 not ok（恢复后 3/3 通过）",
         "定向套件：phase-gate / coding-resources / single-agent-loop 共 67 用例 fail 0（--test-concurrency=1）；npx tsc -b exit 0",
         "范围说明：本次不改「什么算已验证」的语义——没有让模型自证即 ACCEPT，也没有新增任务级命令绑定；只去掉了一个永远无法满足的门禁要求"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-016",
+      "occurredAt": "2026-09-23T09:45:00+08:00",
+      "summary": "修 CI 门禁：npm audit --omit=dev 因新发布的 undici 公告（GHSA-3wwx-pv8p-q78v，7.28.0–7.29.0）失败，导致所有在该时间点之后触发流水线的 PR 都红。把 packages/materials 的 undici 从 7.29.0 固定版升到 7.30.0 并更新 lockfile。",
+      "branch": "chore/bump-undici-7.30.0",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "packages/materials/package.json：undici 7.29.0 → 7.30.0（保持仓库的精确固定风格），npm install 同步 package-lock.json",
+        "影响面：undici 只被 runtime/provider-transport.ts 使用（ProxyAgent + fetch 走代理的 provider 传输），版本号是补丁级推进，API 未变",
+        "为什么单独一个 PR：本仓库门禁 npm audit --omit=dev 对所有分支生效，advisory 是外部发布的，与任何功能改动无关；先合这一个，其余 PR 重新触发流水线即绿",
+        "核对：nanoid 的高危公告只存在于 dev 依赖里，不在 --omit=dev 的门禁范围内（本地 npm audit 报 2 个、加 --omit=dev 报 0 个），因此本次不动它"
+      ],
+      "validation": [
+        "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
+        "npm run build 通过；test:ci-gates 43/43；test:platform-fault-matrix 6/6",
+        "test:staged 出现一次 not ok 179 - binding transaction coordinator serializes owner commit across processes；该用例单独运行连续两次通过，且与 undici/fetch 无关（跨进程锁用例，属负载下的已知抖动），重跑结果见本轮报告"
       ]
     }
   ],
