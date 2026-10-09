@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T09:20:00+08:00",
+  "updatedAt": "2026-09-23T09:47:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -175,6 +175,35 @@
       ]
     },
     {
+      "id": "PLAN-210",
+      "title": "单 coding lane 上的 Planner/Refiner 策略层",
+      "status": "blocked",
+      "priority": "P3",
+      "milestone": "Milestone 5",
+      "owner": "unassigned",
+      "progress": 15,
+      "updatedAt": "2026-08-24T22:00:00+08:00",
+      "objective": "在单一 coding lane 的结构化 Handoff 边界上完善确定性 Planner/Refiner，并用评测证明是否值得增加可选 Planner 模型调用；不创建第二条解题 lane。",
+      "deliverables": [
+        "Planner/Refiner 的结构化 Handoff 与 knowledgeVersion 校验",
+        "add/remove/modify/reorder + afterId 的增量重规划",
+        "重复 Intent 和并行浪费指标"
+      ],
+      "acceptance": [
+        "至少 20 道题每题三次与单 Agent 配对比较",
+        "成功率、成本或 p95 延迟至少一项稳定改善",
+        "其他指标不突破预算",
+        "Planner/Refiner 只作为策略层，不新增第二条解题 lane 或独立 solver transcript"
+      ],
+      "dependencies": [
+        "PLAN-100",
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-130",
+        "PLAN-200"
+      ]
+    },
+    {
       "id": "PLAN-220",
       "title": "可重放 Work Graph 与 CTF 编排纵向切片",
       "status": "in_progress",
@@ -241,35 +270,6 @@
         "PLAN-120",
         "PLAN-200",
         "PLAN-220"
-      ]
-    },
-    {
-      "id": "PLAN-210",
-      "title": "单 coding lane 上的 Planner/Refiner 策略层",
-      "status": "blocked",
-      "priority": "P3",
-      "milestone": "Milestone 5",
-      "owner": "unassigned",
-      "progress": 15,
-      "updatedAt": "2026-08-24T22:00:00+08:00",
-      "objective": "在单一 coding lane 的结构化 Handoff 边界上完善确定性 Planner/Refiner，并用评测证明是否值得增加可选 Planner 模型调用；不创建第二条解题 lane。",
-      "deliverables": [
-        "Planner/Refiner 的结构化 Handoff 与 knowledgeVersion 校验",
-        "add/remove/modify/reorder + afterId 的增量重规划",
-        "重复 Intent 和并行浪费指标"
-      ],
-      "acceptance": [
-        "至少 20 道题每题三次与单 Agent 配对比较",
-        "成功率、成本或 p95 延迟至少一项稳定改善",
-        "其他指标不突破预算",
-        "Planner/Refiner 只作为策略层，不新增第二条解题 lane 或独立 solver transcript"
-      ],
-      "dependencies": [
-        "PLAN-100",
-        "PLAN-110",
-        "PLAN-120",
-        "PLAN-130",
-        "PLAN-200"
       ]
     },
     {
@@ -454,27 +454,6 @@
       ]
     },
     {
-      "id": "UPDATE-20260808-002",
-      "occurredAt": "2026-08-08T02:02:26.8610595+08:00",
-      "summary": "修复严格 OpenAI-compatible Provider 拒绝 Coding Tool Schema 的问题。",
-      "branch": "codex/provider-schema-compat",
-      "commit": "self",
-      "planIds": [
-        "PLAN-120"
-      ],
-      "changes": [
-        "将 evidence 的根级判别联合改为 type object 和 operation 字符串枚举",
-        "将 Coding Tool 内部离散选项改为直接字符串 enum，消除 Provider 可见 anyOf",
-        "把 operation 的必需字段和互斥字段约束保留在确定性运行时校验中",
-        "增加全部 Coding Provider Tool 根 Schema 兼容性与跨操作字段拒绝测试"
-      ],
-      "validation": [
-        "coding provider schema compatibility contract",
-        "npm run test --workspace=@proofblade/materials",
-        "npm run verify"
-      ]
-    },
-    {
       "id": "UPDATE-20260808-001",
       "occurredAt": "2026-08-08T02:47:55.5788475+08:00",
       "summary": "修复长工具回合压缩无效和 length 空回复，建立有界上下文恢复。",
@@ -494,6 +473,27 @@
         "18/18 deterministic fixture evaluations passed",
         "component documentation check passed: 25 components, 5 affected",
         "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-002",
+      "occurredAt": "2026-08-08T02:02:26.8610595+08:00",
+      "summary": "修复严格 OpenAI-compatible Provider 拒绝 Coding Tool Schema 的问题。",
+      "branch": "codex/provider-schema-compat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "将 evidence 的根级判别联合改为 type object 和 operation 字符串枚举",
+        "将 Coding Tool 内部离散选项改为直接字符串 enum，消除 Provider 可见 anyOf",
+        "把 operation 的必需字段和互斥字段约束保留在确定性运行时校验中",
+        "增加全部 Coding Provider Tool 根 Schema 兼容性与跨操作字段拒绝测试"
+      ],
+      "validation": [
+        "coding provider schema compatibility contract",
+        "npm run test --workspace=@proofblade/materials",
+        "npm run verify"
       ]
     },
     {
@@ -866,29 +866,6 @@
       ]
     },
     {
-      "id": "UPDATE-20260810-006",
-      "occurredAt": "2026-08-10T18:00:00+08:00",
-      "summary": "消除并行 PR 对共享组件版本、审计快照和项目报表的合并冲突。",
-      "branch": "codex/fix-concurrent-pr-metadata",
-      "commit": "self",
-      "planIds": [
-        "PLAN-001",
-        "PLAN-002"
-      ],
-      "changes": [
-        "源码变更不再强制修改 COMPONENT.md 的版本、计数和源码指纹快照",
-        "源码 PR 通过构建、测试和变更契约验证，周期性审计仍可更新 SHA-256 快照",
-        "普通 packages/apps/scripts 变更不再要求写入共享 project-status.json",
-        "CI 在临时工作区的契约检查前自动重生成项目报表",
-        "补充并行源码变更与治理文件边界回归检查"
-      ],
-      "validation": [
-        "component and project report gates passed",
-        "CI gates passed",
-        "168/168 repository tests passed"
-      ]
-    },
-    {
       "id": "UPDATE-20260810-004",
       "occurredAt": "2026-08-10T19:42:54+08:00",
       "summary": "完成 PR C Deep Reverse v1：新增函数、反汇编和 XRef 逻辑 Capability，并接入可选 Rizin 与可配置 MCP 后端。",
@@ -912,6 +889,29 @@
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities",
         "Rizin production availability is environment-dependent and remains optional"
+      ]
+    },
+    {
+      "id": "UPDATE-20260810-006",
+      "occurredAt": "2026-08-10T18:00:00+08:00",
+      "summary": "消除并行 PR 对共享组件版本、审计快照和项目报表的合并冲突。",
+      "branch": "codex/fix-concurrent-pr-metadata",
+      "commit": "self",
+      "planIds": [
+        "PLAN-001",
+        "PLAN-002"
+      ],
+      "changes": [
+        "源码变更不再强制修改 COMPONENT.md 的版本、计数和源码指纹快照",
+        "源码 PR 通过构建、测试和变更契约验证，周期性审计仍可更新 SHA-256 快照",
+        "普通 packages/apps/scripts 变更不再要求写入共享 project-status.json",
+        "CI 在临时工作区的契约检查前自动重生成项目报表",
+        "补充并行源码变更与治理文件边界回归检查"
+      ],
+      "validation": [
+        "component and project report gates passed",
+        "CI gates passed",
+        "168/168 repository tests passed"
       ]
     },
     {
@@ -2484,6 +2484,27 @@
         "CI 的 fast 阶段此前红在 'not ok 319 - verify_claim calls cannot exhaust the platform submission budget'，本地在该分支上稳定复现同一断言，修复后通过",
         "过程记录：本地此前的四个定向套件都没有覆盖这条平台连通性检查，所以第一次提交时漏掉了——这也说明单跑受影响套件不足，本轮以 CI 的 fast 阶段为准"
       ]
+    },
+    {
+      "id": "UPDATE-20260923-016",
+      "occurredAt": "2026-09-23T09:45:00+08:00",
+      "summary": "修 CI 门禁：npm audit --omit=dev 因新发布的 undici 公告（GHSA-3wwx-pv8p-q78v，7.28.0–7.29.0）失败，导致所有在该时间点之后触发流水线的 PR 都红。把 packages/materials 的 undici 从 7.29.0 固定版升到 7.30.0 并更新 lockfile。",
+      "branch": "chore/bump-undici-7.30.0",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "packages/materials/package.json：undici 7.29.0 → 7.30.0（保持仓库的精确固定风格），npm install 同步 package-lock.json",
+        "影响面：undici 只被 runtime/provider-transport.ts 使用（ProxyAgent + fetch 走代理的 provider 传输），版本号是补丁级推进，API 未变",
+        "为什么单独一个 PR：本仓库门禁 npm audit --omit=dev 对所有分支生效，advisory 是外部发布的，与任何功能改动无关；先合这一个，其余 PR 重新触发流水线即绿",
+        "核对：nanoid 的高危公告只存在于 dev 依赖里，不在 --omit=dev 的门禁范围内（本地 npm audit 报 2 个、加 --omit=dev 报 0 个），因此本次不动它"
+      ],
+      "validation": [
+        "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
+        "npm run build 通过；test:ci-gates 43/43；test:platform-fault-matrix 6/6",
+        "test:staged 出现一次 not ok 179 - binding transaction coordinator serializes owner commit across processes；该用例单独运行连续两次通过，且与 undici/fetch 无关（跨进程锁用例，属负载下的已知抖动），重跑结果见本轮报告"
+      ]
     }
   ],
   "completions": [
@@ -2525,30 +2546,6 @@
     }
   ],
   "maintenance": [
-    {
-      "id": "MAINT-20260810-001",
-      "performedAt": "2026-08-10T11:17:00+08:00",
-      "status": "passed",
-      "scope": "确定性评测协议、缓存与上下文可观测性、收敛护栏、Evidence 整理和运行状态持久化",
-      "actions": [
-        "拆分 Fixture 求解矩阵与 Runtime Scenario 矩阵",
-        "把仅存在于单元测试的关键跨模块不变量提升为发布评测",
-        "执行 104 个 Materials 测试和 30 项 baseline-v3 评测"
-      ],
-      "findings": [
-        "旧 18 项评测只能证明六类静态题型可被确定性求解，不能发现缓存、上下文和运行时状态回归",
-        "缓存命中 Token 与 Provider 前缀稳定性需要独立评测，固定值不能代表真实前缀命中",
-        "跨模块场景应隔离失败并保留分类、目录哈希和稳定结果哈希"
-      ],
-      "validation": [
-        "104/104 Materials tests passed",
-        "153/153 repository tests passed",
-        "18/18 fixture solve cases passed",
-        "12/12 runtime scenario cases passed",
-        "npm audit: 0 vulnerabilities"
-      ],
-      "nextReviewTrigger": "新增跨题运行时能力、改变缓存前缀、上下文裁剪、证据整理、暂停恢复、Verifier 或 Lease 契约"
-    },
     {
       "id": "MAINT-20260807-001",
       "performedAt": "2026-08-07T18:09:45+08:00",
@@ -2594,6 +2591,30 @@
         "Full repository verification passed"
       ],
       "nextReviewTrigger": "修改 change-contracts、组件哈希算法、关闭协调器、AbortSignal 边界或 SandboxPort 生命周期"
+    },
+    {
+      "id": "MAINT-20260810-001",
+      "performedAt": "2026-08-10T11:17:00+08:00",
+      "status": "passed",
+      "scope": "确定性评测协议、缓存与上下文可观测性、收敛护栏、Evidence 整理和运行状态持久化",
+      "actions": [
+        "拆分 Fixture 求解矩阵与 Runtime Scenario 矩阵",
+        "把仅存在于单元测试的关键跨模块不变量提升为发布评测",
+        "执行 104 个 Materials 测试和 30 项 baseline-v3 评测"
+      ],
+      "findings": [
+        "旧 18 项评测只能证明六类静态题型可被确定性求解，不能发现缓存、上下文和运行时状态回归",
+        "缓存命中 Token 与 Provider 前缀稳定性需要独立评测，固定值不能代表真实前缀命中",
+        "跨模块场景应隔离失败并保留分类、目录哈希和稳定结果哈希"
+      ],
+      "validation": [
+        "104/104 Materials tests passed",
+        "153/153 repository tests passed",
+        "18/18 fixture solve cases passed",
+        "12/12 runtime scenario cases passed",
+        "npm audit: 0 vulnerabilities"
+      ],
+      "nextReviewTrigger": "新增跨题运行时能力、改变缓存前缀、上下文裁剪、证据整理、暂停恢复、Verifier 或 Lease 契约"
     }
   ]
 }
