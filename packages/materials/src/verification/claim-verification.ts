@@ -22,6 +22,16 @@ export interface ResultReproduction {
    * accepted, and retrying cannot change it".
    */
   acceptance: "verified" | "observation_only";
+  /**
+   * The tree this conclusion is recorded in, and whether it already existed.
+   *
+   * `treeReused` is true when every node this chain would add is already covered by
+   * a tree -- the agent recorded the supporting Evidence earlier. Reusing keeps one
+   * tree per conclusion; the verification's own provenance rides on the reasoning
+   * edges either way.
+   */
+  treeId?: string;
+  treeReused?: boolean;
   candidate: string;
   candidateHash: string;
   commandHash: string;
@@ -40,6 +50,9 @@ export interface ResultArtifactReproduction {
   verified: boolean;
   /** Same distinction as {@link ResultReproduction.acceptance}. */
   acceptance: "verified" | "observation_only";
+  /** Same distinction as {@link ResultReproduction.treeReused}. */
+  treeId?: string;
+  treeReused?: boolean;
   resultHash: string;
   resultArtifactId: string;
   commandHash: string;
@@ -306,6 +319,7 @@ export class TaskResultVerifier {
     return {
       verified: reproduction.verified,
       acceptance: reproduction.acceptance,
+      ...(reproduction.treeId ? { treeId: reproduction.treeId, treeReused: reproduction.treeReused } : {}),
       resultHash: reproduction.candidateHash,
       resultArtifactId: reproduction.candidateArtifactId,
       commandHash: reproduction.commandHash,
@@ -661,27 +675,42 @@ export class TaskResultVerifier {
     await graph.linkNodesBatch(graphLinks);
     const graphSnapshot = await this.controlStore.snapshot(this.runId);
     const relatedTreeIds = Object.values(graphSnapshot.reasoningTrees).filter((tree) => supportingEvidenceIds.some((value) => tree.nodeIds.includes(value))).map((tree) => tree.id);
-    await graph.createTree({
-      name: locallyJudged ? (resultArtifactMode ? "结果 Artifact 验证" : "最终候选复现") : "候选观察链",
-      summary: locallyJudged
-        ? resultArtifactMode
-          ? `结果 Artifact ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 验证。`
-          : `候选 ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 复现。`
-        : `候选 ${candidateHash.slice(0, 12)}... 来自模型命令观察，等待任务绑定的 verifier 规则。`,
-      purpose: "汇总最终结论、上游分析依据与可重复验证结果。",
-      explanation: locallyJudged
-        ? resultArtifactMode
-          ? "该树以 Completion 为根，连接结果 Artifact、执行记录、收据、验证 Evidence 与确认 Fact。"
-          : "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。"
-        : "该树只记录模型命令观察，不代表候选已通过受信 verifier。",
-      rootNodeId: completionId,
-      nodeIds: [candidateArtifact.id, outcomeArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id, attempt.evidenceId]), ...supportingEvidenceIds, factId, completionId],
-      relatedTreeIds,
-      tags: resultArtifactMode ? ["verification", "result", "reproduction"] : ["verification", "candidate", "reproduction"],
-      status: locallyJudged ? "SUPPORTED" : "ACTIVE",
-    });
+    const plannedNodeIds = [candidateArtifact.id, outcomeArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id, attempt.evidenceId]), ...supportingEvidenceIds, factId, completionId];
+    // One tree per conclusion.
+    //
+    // CHAT-1790096643438 ended with two trees over the same result: `TREE-b8f448bb`
+    // (the agent's, rooted at its confirming fact) and `TREE-6254a5fe` (this chain,
+    // rooted at a Completion that could never be accepted). They shared two nodes --
+    // the supporting Evidence and the Artifact it points at -- which is exactly the
+    // case here: the verification reuses Evidence a tree already covers. Building a
+    // second view of one conclusion adds nothing (the edges above carry the
+    // provenance either way) and, when the Completion cannot be accepted, it hangs a
+    // tree off a dead node. If any node this chain would add is already in a tree,
+    // that tree is the record and the caller is told it was reused.
+    const existingTree = Object.values(graphSnapshot.reasoningTrees).find((tree) => tree.nodeIds.some((nodeId) => plannedNodeIds.includes(nodeId)));
+    const createdTree = existingTree
+      ? undefined
+      : (await graph.createTree({
+        name: locallyJudged ? (resultArtifactMode ? "结果 Artifact 验证" : "最终候选复现") : "候选观察链",
+        summary: locallyJudged
+          ? resultArtifactMode
+            ? `结果 Artifact ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 验证。`
+            : `候选 ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 复现。`
+          : `候选 ${candidateHash.slice(0, 12)}... 来自模型命令观察，等待任务绑定的 verifier 规则。`,
+        purpose: "汇总最终结论、上游分析依据与可重复验证结果。",
+        explanation: locallyJudged
+          ? resultArtifactMode
+            ? "该树以 Completion 为根，连接结果 Artifact、执行记录、收据、验证 Evidence 与确认 Fact。"
+            : "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。"
+          : "该树只记录模型命令观察，不代表候选已通过受信 verifier。",
+        rootNodeId: completionId,
+        nodeIds: plannedNodeIds,
+        relatedTreeIds,
+        tags: resultArtifactMode ? ["verification", "result", "reproduction"] : ["verification", "candidate", "reproduction"],
+        status: locallyJudged ? "SUPPORTED" : "ACTIVE",
+      })).tree;
 
-    return { verified: locallyJudged, acceptance: locallyJudged ? "verified" : "observation_only", candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
+    return { verified: locallyJudged, acceptance: locallyJudged ? "verified" : "observation_only", treeId: (existingTree ?? createdTree)!.id, treeReused: existingTree !== undefined, candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
   }
 
   /** Rebuild verification exclusively from durable current-generation state. */
