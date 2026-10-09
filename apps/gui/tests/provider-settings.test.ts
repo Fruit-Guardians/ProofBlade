@@ -27,6 +27,17 @@ const config: ProofBladeConfig = {
   },
 };
 
+test("provider profiles default to four concurrent requests", async () => {
+  const path = join(resolve(import.meta.dirname, "../../.."), "tmp", `provider-default-${Date.now()}.json`);
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    assert.equal(store.publicSettings().maxConcurrentRequests, 4);
+    assert.equal(store.modelProfile().maxConcurrentRequests, 4);
+  } finally {
+    await rm(path, { force: true });
+  }
+});
+
 test("persists provider overrides outside the repository response without exposing the key", async () => {
   const root = resolve(import.meta.dirname, "../../..");
   const tempRoot = join(root, "tmp");

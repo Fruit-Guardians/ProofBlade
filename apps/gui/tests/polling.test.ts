@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { SingleFlightPoller, isPollingAllowed } from "../src/polling.js";
+import { SingleFlightPoller, isContiguousEventUpdate, isPollingAllowed, shouldRefreshFullDetail } from "../src/polling.js";
 
 test("[contract:polling-run-switch-single-flight] run switches coalesce behind the active refresh", async () => {
   let selectedRun = "RUN-A";
@@ -126,6 +126,20 @@ test("[contract:polling-hidden-document-is-idle] a hidden document permits no po
   assert.equal(isPollingAllowed("prerender"), false);
 });
 
+test("incremental polling never advances across a missing event", () => {
+  assert.equal(isContiguousEventUpdate(10, 12, [11, 12]), true);
+  assert.equal(isContiguousEventUpdate(10, 12, [12]), false);
+  assert.equal(isContiguousEventUpdate(10, 12, [11]), false);
+  assert.equal(isContiguousEventUpdate(10, 10, []), true);
+  assert.equal(isContiguousEventUpdate(10, 9, []), false);
+});
+
+test("active incremental polling periodically refreshes full detail", () => {
+  assert.equal(shouldRefreshFullDetail(40_000, 10_000), true);
+  assert.equal(shouldRefreshFullDetail(39_999, 10_000), false);
+  assert.equal(shouldRefreshFullDetail(1, 0), true);
+});
+
 test("the background timer enforces the visibility rule through the tested predicate", async () => {
   // The predicate above is only meaningful if the tick actually consults it.
   // App.tsx runs a React component and cannot be mounted here, so this asserts
@@ -137,13 +151,15 @@ test("the background timer enforces the visibility rule through the tested predi
   assert.doesNotMatch(source, /visibilityState\s*!==\s*"visible"/, "the guard must not be re-inlined, or the predicate stops being the single rule");
 });
 
-test("the incremental events endpoint stays available for the chat poll to adopt", async () => {
-  // Item I, second half: the server side already supports `afterSeq`, but no
-  // client calls it, so every poll still transfers the whole event stream. The
-  // client change needs browser verification and is deliberately not made here.
-  // This keeps the endpoint from being removed as "unused" while that is pending.
-  const source = await readFile(join(import.meta.dirname, "..", "src", "server.ts"), "utf8");
-  assert.match(source, /afterSeq/, "the events endpoint must keep supporting incremental reads");
+test("background chat polling adopts the incremental updates endpoint", async () => {
+  const server = await readFile(join(import.meta.dirname, "..", "src", "server.ts"), "utf8");
+  const api = await readFile(join(import.meta.dirname, "..", "src", "api.ts"), "utf8");
+  const app = await readFile(join(import.meta.dirname, "..", "src", "App.tsx"), "utf8");
+  assert.match(server, /parts\[3\] === "updates"[\s\S]*afterSeq/);
+  assert.match(api, /getRunUpdates[\s\S]*afterSeq/);
+  assert.match(app, /mode === "background"[\s\S]*await refreshUpdates/);
+  assert.match(app, /shouldRefreshFullDetail/);
+  assert.match(app, /generation: update\.generation/);
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {

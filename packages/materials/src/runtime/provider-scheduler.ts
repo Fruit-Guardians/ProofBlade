@@ -202,7 +202,7 @@ export class ProviderRequestScheduler {
         const idle = new AbortController();
         const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
         const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
-        const outcome = await this.drainAttempt(source, idle, observer, requestId, attempt, Date.now(), scope);
+        const outcome = await this.drainAttempt(source, idle, options?.signal, observer, requestId, attempt, Date.now(), scope);
         // A terminal error this attempt produced (either a real error event or a
         // synthetic one from an idle stall / iterator throw).
         const errorMessage = outcome.kind === "error" ? outcome.event.error : outcome.kind === "threw" ? errorEvent(model, outcome.error).error : undefined;
@@ -223,7 +223,8 @@ export class ProviderRequestScheduler {
           }
           continue; // discard this attempt's buffer, re-issue
         }
-        if (errorMessage && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage))) {
+        const requestAborted = outcome.kind === "threw" && outcome.error instanceof ProviderRequestQueueAbortedError;
+        if (errorMessage && !requestAborted && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage))) {
           await notifyObserver(() => observer?.recoveryRequired?.(requestId, {
             ...scope,
             attempts: attempt + 1,
@@ -274,7 +275,8 @@ export class ProviderRequestScheduler {
    *   - error:   the stream reached a real `error` event (buffered, terminal).
    *   - threw:   the stream stalled (idle watchdog) or the iterator threw before
    *              any terminal event — a synthetic error is derived by the caller.
-   * Each event resets the idle timer; if none arrives within idleTimeoutMs the
+   * External cancellation always races the iterator, even when idleTimeoutMs is
+   * zero. Each event resets the idle timer; if none arrives within idleTimeoutMs the
    * attempt is treated as stalled and unwinds (best-effort aborting the fetch),
    * so a provider that ignores the abort signal still cannot hang the slot.
    * Buffering costs live token streaming during a call, which the fleet does not
@@ -283,6 +285,7 @@ export class ProviderRequestScheduler {
   private async drainAttempt(
     source: AssistantMessageEventStream,
     idle: AbortController,
+    requestSignal: AbortSignal | undefined,
     observer: ProviderRequestSchedulingObserver | undefined,
     requestId: string | undefined,
     attempt: number,
@@ -291,46 +294,42 @@ export class ProviderRequestScheduler {
   ): Promise<AttemptOutcome> {
     const events: AssistantMessageEvent[] = [];
     const stats: AttemptStats = { maxInterEventIdleMs: 0 };
-    if (this.idleTimeoutMs <= 0) {
-      for await (const event of source) {
-        const now = Date.now();
-        const idleMs = Math.max(0, now - (stats.lastEventAt ?? attemptStartedAt));
-        stats.maxInterEventIdleMs = Math.max(stats.maxInterEventIdleMs, idleMs);
-        stats.lastEventAt = now;
-        observeProviderEvent(observer, requestId, attempt, attemptStartedAt, stats, event, idleMs, scope);
-        events.push(event);
-        if (event.type === "done") return { kind: "success", events, message: event.message, stats };
-        if (event.type === "error") return { kind: "error", events, event, stats };
-      }
-      return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };
-    }
     const iterator = source[Symbol.asyncIterator]();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let lastEventAt = attemptStartedAt;
+    let onRequestAbort: (() => void) | undefined;
     // Local, not an instance field: concurrent streams each run their own attempt
     // and must not share one timer handle.
     let rearm: () => void = () => {};
     const stall = new Promise<never>((_, reject) => {
-        rearm = (): void => {
-          clearTimeout(timer);
-          timer = setTimeout(() => {
-            const idleMs = Math.max(0, Date.now() - lastEventAt);
-            const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
-            void notifyObserver(() => observer?.stalled?.(requestId, { ...scope, attempt, idleMs, reason: reason.message }));
-            idle.abort(reason);
-            reject(reason);
-          }, this.idleTimeoutMs);
+      // A disabled watchdog leaves this promise pending forever, while the
+      // request-abort race below remains active and can still unwind the slot.
+      if (this.idleTimeoutMs <= 0) return;
+      rearm = (): void => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const idleMs = Math.max(0, Date.now() - lastEventAt);
+          const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
+          void notifyObserver(() => observer?.stalled?.(requestId, { ...scope, attempt, idleMs, reason: reason.message }));
+          idle.abort(reason);
+          reject(reason);
+        }, this.idleTimeoutMs);
       };
       rearm();
+    });
+    const requestAbort = new Promise<never>((_, reject) => {
+      onRequestAbort = () => reject(new ProviderRequestQueueAbortedError());
+      if (requestSignal?.aborted) onRequestAbort();
+      else requestSignal?.addEventListener("abort", onRequestAbort, { once: true });
     });
     try {
       for (;;) {
         const pending = iterator.next();
-        // If the stall timer wins the race, `pending` is left in flight and may
-        // later reject once the abort tears down the fetch; swallow that so it
-        // never surfaces as an unhandled rejection.
+        // If cancellation or the stall timer wins the race, `pending` is left
+        // in flight and may later reject once abort tears down the fetch;
+        // observe that rejection so it never becomes unhandled.
         pending.catch(() => {});
-        const next = await Promise.race([pending, stall]);
+        const next = await Promise.race([pending, stall, requestAbort]);
         if (next.done) return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };
         const event = next.value;
         const now = Date.now();
@@ -347,6 +346,7 @@ export class ProviderRequestScheduler {
       return { kind: "threw", events, error, stats };
     } finally {
       clearTimeout(timer);
+      if (onRequestAbort) requestSignal?.removeEventListener("abort", onRequestAbort);
       // Best-effort close so the abandoned generator can run its own cleanup.
       void iterator.return?.(undefined).catch(() => {});
     }
@@ -495,8 +495,15 @@ export function providerRequestScheduler(): ProviderRequestScheduler {
   return sharedScheduler;
 }
 
+/**
+ * Let up to four independent chats share a Provider/model by default. This is
+ * a local scheduling default, not a claim that every upstream accepts four
+ * concurrent requests: constrained profiles can set 1, excess work remains in
+ * the FIFO queue, and transient 429 responses use the Provider retry budget.
+ * Scope validation keeps the configurable hard ceiling at 32.
+ */
 export function configuredMaxConcurrentRequests(value: number | undefined): number {
-  return value ?? 1;
+  return value ?? 4;
 }
 
 function assertScope(scope: ProviderRequestScope): void {

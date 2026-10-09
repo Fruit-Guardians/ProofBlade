@@ -310,10 +310,29 @@ export interface RunDetail {
   telemetry: RunTelemetryReport;
   sessions: PiSessionDebug[];
   controlView: RunControlView;
+  counts?: RunListItem["counts"];
   active?: ActiveRunInfo;
   updatedAt: string;
+  sessionVersion?: string;
   context?: ContextRuntimeInfo;
   observationQueue: ObservationQueueProjection;
+}
+
+/** Lightweight background polling payload; full detail is refreshed periodically. */
+export interface RunUpdates {
+  runId: string;
+  lastSeq: number;
+  status: RunSnapshot["status"];
+  phase: RunSnapshot["phase"];
+  generation: RunSnapshot["generation"];
+  active?: ActiveRunInfo;
+  events: HarnessEvent[];
+  counts: RunListItem["counts"];
+  controlView: RunControlView;
+  observationQueue?: ObservationQueueProjection;
+  updatedAt: string;
+  sessionVersion?: string;
+  reloadDetail: boolean;
 }
 
 export interface ContextRuntimeInfo {

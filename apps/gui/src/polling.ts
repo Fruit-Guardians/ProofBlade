@@ -18,6 +18,19 @@ export function isPollingAllowed(visibilityState: DocumentVisibilityState): bool
   return visibilityState === "visible";
 }
 
+/** A cursor may advance only when every intervening durable event is present. */
+export function isContiguousEventUpdate(afterSeq: number, lastSeq: number, eventSeqs: readonly number[]): boolean {
+  if (!Number.isInteger(afterSeq) || !Number.isInteger(lastSeq) || lastSeq < afterSeq) return false;
+  if (lastSeq === afterSeq) return eventSeqs.length === 0;
+  if (eventSeqs.length !== lastSeq - afterSeq) return false;
+  return eventSeqs.every((seq, index) => seq === afterSeq + index + 1);
+}
+
+/** Periodically refresh heavy telemetry/context even while suffix polling is active. */
+export function shouldRefreshFullDetail(now: number, lastRefreshAt: number, intervalMs = 30_000): boolean {
+  return !Number.isFinite(lastRefreshAt) || lastRefreshAt <= 0 || now - lastRefreshAt >= intervalMs;
+}
+
 export class SingleFlightPoller {
   private running: Promise<void> | undefined;
   private rerunRequested = false;

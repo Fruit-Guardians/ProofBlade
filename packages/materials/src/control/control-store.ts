@@ -41,7 +41,7 @@ import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } f
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { redactCtfCandidates } from "../domain/candidate.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
-import { JsonlControlStore, makeEvent, type JsonlRunRevision, type JsonlRunWriter } from "../storage/jsonl-store.js";
+import { JsonlControlStore, makeEvent, type JsonlEventSuffix, type JsonlRunRevision, type JsonlRunWriter } from "../storage/jsonl-store.js";
 import { resolveControlAuthority } from "../storage/control-authority.js";
 import { projectionHash, reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
@@ -345,6 +345,10 @@ export class ControlStore {
 
   public async events(runId: string): Promise<HarnessEvent[]> {
     return await this.eventStore.events(runId);
+  }
+
+  public async eventsAfter(runId: string, afterSeq: number): Promise<JsonlEventSuffix> {
+    return await this.eventStore.eventsAfter(runId, afterSeq);
   }
 
   /** Atomically claim ingress events under the same Run lock used by writes. */
@@ -977,6 +981,9 @@ export class ControlStore {
 function sameRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
   return left.size === right.size
     && left.mtimeMs === right.mtimeMs
+    && (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
+    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino)
+    && (left.ctimeMs === undefined || right.ctimeMs === undefined || left.ctimeMs === right.ctimeMs)
     && left.taskSize === right.taskSize
     && left.taskMtimeMs === right.taskMtimeMs;
 }

@@ -7,10 +7,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRunUpdates, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import { SingleFlightPoller, isPollingAllowed } from "./polling.js";
+import { SingleFlightPoller, isContiguousEventUpdate, isPollingAllowed, shouldRefreshFullDetail } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
@@ -86,6 +86,9 @@ export function App() {
   const [rightOpen, setRightOpen] = useState(false);
   const runIdRef = useRef(runId);
   runIdRef.current = runId;
+  const detailRef = useRef(detail);
+  detailRef.current = detail;
+  const lastFullDetailRefreshAtRef = useRef(0);
 
   const refreshRuns = useCallback(async (selectPreferred = false) => {
     const next = await getRuns();
@@ -107,6 +110,7 @@ export function App() {
       const next = await getRun(selected);
       if (runIdRef.current !== selected) return;
       setDetail(next);
+      lastFullDetailRefreshAtRef.current = Date.now();
       if (!quiet) setError(undefined);
     } catch (caught) {
       if (runIdRef.current === selected) setError(message(caught));
@@ -115,12 +119,49 @@ export function App() {
     }
   }, []);
 
+  const refreshUpdates = useCallback(async (selected: string) => {
+    const current = detailRef.current;
+    if (!current || current.snapshot.runId !== selected) return;
+    const update = await getRunUpdates(selected, current.snapshot.lastSeq, current.sessionVersion);
+    if (runIdRef.current !== selected) return;
+    if (update.reloadDetail) {
+      await refreshDetail(selected, true);
+      return;
+    }
+    if (!isContiguousEventUpdate(current.snapshot.lastSeq, update.lastSeq, update.events.map((event) => event.seq))) {
+      await refreshDetail(selected, true);
+      return;
+    }
+    setDetail((existing) => {
+      if (!existing || existing.snapshot.runId !== selected) return existing;
+      const bySeq = new Map(existing.events.map((event) => [event.seq, event]));
+      for (const event of update.events) bySeq.set(event.seq, event);
+      const events = [...bySeq.values()].sort((left, right) => left.seq - right.seq).slice(-600);
+      return {
+        ...existing,
+        events,
+        controlView: update.controlView,
+        ...(update.observationQueue ? { observationQueue: update.observationQueue } : {}),
+        snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase, generation: update.generation },
+        active: update.active,
+        updatedAt: update.updatedAt,
+        sessionVersion: update.sessionVersion,
+        // Sidebar counts are derived from the same lightweight projection as
+        // the updates response, so the active Run does not display stale totals.
+        counts: update.counts,
+      };
+    });
+  }, [refreshDetail]);
+
   const refreshPollerRef = useRef<SingleFlightPoller | undefined>(undefined);
   if (!refreshPollerRef.current) {
     refreshPollerRef.current = new SingleFlightPoller(async (mode) => {
       await refreshRuns();
       const selected = runIdRef.current;
-      if (selected) await refreshDetail(selected, mode === "background");
+      if (selected) {
+        if (mode === "background" && !shouldRefreshFullDetail(Date.now(), lastFullDetailRefreshAtRef.current)) await refreshUpdates(selected);
+        else await refreshDetail(selected);
+      }
     });
   }
   const refreshPoller = refreshPollerRef.current;
@@ -150,9 +191,8 @@ export function App() {
   useEffect(() => {
     if (!bootstrap) return;
     const timer = window.setInterval(() => {
-      // A hidden tab must not poll at all: each tick costs a full Run detail
-      // payload, and nobody is looking at it. The rule lives in isPollingAllowed
-      // so it is tested rather than inlined here.
+      // A hidden tab must not poll at all. The rule lives in
+      // isPollingAllowed so it is tested rather than inlined here.
       if (!isPollingAllowed(document.visibilityState)) return;
       void refreshPoller.poll(false).catch((caught) => setError(message(caught)));
     }, bootstrap.refreshIntervalMs);
@@ -943,7 +983,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
   const [cacheRetention, setCacheRetention] = useState<ProviderCacheRetention>("short");
   const [supportsLongCacheRetention, setSupportsLongCacheRetention] = useState(false);
-  const [maxConcurrentRequests, setMaxConcurrentRequests] = useState(1);
+  const [maxConcurrentRequests, setMaxConcurrentRequests] = useState(4);
   const [models, setModels] = useState<string[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [clearApiKey, setClearApiKey] = useState(false);
@@ -964,7 +1004,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   };
 
   const createNew = () => {
-    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setSupportsLongCacheRetention(false); setMaxConcurrentRequests(1); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setSupportsLongCacheRetention(false); setMaxConcurrentRequests(4); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const discover = async () => {

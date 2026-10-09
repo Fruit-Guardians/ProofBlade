@@ -313,6 +313,45 @@ test("folds a sealed projection tail without reconciling during GUI polling", as
   }
 });
 
+test("Run updates retry a revision race and never advance beyond returned events", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-update-race-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "CHAT-UPDATE-RACE-001";
+    const created = await data.createConversation({ runId, title: "update race", workspacePath: root });
+    const services = (data as unknown as { services: { control: import("@proofblade/materials").ControlStore } }).services;
+    const originalEventsAfter = services.control.eventsAfter.bind(services.control);
+    let injected = false;
+    services.control.eventsAfter = async (...args) => {
+      const batch = await originalEventsAfter(...args);
+      if (!injected) {
+        injected = true;
+        await services.control.append(runId, [{
+          schemaVersion: 1,
+          lane: "executor",
+          correlationId: `${runId}:race`,
+          actor: "model",
+          type: "model_usage",
+          payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+        }], { persistProjection: false });
+      }
+      return batch;
+    };
+    (data as unknown as { listRuns: () => Promise<never> }).listRuns = async () => {
+      throw new Error("updates must not scan the global Run list");
+    };
+
+    const update = await data.updates(runId, created.lastSeq);
+    assert.equal(injected, true);
+    assert.equal(update.reloadDetail, false);
+    assert.equal(update.lastSeq, created.lastSeq + 1);
+    assert.deepEqual(update.events.map((event) => event.seq), [update.lastSeq]);
+  } finally {
+    await data.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("RunDetail exposes the durable observation queue projection for the GUI", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-observation-queue-"));
   try {
@@ -335,6 +374,44 @@ test("RunDetail exposes the durable observation queue projection for the GUI", a
     assert.doesNotMatch(JSON.stringify(detail.observationQueue), /secret output/);
     await data.close();
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Run updates replace generation and clear the previous fixture observation queue after reset", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-fixture-reset-update-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "GUI-FIXTURE-RESET-UPDATE-001";
+    await data.createTaskFromTemplate({ runId, templateId: "web-source-1", objective: "inspect fixture reset updates" });
+    const services = (data as unknown as {
+      services: {
+        control: import("@proofblade/materials").ControlStore;
+        fixtureControl: { reset: (requestedRunId: string, generation: number) => Promise<unknown> };
+      };
+    }).services;
+    await new RunEventIngress(services.control).enqueue(runId, {
+      source: "job",
+      kind: "job.output",
+      priority: "urgent",
+      correlationId: "fixture-reset-observation",
+      payload: { jobId: "old-generation-job", cursor: 1 },
+    });
+    const before = await data.getRun(runId);
+    assert.equal(before.observationQueue.total, 1);
+
+    const nextGeneration = before.snapshot.generation + 1;
+    await services.fixtureControl.reset(runId, nextGeneration);
+    const update = await data.updates(runId, before.snapshot.lastSeq);
+
+    assert.equal(update.generation, nextGeneration);
+    assert.equal(update.events.some((event) => event.type === "fixture_reset"), true);
+    assert.equal(update.reloadDetail, true, "fixture_reset must replace every generation-scoped snapshot projection");
+    assert.ok(update.observationQueue, "fixture_reset must return a replacement queue projection");
+    assert.equal(update.observationQueue.total, 0);
+    assert.deepEqual(update.observationQueue.items, []);
+  } finally {
+    await data.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });
   }
 });

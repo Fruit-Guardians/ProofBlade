@@ -1,12 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createAssistantMessageEventStream, type AssistantMessage, type AssistantMessageEvent, type AssistantMessageEventStream, type Model, type ProviderStreams } from "@earendil-works/pi-ai";
-import { ProviderRequestScheduler } from "../src/runtime/provider-scheduler.js";
+import { configuredMaxConcurrentRequests, ProviderRequestScheduler } from "../src/runtime/provider-scheduler.js";
 
 const model: Model<"openai-completions"> = {
   id: "scheduler-model", name: "scheduler-model", api: "openai-completions", provider: "scheduler-provider",
   baseUrl: "http://127.0.0.1:1/v1", reasoning: false, input: ["text"], cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1024, maxTokens: 32,
 };
+
+test("the default concurrency is four and the scheduler keeps FIFO backpressure", async () => {
+  assert.equal(configuredMaxConcurrentRequests(undefined), 4);
+  const scheduler = new ProviderRequestScheduler();
+  let active = 0;
+  let peak = 0;
+  const order: string[] = [];
+  const source: ProviderStreams = {
+    stream: (_model, context) => delayedStream(25, () => { active -= 1; }, () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      order.push(String(context.messages.at(-1)?.content));
+    }),
+    streamSimple: (_model, context) => delayedStream(25, () => { active -= 1; }, () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      order.push(String(context.messages.at(-1)?.content));
+    }),
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-default", maxConcurrentRequests: configuredMaxConcurrentRequests(undefined) });
+  await Promise.all(Array.from({ length: 5 }, (_, index) => collect(wrapped.stream(model, { messages: [{ role: "user", content: `request-${index}`, timestamp: 1 }] }))));
+  assert.equal(peak, 4);
+  assert.deepEqual(order, ["request-0", "request-1", "request-2", "request-3", "request-4"]);
+  assert.equal(scheduler.statuses()[0]?.active, 0);
+});
 
 test("provider scheduler limits concurrent streams and drains FIFO", async () => {
   const scheduler = new ProviderRequestScheduler();
@@ -176,6 +201,29 @@ test("a stalled stream does not permanently block the queue behind it", async ()
   assert.equal(a.stopReason, "error");        // the stalled one timed out
   assert.equal(b.stopReason, "stop");          // the queued one still ran
   assert.equal(secondStarted, true);
+});
+
+test("abort releases an active stalled stream when the idle watchdog is disabled", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0 });
+  const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-abort-no-watchdog", maxConcurrentRequests: 1 };
+  const controller = new AbortController();
+  let secondStarted = false;
+  const source: ProviderStreams = {
+    stream: (_m, ctx) => String(ctx.messages.at(-1)?.content) === "stall"
+      ? createAssistantMessageEventStream()
+      : (secondStarted = true, delayedStream(5)),
+    streamSimple: () => delayedStream(5),
+  };
+  const wrapped = scheduler.wrap(source, scope);
+  const first = collect(wrapped.stream(model, { messages: [{ role: "user", content: "stall", timestamp: 1 }] }, { signal: controller.signal }));
+  const second = collect(wrapped.stream(model, { messages: [{ role: "user", content: "healthy", timestamp: 1 }] }));
+  setTimeout(() => controller.abort(), 20);
+
+  const [aborted, healthy] = await Promise.all([first, second]);
+  assert.equal(aborted.stopReason, "aborted");
+  assert.equal(healthy.stopReason, "stop");
+  assert.equal(secondStarted, true);
+  assert.equal(scheduler.statuses().find((status) => status.endpoint === scope.endpoint)?.active ?? 0, 0);
 });
 
 test("a retryable mid-stream error is retried at the stream boundary and the eventual success is delivered", async () => {

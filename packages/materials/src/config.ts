@@ -55,7 +55,10 @@ export interface ModelProfileConfig {
   maxTokens: number;
   requestTimeoutMs: number;
   maxRetries: number;
-  /** Maximum simultaneous HTTP requests for this Provider/model in one process. */
+  /**
+   * Maximum simultaneous HTTP requests for this Provider/model in one process.
+   * Defaults to 4; set 1 for upstreams that require serialization.
+   */
   maxConcurrentRequests?: number;
   /** Maximum provider-requested Retry-After delay accepted for one attempt. */
   maxRetryDelayMs?: number;

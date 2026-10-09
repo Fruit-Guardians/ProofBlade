@@ -127,6 +127,21 @@ test("[contract:read-path-parse-is-counted] a read at an unchanged revision pars
   }
 });
 
+test("eventsAfter returns only the cached suffix without another parse", async () => {
+  const { store, control, cleanup } = await fixture("BUDGET-SUFFIX", 200);
+  try {
+    await control.events("BUDGET-SUFFIX");
+    const warm = parsed(store);
+    const suffix = await control.eventsAfter("BUDGET-SUFFIX", 195);
+
+    assert.deepEqual(suffix.events.map((event) => event.seq), [196, 197, 198, 199, 200, 201]);
+    assert.equal(suffix.lastSeq, 201);
+    assert.deepEqual(parsed(store), warm, "a suffix read at the cached revision must not parse the stream again");
+  } finally {
+    await cleanup();
+  }
+});
+
 test("[contract:read-path-parse-is-counted] a new revision is parsed and counted", async () => {
   const { store, control, writer, cleanup } = await fixture("BUDGET-3", 200);
   try {
