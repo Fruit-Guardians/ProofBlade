@@ -950,7 +950,7 @@
 ### CodingClaimVerifier
 - Kind: `class`
 - Signature: `CodingClaimVerifier`
-- Source: [src/verification/claim-verification.ts:911](../../../packages/materials/src/verification/claim-verification.ts:911)
+- Source: [src/verification/claim-verification.ts:954](../../../packages/materials/src/verification/claim-verification.ts:954)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding claim verifier class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3740,7 +3740,7 @@
 ### requiresClaimVerification
 - Kind: `function`
 - Signature: `(userPrompt: string, assistantText?: string): boolean`
-- Source: [src/verification/claim-verification.ts:928](../../../packages/materials/src/verification/claim-verification.ts:928)
+- Source: [src/verification/claim-verification.ts:971](../../../packages/materials/src/verification/claim-verification.ts:971)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: requires claim verification operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9012,7 +9012,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: candidates operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/tool-catalog.test.ts`
+- Tests: `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/tool-catalog.test.ts`
 
 ### CapabilityBackendResolver.resolve
 - Kind: `method`
@@ -14144,7 +14144,7 @@
 ### TaskResultVerifier.project
 - Kind: `method`
 - Signature: `(userPrompt: string, assistantText: string): Promise<ResultVerificationProjection>`
-- Source: [src/verification/claim-verification.ts:717](../../../packages/materials/src/verification/claim-verification.ts:717)
+- Source: [src/verification/claim-verification.ts:760](../../../packages/materials/src/verification/claim-verification.ts:760)
 - Export: `@proofblade/materials`
 - Summary: Rebuild verification exclusively from durable current-generation state.
 - Summary source: `tsdoc`

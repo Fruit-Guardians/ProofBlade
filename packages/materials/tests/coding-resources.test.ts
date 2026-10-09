@@ -708,13 +708,13 @@ test("a chat with no task-bound verifier rule says why verify_result cannot pass
   }
 });
 
-test("verification reuses the tree that already covers its supporting evidence", async () => {
+test("verification keeps one tree per candidate, and only for the same candidate", async () => {
   // CHAT-1790096643438 ended with two trees over one conclusion: TREE-6254a5fe (the
-  // verification chain, rooted at a Completion that could never be accepted) beside
-  // TREE-b8f448bb (the agent's own), sharing the supporting Evidence and the
-  // Artifact it points at. The verification reuses Evidence a tree already covers,
-  // so the second view adds nothing and hangs off a dead node. One tree per
-  // conclusion; the provenance rides on the reasoning edges.
+  // verification chain) beside TREE-b8f448bb (the agent's own), sharing the supporting
+  // Evidence and the Artifact it points at. One tree per conclusion -- but the
+  // conclusion is the *candidate*, so sharing an upstream Evidence must not merge two
+  // different candidates, and a merge must add this attempt's nodes rather than return
+  // the old id.
   const root = resolve(import.meta.dirname, "../../..", "tmp");
   await mkdir(root, { recursive: true });
   const dir = await mkdtemp(join(root, "coding-tree-reuse-"));
@@ -733,7 +733,9 @@ test("verification reuses the tree that already covers its supporting evidence",
   chat.verification.command = undefined;
   await services.control.createRun(runId, chat);
   const candidate = "PB{tree_reuse_candidate}";
+  const otherCandidate = "PB{a_different_conclusion}";
   await writeFile(join(dir, "flag-only.mjs"), `process.stdout.write('${candidate}\\n');\n`, "utf8");
+  await writeFile(join(dir, "other-flag.mjs"), `process.stdout.write('${otherCandidate}\\n');\n`, "utf8");
   const env = new NodeExecutionEnv({ cwd: dir });
   const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
   const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
@@ -752,18 +754,44 @@ test("verification reuses the tree that already covers its supporting evidence",
     // returns a trimmed projection, and this case is about the tree, not the tool.
     const recorded = await evidenceGraph.recordEvidence({ name: "supporting evidence", summary: "supporting observation", artifactIds: [supporting.id], tags: ["supporting"], claim: "The supporting observation holds for this run." });
     const evidenceId = recorded.evidenceId;
-    const treeId = recorded.treeId;
-    assert.ok(evidenceId && treeId, "recording evidence must produce an evidence id and a tree");
+    const agentTreeId = recorded.treeId;
+    assert.ok(evidenceId && agentTreeId, "recording evidence must produce an evidence id and a tree");
     const before = await services.control.snapshot(runId);
-    assert.deepEqual(Object.keys(before.reasoningTrees), [treeId], "the agent's own record created exactly one tree");
-    assert.ok(before.reasoningTrees[treeId]!.nodeIds.includes(evidenceId), "and that tree covers the supporting evidence");
+    assert.deepEqual(Object.keys(before.reasoningTrees), [agentTreeId], "the agent's own record created exactly one tree");
 
-    const verified = await executeTool("verify_result", { result: candidate, command: "node flag-only.mjs", evidenceIds: [evidenceId] }, context);
-    const details = verified.details as Record<string, unknown>;
-    assert.equal(details.treeReused, true, "the verification must not open a second tree over the same conclusion");
-    assert.equal(details.treeId, treeId, "it reports the tree it reused");
-    const after = await services.control.snapshot(runId);
-    assert.deepEqual(Object.keys(after.reasoningTrees), [treeId], "still exactly one tree after verification");
+    // First verification of the candidate.
+    const first = await executeTool("verify_result", { result: candidate, command: "node flag-only.mjs", evidenceIds: [evidenceId] }, context);
+    const firstDetails = first.details as Record<string, unknown>;
+    assert.equal(firstDetails.treeReused, false, "the first verification opens its own tree");
+    assert.notEqual(firstDetails.treeId, agentTreeId, "which is not the agent's tree over a different conclusion");
+    const afterFirst = await services.control.snapshot(runId);
+    assert.equal(Object.keys(afterFirst.reasoningTrees).length, 2);
+    const verificationTreeId = String(firstDetails.treeId);
+    assert.ok(afterFirst.reasoningTrees[verificationTreeId]!.nodeIds.includes(String(firstDetails.completionId)), "the tree carries this attempt's Completion");
+
+    // The same candidate again: one conclusion, so the second attempt merges into the
+    // first tree instead of opening a third one, and its new nodes stay visible.
+    const second = await executeTool("verify_result", { result: candidate, command: "node flag-only.mjs --again", evidenceIds: [evidenceId] }, context);
+    const secondDetails = second.details as Record<string, unknown>;
+    assert.equal(secondDetails.treeReused, true, "the same candidate is one conclusion");
+    assert.equal(secondDetails.treeId, verificationTreeId, "so it reports the tree it merged into");
+    const merged = (await services.control.snapshot(runId)).reasoningTrees[verificationTreeId]!;
+    assert.ok(merged.nodeIds.includes(String(secondDetails.completionId)), "and this attempt's Completion is in it, not just its id returned");
+    assert.ok(merged.nodeIds.includes(String(secondDetails.artifactId)), "along with this attempt's receipt Artifact");
+    assert.ok(merged.nodeIds.includes(String(firstDetails.completionId)), "while the earlier attempt stays represented");
+    assert.equal(Object.keys((await services.control.snapshot(runId)).reasoningTrees).length, 2, "still no third tree");
+
+    // A different candidate that happens to reuse the same upstream Evidence is a
+    // different conclusion: it must not be folded into the first candidate's tree.
+    const other = await executeTool("verify_result", { result: otherCandidate, command: "node other-flag.mjs", evidenceIds: [evidenceId] }, context);
+    const otherDetails = other.details as Record<string, unknown>;
+    assert.equal(otherDetails.treeReused, false, "a different candidate is a different conclusion");
+    assert.notEqual(otherDetails.treeId, verificationTreeId);
+    const finalTrees = Object.values((await services.control.snapshot(runId)).reasoningTrees);
+    assert.equal(finalTrees.length, 3, "three conclusions, three trees");
+    const otherTree = finalTrees.find((tree) => tree.id === String(otherDetails.treeId))!;
+    assert.ok(otherTree.nodeIds.includes(String(otherDetails.completionId)));
+    assert.ok(!otherTree.nodeIds.includes(String(firstDetails.completionId)), "and it does not claim the first candidate's Completion");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });

@@ -687,9 +687,52 @@ export class TaskResultVerifier {
     // provenance either way) and, when the Completion cannot be accepted, it hangs a
     // tree off a dead node. If any node this chain would add is already in a tree,
     // that tree is the record and the caller is told it was reused.
-    const existingTree = Object.values(graphSnapshot.reasoningTrees).find((tree) => tree.nodeIds.some((nodeId) => plannedNodeIds.includes(nodeId)));
-    const createdTree = existingTree
-      ? undefined
+    // One tree per conclusion -- where the conclusion is the candidate itself.
+    //
+    // The first version of this reused any tree that shared *any* planned node, which
+    // review correctly rejected on two counts: sharing an upstream supporting Evidence
+    // does not make two candidates the same conclusion, and returning the old tree id
+    // without adding the new nodes left this attempt's Completion, result Artifact and
+    // verifier Evidence invisible to `inspectTree()` and the reasoning forest. The same
+    // candidate verified twice is the case this exists for (CHAT-1790096643438 ran the
+    // second attempt after the first command failed).
+    //
+    // So the identity is the candidate hash, carried as a tag this method owns end to
+    // end -- not inferred from node overlap -- and a match merges this chain into that
+    // tree with `updateTree`, which recomputes the upstream closure so every node of
+    // this attempt stays reachable.
+    // The tag carries 24 hex characters (96 bits) of the candidate hash because
+    // `validateReasoningTags` caps a tag at 40 characters. A collision would at worst
+    // group two candidates that agree on 96 bits of the same digest, and grouping is
+    // not a verification claim: `locallyJudged` is decided before the tree is chosen.
+    const conclusionTag = `candidate:${candidateHash.slice(0, 24)}`;
+    const conclusionTree = Object.values(graphSnapshot.reasoningTrees).find((tree) => tree.tags.includes(conclusionTag));
+    if (conclusionTree) {
+      // A tree must be connected from its root (`validateReasoningTree` walks edges in
+      // both directions), and this attempt is a separate cluster: its own Completion,
+      // Artifacts and Evidence hang off each other, and nothing links them to the
+      // earlier conclusion. Without this edge the merge produces exactly what the
+      // platform run reported -- "Reasoning tree contains disconnected nodes:
+      // A-1db773a1..., C-8454dfb4..." -- so record what the second attempt is: the same
+      // candidate, verified again, supporting the conclusion already in the tree.
+      await graph.linkNodesBatch([{
+        from: completionId,
+        to: conclusionTree.rootNodeId,
+        relation: "supports",
+        explanation: `Second verification of candidate ${candidateHash.slice(0, 12)}... supports the conclusion this tree already records.`,
+        confidence: 1,
+      }]);
+    }
+    const createdTree = conclusionTree
+      ? (await graph.updateTree({
+        treeId: conclusionTree.id,
+        nodeIds: [...new Set([...conclusionTree.nodeIds, ...plannedNodeIds])],
+        // A tree may not relate to itself, and this attempt's supporting Evidence is by
+        // definition already in the tree being merged into, so the recomputed set
+        // contains it.
+        relatedTreeIds: [...new Set([...conclusionTree.relatedTreeIds, ...relatedTreeIds])].filter((id) => id !== conclusionTree.id),
+        ...(locallyJudged ? { status: "SUPPORTED" as const } : {}),
+      })).tree
       : (await graph.createTree({
         name: locallyJudged ? (resultArtifactMode ? "结果 Artifact 验证" : "最终候选复现") : "候选观察链",
         summary: locallyJudged
@@ -706,11 +749,11 @@ export class TaskResultVerifier {
         rootNodeId: completionId,
         nodeIds: plannedNodeIds,
         relatedTreeIds,
-        tags: resultArtifactMode ? ["verification", "result", "reproduction"] : ["verification", "candidate", "reproduction"],
+        tags: [...(resultArtifactMode ? ["verification", "result", "reproduction"] : ["verification", "candidate", "reproduction"]), conclusionTag],
         status: locallyJudged ? "SUPPORTED" : "ACTIVE",
       })).tree;
 
-    return { verified: locallyJudged, acceptance: locallyJudged ? "verified" : "observation_only", treeId: (existingTree ?? createdTree)!.id, treeReused: existingTree !== undefined, candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
+    return { verified: locallyJudged, acceptance: locallyJudged ? "verified" : "observation_only", treeId: createdTree.id, treeReused: conclusionTree !== undefined, candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
   }
 
   /** Rebuild verification exclusively from durable current-generation state. */
