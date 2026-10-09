@@ -203,6 +203,29 @@ test("a stalled stream does not permanently block the queue behind it", async ()
   assert.equal(secondStarted, true);
 });
 
+test("abort releases an active stalled stream when the idle watchdog is disabled", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0 });
+  const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-abort-no-watchdog", maxConcurrentRequests: 1 };
+  const controller = new AbortController();
+  let secondStarted = false;
+  const source: ProviderStreams = {
+    stream: (_m, ctx) => String(ctx.messages.at(-1)?.content) === "stall"
+      ? createAssistantMessageEventStream()
+      : (secondStarted = true, delayedStream(5)),
+    streamSimple: () => delayedStream(5),
+  };
+  const wrapped = scheduler.wrap(source, scope);
+  const first = collect(wrapped.stream(model, { messages: [{ role: "user", content: "stall", timestamp: 1 }] }, { signal: controller.signal }));
+  const second = collect(wrapped.stream(model, { messages: [{ role: "user", content: "healthy", timestamp: 1 }] }));
+  setTimeout(() => controller.abort(), 20);
+
+  const [aborted, healthy] = await Promise.all([first, second]);
+  assert.equal(aborted.stopReason, "aborted");
+  assert.equal(healthy.stopReason, "stop");
+  assert.equal(secondStarted, true);
+  assert.equal(scheduler.statuses().find((status) => status.endpoint === scope.endpoint)?.active ?? 0, 0);
+});
+
 test("a retryable mid-stream error is retried at the stream boundary and the eventual success is delivered", async () => {
   const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
   let calls = 0;

@@ -411,6 +411,9 @@ export class DebugDataService {
       }
       const reloadDetail = snapshot.status === "PAUSED"
         || ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)
+        // Reset invalidates generation-scoped snapshot projections beyond the
+        // lightweight fields carried here (tool preparation, resources, gates).
+        || batch.events.some((event) => event.type === "fixture_reset")
         || batch.events.length > clientEventLimit
         || afterSeq > batch.lastSeq
         || (knownSessionVersion !== undefined && knownSessionVersion !== sessionVersionToken);

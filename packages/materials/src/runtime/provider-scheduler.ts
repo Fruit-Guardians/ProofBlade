@@ -223,7 +223,8 @@ export class ProviderRequestScheduler {
           }
           continue; // discard this attempt's buffer, re-issue
         }
-        if (errorMessage && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage))) {
+        const requestAborted = outcome.kind === "threw" && outcome.error instanceof ProviderRequestQueueAbortedError;
+        if (errorMessage && !requestAborted && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage))) {
           await notifyObserver(() => observer?.recoveryRequired?.(requestId, {
             ...scope,
             attempts: attempt + 1,
@@ -274,7 +275,8 @@ export class ProviderRequestScheduler {
    *   - error:   the stream reached a real `error` event (buffered, terminal).
    *   - threw:   the stream stalled (idle watchdog) or the iterator threw before
    *              any terminal event — a synthetic error is derived by the caller.
-   * Each event resets the idle timer; if none arrives within idleTimeoutMs the
+   * External cancellation always races the iterator, even when idleTimeoutMs is
+   * zero. Each event resets the idle timer; if none arrives within idleTimeoutMs the
    * attempt is treated as stalled and unwinds (best-effort aborting the fetch),
    * so a provider that ignores the abort signal still cannot hang the slot.
    * Buffering costs live token streaming during a call, which the fleet does not
@@ -292,19 +294,6 @@ export class ProviderRequestScheduler {
   ): Promise<AttemptOutcome> {
     const events: AssistantMessageEvent[] = [];
     const stats: AttemptStats = { maxInterEventIdleMs: 0 };
-    if (this.idleTimeoutMs <= 0) {
-      for await (const event of source) {
-        const now = Date.now();
-        const idleMs = Math.max(0, now - (stats.lastEventAt ?? attemptStartedAt));
-        stats.maxInterEventIdleMs = Math.max(stats.maxInterEventIdleMs, idleMs);
-        stats.lastEventAt = now;
-        observeProviderEvent(observer, requestId, attempt, attemptStartedAt, stats, event, idleMs, scope);
-        events.push(event);
-        if (event.type === "done") return { kind: "success", events, message: event.message, stats };
-        if (event.type === "error") return { kind: "error", events, event, stats };
-      }
-      return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };
-    }
     const iterator = source[Symbol.asyncIterator]();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let lastEventAt = attemptStartedAt;
@@ -313,15 +302,18 @@ export class ProviderRequestScheduler {
     // and must not share one timer handle.
     let rearm: () => void = () => {};
     const stall = new Promise<never>((_, reject) => {
-        rearm = (): void => {
-          clearTimeout(timer);
-          timer = setTimeout(() => {
-            const idleMs = Math.max(0, Date.now() - lastEventAt);
-            const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
-            void notifyObserver(() => observer?.stalled?.(requestId, { ...scope, attempt, idleMs, reason: reason.message }));
-            idle.abort(reason);
-            reject(reason);
-          }, this.idleTimeoutMs);
+      // A disabled watchdog leaves this promise pending forever, while the
+      // request-abort race below remains active and can still unwind the slot.
+      if (this.idleTimeoutMs <= 0) return;
+      rearm = (): void => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const idleMs = Math.max(0, Date.now() - lastEventAt);
+          const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
+          void notifyObserver(() => observer?.stalled?.(requestId, { ...scope, attempt, idleMs, reason: reason.message }));
+          idle.abort(reason);
+          reject(reason);
+        }, this.idleTimeoutMs);
       };
       rearm();
     });
@@ -333,9 +325,9 @@ export class ProviderRequestScheduler {
     try {
       for (;;) {
         const pending = iterator.next();
-        // If the stall timer wins the race, `pending` is left in flight and may
-        // later reject once the abort tears down the fetch; swallow that so it
-        // never surfaces as an unhandled rejection.
+        // If cancellation or the stall timer wins the race, `pending` is left
+        // in flight and may later reject once abort tears down the fetch;
+        // observe that rejection so it never becomes unhandled.
         pending.catch(() => {});
         const next = await Promise.race([pending, stall, requestAbort]);
         if (next.done) return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };

@@ -406,6 +406,7 @@ test("Run updates replace generation and clear the previous fixture observation 
 
     assert.equal(update.generation, nextGeneration);
     assert.equal(update.events.some((event) => event.type === "fixture_reset"), true);
+    assert.equal(update.reloadDetail, true, "fixture_reset must replace every generation-scoped snapshot projection");
     assert.ok(update.observationQueue, "fixture_reset must return a replacement queue projection");
     assert.equal(update.observationQueue.total, 0);
     assert.deepEqual(update.observationQueue.items, []);
