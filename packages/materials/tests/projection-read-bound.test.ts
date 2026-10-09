@@ -7,7 +7,7 @@ import { ControlStore } from "../src/control/control-store.js";
 import { projectionHash } from "../src/control/reducer.js";
 import { demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
-import { JsonlControlStore } from "../src/storage/jsonl-store.js";
+import { JsonlControlStore, makeEvent } from "../src/storage/jsonl-store.js";
 
 /**
  * Read bound for the authoritative snapshot path.
@@ -255,6 +255,48 @@ test("snapshot and replay agree after a historical event is rewritten in place",
     // test is what pins that it must keep not trusting it.
     const hint = await new JsonlControlStore(runsRoot).loadProjectionHint("READBOUND-6", secret).catch(() => undefined);
     assert.ok(hint, "the hint cannot detect a size-preserving rewrite; see the comment above");
+  } finally {
+    await rm(root, { recursive: true, force: true }).catch(() => undefined);
+  }
+});
+
+test("a writer reparses a rewritten prefix before extending its event cache", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-writer-cache-"));
+  try {
+    const runId = "READBOUND-WRITER-CACHE";
+    const runsRoot = join(root, config.storage.runsDir);
+    const eventsPath = join(runsRoot, runId, "events.jsonl");
+    const eventStore = new JsonlControlStore(runsRoot);
+    const writer = new ControlStore(eventStore, undefined, secret);
+    await writer.createRun(runId, demoTask(runId, root, config));
+    await writer.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
+    assert.equal((await writer.snapshot(runId)).phase, "reconnaissance", "the writer must start with a warm event cache");
+
+    const before = await readFile(eventsPath, "utf8");
+    const phaseLine = before.split("\n").find((line) => line.includes('"phase_started"'));
+    assert.ok(phaseLine, "the phase event must be in the log");
+    const tampered = phaseLine.replace('"phase":"reconnaissance"', '"phase":"hypothesis"    ');
+    assert.equal(Buffer.byteLength(tampered), Buffer.byteLength(phaseLine), "the rewrite must preserve the event-stream size");
+    await writeFile(eventsPath, before.replace(phaseLine, tampered), "utf8");
+
+    // Append through the same JsonlControlStore instance whose cache still has
+    // the old prefix. The append must invalidate that cache instead of blessing
+    // it with the new post-append file revision.
+    const telemetry = makeEvent(runId, 3, "tool_result_recorded", "tool", "executor", {
+      toolCallId: "writer-cache-regression",
+      toolName: "read",
+      outputBytes: 1,
+      isError: false,
+    });
+    await eventStore.withRunLock(runId, async (rawWriter) => {
+      await rawWriter.append([telemetry], secret);
+    });
+
+    const warm = await writer.snapshot(runId);
+    const cold = await new ControlStore(new JsonlControlStore(runsRoot), undefined, secret).replay(runId);
+    assert.equal(warm.phase, "hypothesis", "the appending Store must observe the rewritten prefix");
+    assert.equal(warm.phase, cold.phase, "warm snapshot and cold replay must agree after the append");
+    assert.equal(warm.lastSeq, cold.lastSeq);
   } finally {
     await rm(root, { recursive: true, force: true }).catch(() => undefined);
   }

@@ -711,14 +711,20 @@ export class JsonlControlStore {
     const path = this.runPath(events[0]!.runId);
     const runId = events[0]!.runId;
     const cached = this.eventCache.get(runId);
-    const cacheCanExtend = cached !== undefined
-      && (cached.events.at(-1)?.seq ?? 0) + 1 === events[0]!.seq
-      && events.every((event, index) => event.seq === events[0]!.seq + index);
     await mkdir(dirname(path), { recursive: true });
     // Repair a torn final record left by an interrupted append before adding
     // new data. This is a cheap last-byte check in the normal case and only
     // scans backwards when a crash left an unterminated JSON line.
     await repairTrailingRecord(path);
+    // A sequence-contiguous cache is not enough to witness the bytes already on
+    // disk. Another process may have rewritten an earlier event since this
+    // instance populated the cache. Only extend a cache whose complete event
+    // revision still matches immediately before our own durable append.
+    const revisionBeforeAppend = await this.revision(runId);
+    const cacheCanExtend = cached !== undefined
+      && sameEventRevision(cached.revision, revisionBeforeAppend)
+      && (cached.events.at(-1)?.seq ?? 0) + 1 === events[0]!.seq
+      && events.every((event, index) => event.seq === events[0]!.seq + index);
     const serialized = events.map((event) => `${canonicalJson(event)}\n`).join("");
     // One append + one fsync for both single events and validated batches.
     // The lock and pre-validated reducer state preserve ordering, while the
@@ -728,9 +734,9 @@ export class JsonlControlStore {
     // Keep a warm reader cache coherent with our own append. Without this,
     // the next context/GUI read would parse the entire long event stream again
     // even though the writer already knows the exact new suffix.
+    const revision = await this.revision(runId);
+    this.eventCache.delete(runId);
     if (cacheCanExtend && cached) {
-      const revision = await this.revision(runId);
-      this.eventCache.delete(runId);
       this.eventCache.set(runId, { revision, events: [...cached.events, ...events] });
     }
   }
