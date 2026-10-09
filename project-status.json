@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T10:51:00+08:00",
+  "updatedAt": "2026-09-23T10:53:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2503,6 +2503,27 @@
         "变异验证：把 `long &&` 去掉（恢复上一版条件）→ 新用例 not ok（恢复后通过）",
         "tool-repeat-breaker.test.ts 35 用例 fail 0；npx tsc -b exit 0",
         "边界：超时观察若同时满足长命令启发式（命令文本里带 timeout N），仍由慢命令分支优先裁决——这是有意的顺序，长命令预算是更强信号；测试因此用「命令文本无循环、因工具超时而失败」的形态验证 timeout 分支"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-014",
+      "occurredAt": "2026-09-23T08:40:00+08:00",
+      "summary": "按审查意见修 PR #255：旧 projection 缺 toolCalls 字段时，applyTail 只会折叠 lastSeq 之后的事件，从 0 累加会把「尾部调用数」当成「本 Run 的调用数」（历史 100 次 + 新 1 次会被报成 1）。现在新 projection 一律带确定值，旧 projection 保持「未知」。",
+      "branch": "fix/tool-call-count",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "control/reducer.ts：createInitialSnapshot 起始 toolCalls=0，使本版本写出的每个 projection 都带确定计数——否则「首个工具结果之前写下的 projection」与「字段存在之前写下的旧 projection」无法区分",
+        "control/control-store.ts：applyTail 在 base.toolCalls === undefined 时把折叠结果重置为 undefined（未知保持未知，调用方据此省略该数字），而不是让 reducer 从 0 累加成尾部数量；完整 replay 仍然精确",
+        "domain/types.ts：RunSnapshot.toolCalls 的文档改为「undefined = 不知道（旧 projection 被尾部折叠）」，并写明新 projection 一律确定",
+        "测试新增两条：①旧形态 projection（取真实快照后删除该字段，经 saveProjection 正常封印）再追加两次调用，冷读必须折叠尾部（lastSeq 前进）而 toolCalls 保持 undefined、replay 仍报 4；②本版本写出的 projection 跨尾部折叠仍然精确（3+2=5）"
+      ],
+      "validation": [
+        "变异验证：删掉 applyTail 里的重置 → 旧 projection 用例 not ok（恢复后通过）",
+        "tool-call-count + control-store + projection-read-bound 共 29 用例 fail 0；fast 阶段 1076/1080（4 skipped）fail 0；npx tsc -b exit 0",
+        "边界：冷读才有投影路径——snapshotCache 命中即返回，revision 变化则直接 replay，因此本修复只作用于「重启后第一次读 + 旧投影」这一真实场景"
       ]
     },
     {

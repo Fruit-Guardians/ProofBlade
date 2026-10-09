@@ -21,6 +21,11 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     domainPhase: "INTAKE",
     generation: 0,
     lastSeq: 0,
+    // Known from the start, so every projection this build writes carries a definite
+    // count. Without it, a projection written before the first tool result would be
+    // indistinguishable from one written before the field existed, and `applyTail`
+    // would have to report the count as unknown for the rest of the Run.
+    toolCalls: 0,
     facts: {},
     observations: {},
     evidence: {},
