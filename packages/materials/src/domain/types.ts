@@ -1037,6 +1037,22 @@ export interface RunSnapshot {
   domainPhase: DomainPhase;
   generation: number;
   lastSeq: number;
+  /**
+   * Tool results folded into this snapshot -- how many tools the model has called.
+   *
+   * The prompt used to present `Object.keys(snapshot.effects).length` as the tool
+   * budget, and the coding lane's `bash`/`read`/`edit`/`write` never enter the
+   * Effect Journal: CHAT-1790096643438 made ten tool calls and read "2 used, 998
+   * remaining". PR #250 renamed that counter to what it measures; this one counts
+   * the real thing.
+   *
+   * Undefined means "not known": a Run whose durable projection was written before
+   * this field existed, then extended by a tail fold, cannot see its own earlier tool
+   * results. Callers must omit the number rather than print a lower bound as if it were
+   * the count; a full `replay()` is exact, and `createInitialSnapshot` starts the
+   * counter at 0 so every projection written from now on carries a definite value.
+   */
+  toolCalls?: number;
   startedAt?: string;
   finishedAt?: string;
   facts: Record<string, Fact>;
