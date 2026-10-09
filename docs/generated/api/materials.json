@@ -33,7 +33,7 @@
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "6be0c85d69b28efd4cd597e6e71eec1a0b0c16ed5d0de3946c298a890a727c22",
     "src/context/checkpoint.ts": "afae1dc4d38a8e1288dd78f36c68b43e8b0af5928e49e076431b6e7ec214c497",
-    "src/context/compiler.ts": "644420b42c4fceb2f35f5a6044439e9c22e1afe64c9f26c855f8db1521221ca7",
+    "src/context/compiler.ts": "62300b4788870ce09f8c3b53bbb90fc3cec5cd30622b7755ec5cad17f870e0e6",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
     "src/context/model-context-frame.ts": "2b9465991409ffa8fab2c5b4075e8b82373ac531408faccd86c643c41762ee17",
@@ -49,7 +49,7 @@
     "src/domain/general-task-contract.ts": "db1a541271ba0d280ea332097ffc2f9984915b4b390af55f44305a2c22967e24",
     "src/domain/handoff.ts": "c8b05fccff8b0751c98aab3bd8ef5702a1c07fa85084e70b2a72436b4d88f88c",
     "src/domain/intent.ts": "68773dfc14034905acf9de2d19fe03fae8efebe6c8717d461a308d5784761c9c",
-    "src/domain/phase-budget.ts": "b24231dc02e17149347cf84bc2fa6a1178eb27291f6725d56cf48e0091acd6ad",
+    "src/domain/phase-budget.ts": "47af0fe408e15eb825933452b8125ffb807a1a478a28844742e4926cb80387bc",
     "src/domain/phase-gate.ts": "0e91f8f8476404383fd2f8fde441ef44e3593621c5dff9f45e1233d7530749b8",
     "src/domain/reasoning.ts": "8b963b8589782b26805e02dad008b06def6ed33b75d95a05fd6cb0005de2fec0",
     "src/domain/records.ts": "0959042f6f622d5a773c21e58c8f10917ec12f8d7fb73a347fc478283fe147b6",
@@ -6028,7 +6028,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 647,
+      "line": 650,
       "signature": "(output: ContextBuildOutput, maxTokens?: number): string",
       "summary": "Render the compiler output for providers that accept one system prompt.",
       "summarySource": "tsdoc",
@@ -6056,7 +6056,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 652,
+      "line": 655,
       "signature": "(snapshot: RunSnapshot, runId: string): ContextBuildOutput",
       "summary": "Inferred summary: snapshot context operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -6684,7 +6684,7 @@
       "visibility": "public",
       "module": "src/domain/phase-budget.ts",
       "exportPath": "@proofblade/materials",
-      "line": 56,
+      "line": 74,
       "signature": "(targetKind: TargetKind, configured?: number): number",
       "summary": "Inferred summary: max replans for operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -6702,7 +6702,7 @@
       "visibility": "public",
       "module": "src/domain/phase-budget.ts",
       "exportPath": "@proofblade/materials",
-      "line": 24,
+      "line": 42,
       "signature": "(snapshot: RunSnapshot, now?: number): PhaseBudgetView",
       "summary": "Derive the bounded recovery budget from durable Run state. Callers may pass",
       "summarySource": "tsdoc",
@@ -6715,7 +6715,7 @@
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts"
       ],
-      "structureHash": "4c8a59a9d65244dea6192eeb7caa149fa97472d20d7596ffdf297127c308fe49"
+      "structureHash": "56bb8c69935d9bb293f1d47da2a32750c7a96a3a2c6493d14894e77bdc646500"
     },
     {
       "id": "@proofblade/materials::function::evaluatePhaseGate",
@@ -15634,6 +15634,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/domain-records.test.ts",
         "packages/materials/tests/durability.test.ts",
@@ -32797,7 +32798,7 @@
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts"
       ],
-      "structureHash": "bd99ceecc3c06dd0b27f7641623a46c3b04d2c479430a7edc14b6a94e747bb30",
+      "structureHash": "3831d9dff84349e273d4d910cf05bc55f8800eac24355858c1d5d3c485d9cc3c",
       "parentId": "@proofblade/materials::class::ContextCompiler"
     },
     {

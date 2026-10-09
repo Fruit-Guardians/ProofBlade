@@ -1876,7 +1876,7 @@
 ### contextText
 - Kind: `function`
 - Signature: `(output: ContextBuildOutput, maxTokens?: number): string`
-- Source: [src/context/compiler.ts:647](../../../packages/materials/src/context/compiler.ts:647)
+- Source: [src/context/compiler.ts:650](../../../packages/materials/src/context/compiler.ts:650)
 - Export: `@proofblade/materials`
 - Summary: Render the compiler output for providers that accept one system prompt.
 - Summary source: `tsdoc`
@@ -1885,7 +1885,7 @@
 ### snapshotContext
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, runId: string): ContextBuildOutput`
-- Source: [src/context/compiler.ts:652](../../../packages/materials/src/context/compiler.ts:652)
+- Source: [src/context/compiler.ts:655](../../../packages/materials/src/context/compiler.ts:655)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot context operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2127,7 +2127,7 @@
 ### maxReplansFor
 - Kind: `function`
 - Signature: `(targetKind: TargetKind, configured?: number): number`
-- Source: [src/domain/phase-budget.ts:56](../../../packages/materials/src/domain/phase-budget.ts:56)
+- Source: [src/domain/phase-budget.ts:74](../../../packages/materials/src/domain/phase-budget.ts:74)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max replans for operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2135,7 +2135,7 @@
 ### phaseBudget
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, now?: number): PhaseBudgetView`
-- Source: [src/domain/phase-budget.ts:24](../../../packages/materials/src/domain/phase-budget.ts:24)
+- Source: [src/domain/phase-budget.ts:42](../../../packages/materials/src/domain/phase-budget.ts:42)
 - Export: `@proofblade/materials`
 - Summary: Derive the bounded recovery budget from durable Run state. Callers may pass
 - Summary source: `tsdoc`
@@ -5265,7 +5265,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: effect type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### EffectRequest
 - Kind: `interface`
