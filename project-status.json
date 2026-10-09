@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T10:55:00+08:00",
+  "updatedAt": "2026-09-23T10:57:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2486,6 +2486,27 @@
       ]
     },
     {
+      "id": "UPDATE-20260923-011",
+      "occurredAt": "2026-09-23T07:00:00+08:00",
+      "summary": "按审查意见修 PR #252 的两条：①旧 Run 上已经持久化的恢复债（recoveryState=RECOVERY_REQUIRED）在 OBSERVED_ONLY 判定下必须被清除，否则 GUI 与模型上下文一直显示有待恢复任务；②OBSERVED_ONLY 单独计入终态统计，不再出现「items 里有、所有汇总计数都是 0」。",
+      "branch": "fix/observed-only-recovery",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "recovery/verification-recovery.ts：reconcile() 的清除分支由「仅 TERMINAL」扩为「TERMINAL 或 OBSERVED_ONLY」，两者各用自己的 reason（observed-only 的说明是「该契约绑定不了验证规则，没有任何恢复能满足它」）；inspect() 新增 observedOnly 计数，并把 OBSERVED_ONLY 从 requiresRecovery/recoveryRequired 中排除——即使持久化状态还没被 reconcile 清掉，汇总也不再把它算作欠账",
+        "control/control-store.ts：verify 命令校验放宽一处——verification_recovery_resolved 原本要求 Completion 处于 ACCEPTED/REJECTED，而绑定不了验证规则的任务其 Completion 按构造永远停在 PROPOSED，于是这条「清除」在真实场景里会直接抛错。现在仅对「任务不绑定验证规则」豁免该前置条件，其余任务保持原强度（新用例在规则任务 + PROPOSED Completion 上断言仍然拒绝）",
+        "context/compiler.ts 与 apps/gui/src/control-view.ts：投影侧按同一判据（verificationBindsRule）不再把不可偿付的 RECOVERY_REQUIRED 呈现为待恢复（模型上下文 required=0、request state 归一为 READY；GUI 列表与计数同样过滤），这样即使没人跑过 reconcile，界面与提示也不会显示假债务",
+        "五条守卫逐一做了变异验证：inspect 排除、reconcile 清除、校验豁免、compiler 过滤、GUI 过滤各自被撤销时，对应用例转红"
+      ],
+      "validation": [
+        "verification-recovery + claim-verification-recovery + context + control-store + gui/control-view 共 55 用例 fail 0；npx tsc -b exit 0",
+        "api:index 重新生成；check:components（26 组件）与 check:change-contracts（11 契约）通过",
+        "发现并记录的实现约束：markResolved 的前置条件使「清除」在无规则任务上必然抛错（而不是静默失败），这正是需要同时改校验的原因；该豁免只作用于 !verificationBindsRule(snapshot.task)"
+      ]
+    },
+    {
       "id": "UPDATE-20260923-012",
       "occurredAt": "2026-09-23T08:00:00+08:00",
       "summary": "按审查意见重做 PR #254 的树复用判据：原来「计划节点与既有树有交集就复用」是错的——共享一个 supporting Evidence 不能证明两个候选是同一个结论，而且复用只返回旧树 id、不并入本次的 Completion/结果 Artifact/验证 Evidence，导致 inspectTree 与推理森林看不到这条验证链。现改为按候选身份（候选哈希标签）判定，命中即用 updateTree 合并新节点。",
@@ -2587,6 +2608,26 @@
         "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
         "npm run build 通过；test:ci-gates 43/43；test:platform-fault-matrix 6/6",
         "test:staged 出现一次 not ok 179 - binding transaction coordinator serializes owner commit across processes；该用例单独运行连续两次通过，且与 undici/fetch 无关（跨进程锁用例，属负载下的已知抖动），重跑结果见本轮报告"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-017",
+      "occurredAt": "2026-09-23T10:10:00+08:00",
+      "summary": "按审查意见修 PR #252 的 P2 一致性问题：无 verifier 规则的任务里，恢复请求的 state 被归一为 READY，却仍把原来的 recoveryReason（例如 'Completion is proposed but no verifier Effect is durable yet'）发给模型——一个字段说无事可做、另一个说有待处理。现在统一输出 observed-only 的说明。",
+      "branch": "fix/observed-only-recovery",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "context/compiler.ts 的 recovery.requests：绑定验证规则的任务保持原样（state + 原 reason 逐字保留）；不绑定规则的任务输出 state=READY 且 reason 改为 'Observed-only: the task binds no verification rule, so this request requires no recovery and none is possible.'",
+        "实现中确认的一件事写进了注释：recoveryRequests 本身已按 (recoveryState ?? 'READY') !== 'READY' 过滤，所以进入这个 map 的请求必然是被标记过的——因此不需要再做 '是否 flagged' 的分支（先写成条件分支属于死代码，已删除）",
+        "测试扩展（同一用例内三段）：①无规则任务 → required=0、state=READY、旧 reason 不再出现、出现 observed-only 说明；②规则任务 → 保持 required=1 且 reason 逐字保留；③无规则任务 + 从未被标记的请求（recoveryState=READY）→ 整个 requests 为空数组，什么都不说"
+      ],
+      "validation": [
+        "变异验证：把 observed-only 分支改回输出 request.recoveryReason → 用例转红（恢复后通过）",
+        "context.test.ts 20 用例 fail 0；npx tsc -b exit 0",
+        "边界：第三段最初写成 'state=READY 且不含 observed-only 文案'，实测失败并暴露了过滤规则——从未被标记的请求根本不会被投影，断言据此改为 requests=[]"
       ]
     },
     {
