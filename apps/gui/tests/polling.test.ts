@@ -159,6 +159,7 @@ test("background chat polling adopts the incremental updates endpoint", async ()
   assert.match(api, /getRunUpdates[\s\S]*afterSeq/);
   assert.match(app, /mode === "background"[\s\S]*await refreshUpdates/);
   assert.match(app, /shouldRefreshFullDetail/);
+  assert.match(app, /generation: update\.generation/);
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {

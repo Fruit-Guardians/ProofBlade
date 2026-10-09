@@ -142,7 +142,7 @@ export function App() {
         events,
         controlView: update.controlView,
         ...(update.observationQueue ? { observationQueue: update.observationQueue } : {}),
-        snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase },
+        snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase, generation: update.generation },
         active: update.active,
         updatedAt: update.updatedAt,
         sessionVersion: update.sessionVersion,

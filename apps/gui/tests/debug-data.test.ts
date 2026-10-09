@@ -378,6 +378,43 @@ test("RunDetail exposes the durable observation queue projection for the GUI", a
   }
 });
 
+test("Run updates replace generation and clear the previous fixture observation queue after reset", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-fixture-reset-update-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "GUI-FIXTURE-RESET-UPDATE-001";
+    await data.createTaskFromTemplate({ runId, templateId: "web-source-1", objective: "inspect fixture reset updates" });
+    const services = (data as unknown as {
+      services: {
+        control: import("@proofblade/materials").ControlStore;
+        fixtureControl: { reset: (requestedRunId: string, generation: number) => Promise<unknown> };
+      };
+    }).services;
+    await new RunEventIngress(services.control).enqueue(runId, {
+      source: "job",
+      kind: "job.output",
+      priority: "urgent",
+      correlationId: "fixture-reset-observation",
+      payload: { jobId: "old-generation-job", cursor: 1 },
+    });
+    const before = await data.getRun(runId);
+    assert.equal(before.observationQueue.total, 1);
+
+    const nextGeneration = before.snapshot.generation + 1;
+    await services.fixtureControl.reset(runId, nextGeneration);
+    const update = await data.updates(runId, before.snapshot.lastSeq);
+
+    assert.equal(update.generation, nextGeneration);
+    assert.equal(update.events.some((event) => event.type === "fixture_reset"), true);
+    assert.ok(update.observationQueue, "fixture_reset must return a replacement queue projection");
+    assert.equal(update.observationQueue.total, 0);
+    assert.deepEqual(update.observationQueue.items, []);
+  } finally {
+    await data.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("an ordinary conversation never stages a workspace while an attachment task still does", async () => {
   // Regression guard for the behaviour PLAN-240 §2.2 verified as already correct:
   // createConversation() builds its TaskContract from the user's real directory

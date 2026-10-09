@@ -98,6 +98,7 @@ export const ARTIFACT_PREVIEW_MAX_BYTES = 64 * 1024;
 const clientEventLimit = 600;
 const updateReadAttempts = 3;
 const observationQueueEventTypes = new Set<HarnessEvent["type"]>([
+  "fixture_reset",
   "event_ingress_received",
   "observation_consumed",
   "job_finished",
@@ -385,6 +386,7 @@ export class DebugDataService {
         lastSeq: batch.lastSeq,
         status: snapshot.status,
         phase: snapshot.phase,
+        generation: snapshot.generation,
         active: this.active.get(runId),
         events: batch.events.length > clientEventLimit ? batch.events.slice(-clientEventLimit) : batch.events,
         counts: {

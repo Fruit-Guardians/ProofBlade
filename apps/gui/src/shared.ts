@@ -321,6 +321,7 @@ export interface RunUpdates {
   lastSeq: number;
   status: RunSnapshot["status"];
   phase: RunSnapshot["phase"];
+  generation: RunSnapshot["generation"];
   active?: ActiveRunInfo;
   events: HarnessEvent[];
   counts: RunListItem["counts"];
