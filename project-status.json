@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T09:47:00+08:00",
+  "updatedAt": "2026-09-23T10:49:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2441,6 +2441,26 @@
         "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
         "npm run build 通过；test:ci-gates 43/43；test:platform-fault-matrix 6/6",
         "test:staged 出现一次 not ok 179 - binding transaction coordinator serializes owner commit across processes；该用例单独运行连续两次通过，且与 undici/fetch 无关（跨进程锁用例，属负载下的已知抖动），重跑结果见本轮报告"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-018",
+      "occurredAt": "2026-09-23T10:40:00+08:00",
+      "summary": "继续修 CI 门禁：undici 之后又出现两条新的 dev/prod 依赖公告（dompurify 经 npm audit fix 消除，@modelcontextprotocol/client 2.0.0 命中 GHSA-6qxp-vccf-f47h 需升到 2.3.1），npm audit --omit=dev 再次非零。本 PR 把 MCP client 升到 2.3.1 并同步 lockfile。",
+      "branch": "chore/bump-audit-advisories",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "packages/materials/package.json：@modelcontextprotocol/client 2.0.0 → 2.3.1（保持精确固定风格）；npm audit fix 顺带消除 dompurify 的公告；package-lock.json 同步",
+        "@modelcontextprotocol/core 与 server 仍是 2.0.0：公告只点名 client，没有证据表明另两个需要升，故不动",
+        "验证边界：mcp.test.ts 6/6 通过、npm run build 通过；本条只做依赖升级与 lockfile 同步，不改任何源码语义"
+      ],
+      "validation": [
+        "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
+        "npm ls @modelcontextprotocol/client → 2.3.1；npm run build exit 0；packages/materials/tests/mcp.test.ts 6 用例 fail 0",
+        "背景：同一门禁在本次连续命中三条外部公告（undici → dompurify/@modelcontextprotocol/client），均与仓库自身改动无关；功能 PR 分支在合并 main 后重新触发流水线即可转绿"
       ]
     }
   ],
