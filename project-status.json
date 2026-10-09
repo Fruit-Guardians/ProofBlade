@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T09:47:00+08:00",
+  "updatedAt": "2026-09-23T10:55:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2444,6 +2444,48 @@
       ]
     },
     {
+      "id": "UPDATE-20260923-009",
+      "occurredAt": "2026-09-23T05:20:00+08:00",
+      "summary": "按反馈计划 P0-1 的后半：给出真实的工具调用计数。RunSnapshot 新增 toolCalls（由 tool_result_recorded 折叠而来，可重放），相位块输出 tool_calls_used，与「enforced 的 Effect Journal 预算」并列显示——两者曾经被混为一谈。",
+      "branch": "fix/tool-call-count",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "domain/types.ts：RunSnapshot 新增可选 toolCalls，注释写明它是「折叠进来的工具结果数」、undefined 表示不知道（旧投影被尾部折叠时早期工具结果不在 fold 里），调用方必须省略而不是把下界当计数；control/reducer.ts 把 tool_result_recorded 从 no-op 分支移出并自增",
+        "domain/phase-budget.ts 暴露 toolCallsUsed（snapshot 不知道时不填）；context/compiler.ts 的相位块输出 tool_calls_used，与 journaled_effects_used/remaining 并列；GUI 侧 shared.ts、control-view.ts、App.tsx 同步显示「工具调用 N 次 · Journaled Effect x used」",
+        "为什么两条并存：max_tool_calls 强制的是 Effect Journal 条目（effect-journal.ts 的判定），而 bash/read/edit/write 与一等 MCP 工具不进 Journal。PR #250 把那个计数器改名成 journaled_effects_*，本项补上真正的调用数——反馈的原话是「当计数与事实差一个数量级时，预算就不该作为信号展示」",
+        "测试：新增 packages/materials/tests/tool-call-count.test.ts 两条——①追加 3 条 tool_result_recorded 后 snapshot.toolCalls=3、effects=0、phaseBudget.toolCallsUsed=3、提示里出现 tool_calls_used:3 且 journaled_effects_used:0；②未折叠任何工具结果的快照在提示里完全不出现 tool_calls_used（没有数据就不编数字）"
+      ],
+      "validation": [
+        "变异验证：把 reducer 的自增改回 break → 第一条用例 not ok（恢复后通过）",
+        "tool-call-count.test.ts 2 用例 + apps/gui/tests/control-view.test.ts 1 用例 fail 0；npx tsc -b exit 0；api:index 重新生成后 check 通过；check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
+        "边界：既有投影（写于本字段之前）被尾部折叠时 toolCalls 保持 undefined，提示里不显示该字段——这条边界写在 RunSnapshot.toolCalls 的注释里，而不是靠读者推断"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-010",
+      "occurredAt": "2026-09-23T06:00:00+08:00",
+      "summary": "按反馈计划 P1-2：实验预算提示不再把正常迭代误判为重复探测——先度量确实存在误判（该 run 15 次实验、15 个不同 repeatKey，却因 4 次「长命令」被判为重复），再让「长命令」分支要求真正的重复才提示。",
+      "branch": "fix/experiment-nudge-repeat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "度量（先做）：CHAT-1790096643438 的 15 条 experiment_recorded 有 15 个互不相同的 repeatKey，而模型收到的提示是 {count:4, key:'long-running', reason:'long_running'}——即计数来自 isLongRunningCommand 对命令文本的启发式（含 for/while 循环、timeout N、fuzzer 名），与「是否重复」无关。反馈所称的误判成立",
+        "runtime/tool-repeat-breaker.ts：ExperimentBudgetBreaker 记录每次长命令的指纹（复用本文件既有的 observationKey——输入+输出，优先用归档 artifact 哈希），maxLongRunning 触发时先判是否存在真正的重复；全部互不相同则返回 terminate:false、key:'long-running-distinct'（投影据此不发提示），存在重复才返回原来的 terminate:true、key:'long-running'。durable progress 与 reset() 一并清理该指纹表",
+        "保留的边界：maxExperimentCalls（总调用上限）仍在最前面无条件终止，所以「一直跑不同的慢命令」仍会被总量兜住；本次只去掉错误的「重复」指控",
+        "测试：packages/materials/tests/tool-repeat-breaker.test.ts 新增用例——四次互不相同的长命令全部 terminate:false 且第四次 key 为 long-running-distinct；同一长命令四次则 terminate:true、key 为 long-running，且 experimentBudgetNudge 文案含 is repeating（提示语在新触发条件下才成立）"
+      ],
+      "validation": [
+        "变异验证：把重复判定改成恒真（恢复旧的「四次长命令即提示」）→ 新用例 not ok（恢复后通过）",
+        "tool-repeat-breaker.test.ts 34 用例 fail 0；npx tsc -b exit 0；api:index / check:components / check:change-contracts / check:project-reports / test:ci-gates 全绿",
+        "计划文档 §P1-2 的「先度量再改」至此完成：度量结论是「误判成立且根因是命令文本启发式」，不是「未复现」"
+      ]
+    },
+    {
       "id": "UPDATE-20260923-012",
       "occurredAt": "2026-09-23T08:00:00+08:00",
       "summary": "按审查意见重做 PR #254 的树复用判据：原来「计划节点与既有树有交集就复用」是错的——共享一个 supporting Evidence 不能证明两个候选是同一个结论，而且复用只返回旧树 id、不并入本次的 Completion/结果 Artifact/验证 Evidence，导致 inspectTree 与推理森林看不到这条验证链。现改为按候选身份（候选哈希标签）判定，命中即用 updateTree 合并新节点。",
@@ -2462,6 +2504,47 @@
         "coding-resources + evidence-curation-gate + reasoning-forest + knowledge-read-bounds 共 55 用例 fail 0；npx tsc -b exit 0",
         "api:index 重新生成；check:components（26 组件）与 check:change-contracts（11 契约）通过",
         "边界：第三个候选的首次失败并非代码问题——测试脚本 flag-only.mjs 打印的是第一个候选，复现校验按规则拒绝（'did not print the exact candidate on its own line'），补一个 other-flag.mjs 后通过；这条也说明复现校验本身工作正常"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-013",
+      "occurredAt": "2026-09-23T08:20:00+08:00",
+      "summary": "按审查意见修 PR #256：上一版的 long-running 分支条件没有判断「当前事件是否长命令」，于是慢命令阈值一旦达到，后续普通实验与 timeout/family 检查都被这层提前返回挡住，后两个预算实际上不可达。",
+      "branch": "fix/experiment-nudge-repeat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "runtime/tool-repeat-breaker.ts：条件改为 if (long && this.longRunning >= this.limits.maxLongRunning)——只有又一次长命令才交给慢命令预算裁决；普通命令继续走到 maxTimeouts / maxFamily 判断，总调用上限 maxExperimentCalls 仍在最前无条件终止",
+        "测试新增一条「达到慢命令阈值不得掩盖 timeout 与 family 预算」：4 条互不相同的慢命令（阈值达成、仍不提示）→ 一条快速命令（不得继承慢命令裁决）→ 两条超时观察（命令文本里没有循环，第二条以 key=timeouts 终止）→ 同一 family 的两条非慢命令（第二条以 reason=experiment_family 终止）",
+        "过程中的一次测试修正已记录：最初用 strings | grep 构造 family 重复，但 isExperimentObservation 对这类命令返回 false（不计入实验），换成 python3 probe.py --stage N 才真正命中 family 计数"
+      ],
+      "validation": [
+        "变异验证：把 `long &&` 去掉（恢复上一版条件）→ 新用例 not ok（恢复后通过）",
+        "tool-repeat-breaker.test.ts 35 用例 fail 0；npx tsc -b exit 0",
+        "边界：超时观察若同时满足长命令启发式（命令文本里带 timeout N），仍由慢命令分支优先裁决——这是有意的顺序，长命令预算是更强信号；测试因此用「命令文本无循环、因工具超时而失败」的形态验证 timeout 分支"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-014",
+      "occurredAt": "2026-09-23T08:40:00+08:00",
+      "summary": "按审查意见修 PR #255：旧 projection 缺 toolCalls 字段时，applyTail 只会折叠 lastSeq 之后的事件，从 0 累加会把「尾部调用数」当成「本 Run 的调用数」（历史 100 次 + 新 1 次会被报成 1）。现在新 projection 一律带确定值，旧 projection 保持「未知」。",
+      "branch": "fix/tool-call-count",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "control/reducer.ts：createInitialSnapshot 起始 toolCalls=0，使本版本写出的每个 projection 都带确定计数——否则「首个工具结果之前写下的 projection」与「字段存在之前写下的旧 projection」无法区分",
+        "control/control-store.ts：applyTail 在 base.toolCalls === undefined 时把折叠结果重置为 undefined（未知保持未知，调用方据此省略该数字），而不是让 reducer 从 0 累加成尾部数量；完整 replay 仍然精确",
+        "domain/types.ts：RunSnapshot.toolCalls 的文档改为「undefined = 不知道（旧 projection 被尾部折叠）」，并写明新 projection 一律确定",
+        "测试新增两条：①旧形态 projection（取真实快照后删除该字段，经 saveProjection 正常封印）再追加两次调用，冷读必须折叠尾部（lastSeq 前进）而 toolCalls 保持 undefined、replay 仍报 4；②本版本写出的 projection 跨尾部折叠仍然精确（3+2=5）"
+      ],
+      "validation": [
+        "变异验证：删掉 applyTail 里的重置 → 旧 projection 用例 not ok（恢复后通过）",
+        "tool-call-count + control-store + projection-read-bound 共 29 用例 fail 0；fast 阶段 1076/1080（4 skipped）fail 0；npx tsc -b exit 0",
+        "边界：冷读才有投影路径——snapshotCache 命中即返回，revision 变化则直接 replay，因此本修复只作用于「重启后第一次读 + 旧投影」这一真实场景"
       ]
     },
     {
@@ -2504,6 +2587,26 @@
         "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
         "npm run build 通过；test:ci-gates 43/43；test:platform-fault-matrix 6/6",
         "test:staged 出现一次 not ok 179 - binding transaction coordinator serializes owner commit across processes；该用例单独运行连续两次通过，且与 undici/fetch 无关（跨进程锁用例，属负载下的已知抖动），重跑结果见本轮报告"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-018",
+      "occurredAt": "2026-09-23T10:40:00+08:00",
+      "summary": "继续修 CI 门禁：undici 之后又出现两条新的 dev/prod 依赖公告（dompurify 经 npm audit fix 消除，@modelcontextprotocol/client 2.0.0 命中 GHSA-6qxp-vccf-f47h 需升到 2.3.1），npm audit --omit=dev 再次非零。本 PR 把 MCP client 升到 2.3.1 并同步 lockfile。",
+      "branch": "chore/bump-audit-advisories",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "packages/materials/package.json：@modelcontextprotocol/client 2.0.0 → 2.3.1（保持精确固定风格）；npm audit fix 顺带消除 dompurify 的公告；package-lock.json 同步",
+        "@modelcontextprotocol/core 与 server 仍是 2.0.0：公告只点名 client，没有证据表明另两个需要升，故不动",
+        "验证边界：mcp.test.ts 6/6 通过、npm run build 通过；本条只做依赖升级与 lockfile 同步，不改任何源码语义"
+      ],
+      "validation": [
+        "npm audit --omit=dev → found 0 vulnerabilities（门禁原命令）",
+        "npm ls @modelcontextprotocol/client → 2.3.1；npm run build exit 0；packages/materials/tests/mcp.test.ts 6 用例 fail 0",
+        "背景：同一门禁在本次连续命中三条外部公告（undici → dompurify/@modelcontextprotocol/client），均与仓库自身改动无关；功能 PR 分支在合并 main 后重新触发流水线即可转绿"
       ]
     }
   ],

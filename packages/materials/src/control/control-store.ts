@@ -986,6 +986,14 @@ function applyTail(base: RunSnapshot, events: HarnessEvent[]): RunSnapshot {
   for (const event of events) {
     if (event.seq > base.lastSeq) next = reduce(next, event);
   }
+  // A projection written before `toolCalls` existed cannot know how many tool results
+  // it already folded, and this fold only sees the events after its `lastSeq`. Letting
+  // the reducer accumulate would report the tail's count as the Run's: a Run with a
+  // hundred historical calls and one new one would read `tool_calls_used: 1`. Unknown
+  // stays unknown -- callers omit the number and a full replay reports it exactly. New
+  // projections always carry the field (`createInitialSnapshot` starts it at 0), so this
+  // only fires for state written before the field existed.
+  if (base.toolCalls === undefined) next.toolCalls = undefined;
   return next;
 }
 

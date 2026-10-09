@@ -22,6 +22,7 @@ export function buildRunControlView(snapshot: RunSnapshot): RunControlView {
     budget: {
       phaseActionsUsed: budget.phaseActionsUsed,
       phaseActionsRemaining: budget.phaseActionsRemaining,
+      ...(budget.toolCallsUsed === undefined ? {} : { toolCallsUsed: budget.toolCallsUsed }),
       journaledEffectsUsed: budget.journaledEffectsUsed,
       journaledEffectsRemaining: budget.journaledEffectsRemaining,
       submissionsUsed: budget.submissionsUsed,
