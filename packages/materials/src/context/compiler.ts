@@ -125,12 +125,17 @@ export class ContextCompiler {
           required: verificationBindsRule(snapshot.task)
             ? recoveryRequests.filter((request) => request.recoveryState === "RECOVERY_REQUIRED").length
             : 0,
-          requests: recoveryRequests.map((request) => ({
-            id: request.id,
-            kind: request.kind,
-            state: verificationBindsRule(snapshot.task) ? request.recoveryState ?? "READY" : "READY",
-            reason: request.recoveryReason,
-          })),
+          requests: recoveryRequests.map((request) => {
+            // `recoveryRequests` is already restricted to requests whose persisted state
+            // is not READY, so each entry here had something to say. For a task that
+            // binds no rule, echoing the verifier's stale "Completion is proposed but no
+            // verifier Effect is durable yet" next to `READY` would say the opposite of
+            // what `READY` claims; what actually happened is that the request is
+            // observed-only.
+            return verificationBindsRule(snapshot.task)
+              ? { id: request.id, kind: request.kind, state: request.recoveryState ?? "READY", reason: request.recoveryReason }
+              : { id: request.id, kind: request.kind, state: "READY" as const, reason: "Observed-only: the task binds no verification rule, so this request requires no recovery and none is possible." };
+          }),
         },
         work_items: activeWorkItems.map((item) => ({
           id: item.id,

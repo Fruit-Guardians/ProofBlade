@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-23T07:00:00+08:00",
+  "updatedAt": "2026-09-23T10:10:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -2421,6 +2421,26 @@
         "verification-recovery + claim-verification-recovery + context + control-store + gui/control-view 共 55 用例 fail 0；npx tsc -b exit 0",
         "api:index 重新生成；check:components（26 组件）与 check:change-contracts（11 契约）通过",
         "发现并记录的实现约束：markResolved 的前置条件使「清除」在无规则任务上必然抛错（而不是静默失败），这正是需要同时改校验的原因；该豁免只作用于 !verificationBindsRule(snapshot.task)"
+      ]
+    },
+    {
+      "id": "UPDATE-20260923-017",
+      "occurredAt": "2026-09-23T10:10:00+08:00",
+      "summary": "按审查意见修 PR #252 的 P2 一致性问题：无 verifier 规则的任务里，恢复请求的 state 被归一为 READY，却仍把原来的 recoveryReason（例如 'Completion is proposed but no verifier Effect is durable yet'）发给模型——一个字段说无事可做、另一个说有待处理。现在统一输出 observed-only 的说明。",
+      "branch": "fix/observed-only-recovery",
+      "commit": "self",
+      "planIds": [
+        "PLAN-240"
+      ],
+      "changes": [
+        "context/compiler.ts 的 recovery.requests：绑定验证规则的任务保持原样（state + 原 reason 逐字保留）；不绑定规则的任务输出 state=READY 且 reason 改为 'Observed-only: the task binds no verification rule, so this request requires no recovery and none is possible.'",
+        "实现中确认的一件事写进了注释：recoveryRequests 本身已按 (recoveryState ?? 'READY') !== 'READY' 过滤，所以进入这个 map 的请求必然是被标记过的——因此不需要再做 '是否 flagged' 的分支（先写成条件分支属于死代码，已删除）",
+        "测试扩展（同一用例内三段）：①无规则任务 → required=0、state=READY、旧 reason 不再出现、出现 observed-only 说明；②规则任务 → 保持 required=1 且 reason 逐字保留；③无规则任务 + 从未被标记的请求（recoveryState=READY）→ 整个 requests 为空数组，什么都不说"
+      ],
+      "validation": [
+        "变异验证：把 observed-only 分支改回输出 request.recoveryReason → 用例转红（恢复后通过）",
+        "context.test.ts 20 用例 fail 0；npx tsc -b exit 0",
+        "边界：第三段最初写成 'state=READY 且不含 observed-only 文案'，实测失败并暴露了过滤规则——从未被标记的请求根本不会被投影，断言据此改为 requests=[]"
       ]
     }
   ],

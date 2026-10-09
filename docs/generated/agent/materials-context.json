@@ -32,7 +32,7 @@
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "6be0c85d69b28efd4cd597e6e71eec1a0b0c16ed5d0de3946c298a890a727c22",
     "src/context/checkpoint.ts": "afae1dc4d38a8e1288dd78f36c68b43e8b0af5928e49e076431b6e7ec214c497",
-    "src/context/compiler.ts": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+    "src/context/compiler.ts": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
     "src/context/model-context-frame.ts": "2b9465991409ffa8fab2c5b4075e8b82373ac531408faccd86c643c41762ee17",
@@ -689,7 +689,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 24,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -2364,7 +2364,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 9,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": []
     },
     {
@@ -2378,7 +2378,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 10,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": []
     },
     {
@@ -2392,7 +2392,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 14,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -2408,7 +2408,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 13,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -2424,7 +2424,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 11,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -2440,7 +2440,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 12,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -2456,7 +2456,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 16,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": []
     },
     {
@@ -3808,8 +3808,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 656,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "line": 661,
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/handoff.test.ts",
@@ -3826,8 +3826,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 661,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "line": 666,
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": []
     },
     {
@@ -22299,7 +22299,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 25,
-      "moduleHash": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+      "moduleHash": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",

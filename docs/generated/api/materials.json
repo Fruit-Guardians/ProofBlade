@@ -33,7 +33,7 @@
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "6be0c85d69b28efd4cd597e6e71eec1a0b0c16ed5d0de3946c298a890a727c22",
     "src/context/checkpoint.ts": "afae1dc4d38a8e1288dd78f36c68b43e8b0af5928e49e076431b6e7ec214c497",
-    "src/context/compiler.ts": "1ad25cfd6b724a21dcb543c6a67db48c6a74a2939c960790b52f80517f34ab6a",
+    "src/context/compiler.ts": "c242f45337c5b62aeca68c57bb2423efb5c0bb566f726bb29921f6628a324e1e",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
     "src/context/model-context-frame.ts": "2b9465991409ffa8fab2c5b4075e8b82373ac531408faccd86c643c41762ee17",
@@ -6031,7 +6031,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 656,
+      "line": 661,
       "signature": "(output: ContextBuildOutput, maxTokens?: number): string",
       "summary": "Render the compiler output for providers that accept one system prompt.",
       "summarySource": "tsdoc",
@@ -6059,7 +6059,7 @@
       "visibility": "public",
       "module": "src/context/compiler.ts",
       "exportPath": "@proofblade/materials",
-      "line": 661,
+      "line": 666,
       "signature": "(snapshot: RunSnapshot, runId: string): ContextBuildOutput",
       "summary": "Inferred summary: snapshot context operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -32813,7 +32813,7 @@
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/version-cache.test.ts"
       ],
-      "structureHash": "bc6cfd8c356a4b563e74e49499d0d7e5c2d9365b32689b11d9c0690532e2ed78",
+      "structureHash": "9ef39219f10004afdd3c8ed75efac2eb438f2f8c3fa2822012b4bce1111e5113",
       "parentId": "@proofblade/materials::class::ContextCompiler"
     },
     {

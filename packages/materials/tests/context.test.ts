@@ -40,15 +40,28 @@ test("a task that binds no verification rule does not show recovery debt it cann
   } as never;
 
   const view = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task: ruleLess, snapshot });
-  assert.match(contextText(view), /"recovery":\{"required":0/, "no obligation is projected");
-  assert.match(contextText(view), /"state":"READY"/, "and the request is not shown as owing recovery");
+  const rendered = contextText(view);
+  assert.match(rendered, /"recovery":\{"required":0/, "no obligation is projected");
+  assert.match(rendered, /"state":"READY"/, "and the request is not shown as owing recovery");
+  assert.doesNotMatch(rendered, /no verifier Effect is durable yet/, "the stale reason must not contradict the READY state");
+  assert.match(rendered, /Observed-only: the task binds no verification rule/, "say what actually happened instead");
 
   // The same persisted state under a task that does bind a rule stays visible.
   const bound: TaskContract = { ...task, task_id: "CTX-RULE" };
   const boundSnapshot = createInitialSnapshot("CTX-RULE", bound);
   boundSnapshot.verificationRequests["VR-1"] = { ...snapshot.verificationRequests["VR-1"]!, runId: boundSnapshot.runId } as never;
   const boundView = new ContextCompiler().build({ runId: boundSnapshot.runId, lane: "main", phase: boundSnapshot.phase, task: bound, snapshot: boundSnapshot });
-  assert.match(contextText(boundView), /"recovery":\{"required":1/, "a recoverable task still shows its debt");
+  const boundRendered = contextText(boundView);
+  assert.match(boundRendered, /"recovery":\{"required":1/, "a recoverable task still shows its debt");
+  assert.match(boundRendered, /no verifier Effect is durable yet/, "and keeps the verifier's own reason verbatim");
+
+  // A rule-less request that was never flagged is not projected at all: the recovery
+  // block is assembled from requests whose persisted state is not READY, so there is
+  // nothing to explain and nothing is said.
+  const quiet = createInitialSnapshot("CTX-NO-RULE-QUIET", ruleLess);
+  quiet.verificationRequests["VR-2"] = { ...snapshot.verificationRequests["VR-1"]!, id: "VR-2", runId: quiet.runId, recoveryState: "READY", recoveryReason: undefined } as never;
+  const quietView = new ContextCompiler().build({ runId: quiet.runId, lane: "main", phase: quiet.phase, task: ruleLess, snapshot: quiet });
+  assert.match(contextText(quietView), /"recovery":\{"required":0,"requests":\[\]\}/, "an unflagged request stays out of the prompt entirely");
 });
 
 test("context manifest is deterministic and labels target data as untrusted", () => {
