@@ -41,7 +41,7 @@ import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } f
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { redactCtfCandidates } from "../domain/candidate.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
-import { JsonlControlStore, makeEvent, type JsonlRunRevision, type JsonlRunWriter } from "../storage/jsonl-store.js";
+import { JsonlControlStore, makeEvent, type JsonlEventSuffix, type JsonlRunRevision, type JsonlRunWriter } from "../storage/jsonl-store.js";
 import { resolveControlAuthority } from "../storage/control-authority.js";
 import { projectionHash, reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
@@ -344,6 +344,10 @@ export class ControlStore {
 
   public async events(runId: string): Promise<HarnessEvent[]> {
     return await this.eventStore.events(runId);
+  }
+
+  public async eventsAfter(runId: string, afterSeq: number): Promise<JsonlEventSuffix> {
+    return await this.eventStore.eventsAfter(runId, afterSeq);
   }
 
   /** Atomically claim ingress events under the same Run lock used by writes. */

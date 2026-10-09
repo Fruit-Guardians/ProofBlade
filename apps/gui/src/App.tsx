@@ -10,7 +10,7 @@ import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/ma
 import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRunUpdates, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import { SingleFlightPoller, isPollingAllowed } from "./polling.js";
+import { SingleFlightPoller, isContiguousEventUpdate, isPollingAllowed, shouldRefreshFullDetail } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
@@ -88,6 +88,7 @@ export function App() {
   runIdRef.current = runId;
   const detailRef = useRef(detail);
   detailRef.current = detail;
+  const lastFullDetailRefreshAtRef = useRef(0);
 
   const refreshRuns = useCallback(async (selectPreferred = false) => {
     const next = await getRuns();
@@ -109,6 +110,7 @@ export function App() {
       const next = await getRun(selected);
       if (runIdRef.current !== selected) return;
       setDetail(next);
+      lastFullDetailRefreshAtRef.current = Date.now();
       if (!quiet) setError(undefined);
     } catch (caught) {
       if (runIdRef.current === selected) setError(message(caught));
@@ -126,6 +128,10 @@ export function App() {
       await refreshDetail(selected, true);
       return;
     }
+    if (!isContiguousEventUpdate(current.snapshot.lastSeq, update.lastSeq, update.events.map((event) => event.seq))) {
+      await refreshDetail(selected, true);
+      return;
+    }
     setDetail((existing) => {
       if (!existing || existing.snapshot.runId !== selected) return existing;
       const bySeq = new Map(existing.events.map((event) => [event.seq, event]));
@@ -135,7 +141,7 @@ export function App() {
         ...existing,
         events,
         controlView: update.controlView,
-        observationQueue: update.observationQueue,
+        ...(update.observationQueue ? { observationQueue: update.observationQueue } : {}),
         snapshot: { ...existing.snapshot, lastSeq: update.lastSeq, status: update.status, phase: update.phase },
         active: update.active,
         updatedAt: update.updatedAt,
@@ -153,7 +159,7 @@ export function App() {
       await refreshRuns();
       const selected = runIdRef.current;
       if (selected) {
-        if (mode === "background") await refreshUpdates(selected);
+        if (mode === "background" && !shouldRefreshFullDetail(Date.now(), lastFullDetailRefreshAtRef.current)) await refreshUpdates(selected);
         else await refreshDetail(selected);
       }
     });

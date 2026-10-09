@@ -39,6 +39,11 @@ interface EventCacheEntry {
   readonly events: HarnessEvent[];
 }
 
+export interface JsonlEventSuffix {
+  readonly events: HarnessEvent[];
+  readonly lastSeq: number;
+}
+
 interface ProjectionSeal {
   schemaVersion: 1;
   eventPrefixHash: string;
@@ -198,6 +203,24 @@ export class JsonlControlStore {
     } finally {
       if (this.eventLoads.get(runId) === load) this.eventLoads.delete(runId);
     }
+  }
+
+  /**
+   * Return only events newer than `afterSeq` without copying or scanning the
+   * complete cached stream. A cache miss still performs the authoritative full
+   * parse; the common same-process append path remains proportional to the new
+   * suffix.
+   */
+  public async eventsAfter(runId: string, afterSeq: number): Promise<JsonlEventSuffix> {
+    if (!Number.isInteger(afterSeq) || afterSeq < 0) throw new Error("afterSeq must be a non-negative integer");
+    const revision = await this.revision(runId);
+    const cached = this.eventCache.get(runId);
+    if (cached && sameEventRevision(cached.revision, revision)) {
+      this.eventCache.delete(runId);
+      this.eventCache.set(runId, cached);
+      return eventSuffix(cached.events, afterSeq);
+    }
+    return eventSuffix(await this.events(runId), afterSeq);
   }
 
   async #loadEvents(runId: string, initialRevision: JsonlRunRevision): Promise<HarnessEvent[]> {
@@ -706,6 +729,16 @@ export class JsonlControlStore {
     await this.#appendUnchecked(events);
   }
 
+  /**
+   * Append while the caller holds this Run's `.control.lock`.
+   *
+   * Every supported writer enters through `create()`, `withRunLock()`, or the
+   * migration path, so independent ProofBlade processes cannot rewrite or
+   * append the prefix between the revision check and the durable append. Raw
+   * filesystem mutation that bypasses the lock is outside the storage
+   * protocol; the post-append identity/size check below still prevents many
+   * such races from publishing a cache entry that claims the new revision.
+   */
   async #appendUnchecked(events: HarnessEvent[]): Promise<void> {
     if (events.length === 0) return;
     const path = this.runPath(events[0]!.runId);
@@ -735,8 +768,11 @@ export class JsonlControlStore {
     // the next context/GUI read would parse the entire long event stream again
     // even though the writer already knows the exact new suffix.
     const revision = await this.revision(runId);
+    const appendedBytes = Buffer.byteLength(serialized, "utf8");
+    const appendIsExactlyOurs = sameEventFileIdentity(revisionBeforeAppend, revision)
+      && revision.size === revisionBeforeAppend.size + appendedBytes;
     this.eventCache.delete(runId);
-    if (cacheCanExtend && cached) {
+    if (cacheCanExtend && appendIsExactlyOurs && cached) {
       this.eventCache.set(runId, { revision, events: [...cached.events, ...events] });
     }
   }
@@ -762,9 +798,27 @@ export class JsonlControlStore {
 
 function sameEventRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
   return left.size === right.size && left.mtimeMs === right.mtimeMs
-    && (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
-    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino)
+    && sameEventFileIdentity(left, right)
     && (left.ctimeMs === undefined || right.ctimeMs === undefined || left.ctimeMs === right.ctimeMs);
+}
+
+function sameEventFileIdentity(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
+  return (left.dev === undefined || right.dev === undefined || left.dev === right.dev)
+    && (left.ino === undefined || right.ino === undefined || left.ino === right.ino);
+}
+
+function eventSuffix(events: readonly HarnessEvent[], afterSeq: number): JsonlEventSuffix {
+  let low = 0;
+  let high = events.length;
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2);
+    if (events[middle]!.seq <= afterSeq) low = middle + 1;
+    else high = middle;
+  }
+  return {
+    events: events.slice(low),
+    lastSeq: events.at(-1)?.seq ?? 0,
+  };
 }
 
 /**

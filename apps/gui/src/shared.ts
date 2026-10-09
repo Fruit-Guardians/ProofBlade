@@ -315,7 +315,7 @@ export interface RunDetail {
   observationQueue: ObservationQueueProjection;
 }
 
-/** Lightweight background polling payload; it never includes sessions or telemetry. */
+/** Lightweight background polling payload; full detail is refreshed periodically. */
 export interface RunUpdates {
   runId: string;
   lastSeq: number;
@@ -325,7 +325,7 @@ export interface RunUpdates {
   events: HarnessEvent[];
   counts: RunListItem["counts"];
   controlView: RunControlView;
-  observationQueue: ObservationQueueProjection;
+  observationQueue?: ObservationQueueProjection;
   updatedAt: string;
   sessionVersion?: string;
   reloadDetail: boolean;

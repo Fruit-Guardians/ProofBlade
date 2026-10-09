@@ -313,6 +313,45 @@ test("folds a sealed projection tail without reconciling during GUI polling", as
   }
 });
 
+test("Run updates retry a revision race and never advance beyond returned events", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-update-race-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "CHAT-UPDATE-RACE-001";
+    const created = await data.createConversation({ runId, title: "update race", workspacePath: root });
+    const services = (data as unknown as { services: { control: import("@proofblade/materials").ControlStore } }).services;
+    const originalEventsAfter = services.control.eventsAfter.bind(services.control);
+    let injected = false;
+    services.control.eventsAfter = async (...args) => {
+      const batch = await originalEventsAfter(...args);
+      if (!injected) {
+        injected = true;
+        await services.control.append(runId, [{
+          schemaVersion: 1,
+          lane: "executor",
+          correlationId: `${runId}:race`,
+          actor: "model",
+          type: "model_usage",
+          payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+        }], { persistProjection: false });
+      }
+      return batch;
+    };
+    (data as unknown as { listRuns: () => Promise<never> }).listRuns = async () => {
+      throw new Error("updates must not scan the global Run list");
+    };
+
+    const update = await data.updates(runId, created.lastSeq);
+    assert.equal(injected, true);
+    assert.equal(update.reloadDetail, false);
+    assert.equal(update.lastSeq, created.lastSeq + 1);
+    assert.deepEqual(update.events.map((event) => event.seq), [update.lastSeq]);
+  } finally {
+    await data.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("RunDetail exposes the durable observation queue projection for the GUI", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-observation-queue-"));
   try {

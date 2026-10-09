@@ -503,6 +503,13 @@ export function providerRequestScheduler(): ProviderRequestScheduler {
   return sharedScheduler;
 }
 
+/**
+ * Let up to four independent chats share a Provider/model by default. This is
+ * a local scheduling default, not a claim that every upstream accepts four
+ * concurrent requests: constrained profiles can set 1, excess work remains in
+ * the FIFO queue, and transient 429 responses use the Provider retry budget.
+ * Scope validation keeps the configurable hard ceiling at 32.
+ */
 export function configuredMaxConcurrentRequests(value: number | undefined): number {
   return value ?? 4;
 }

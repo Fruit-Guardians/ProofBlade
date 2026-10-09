@@ -96,6 +96,20 @@ const largeRunDetailCacheMaxEntryBytes = 32 * 1024 * 1024;
 export const ARTIFACT_PREVIEW_MAX_BYTES = 64 * 1024;
 /** Keep detail responses responsive; telemetry and session projections retain full history server-side. */
 const clientEventLimit = 600;
+const updateReadAttempts = 3;
+const observationQueueEventTypes = new Set<HarnessEvent["type"]>([
+  "event_ingress_received",
+  "observation_consumed",
+  "job_finished",
+  "job_reconciled",
+  "provider_request_stalled",
+  "provider_recovery_required",
+  "verification_recovery_required",
+  "verification_recovery_resolved",
+  "completion_verified",
+  "consolidate_failed",
+  "context_overflow_recovered",
+]);
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -350,35 +364,62 @@ export class DebugDataService {
   public async updates(runId: string, afterSeq: number, knownSessionVersion?: string): Promise<RunUpdates> {
     assertRunId(runId);
     if (!Number.isInteger(afterSeq) || afterSeq < 0) throw new Error("afterSeq must be a non-negative integer");
-    const sessionsVersion = await filesystemVersion(join(this.services.runsRoot, runId, "pi-sessions"));
-    const sessionVersionToken = hashFilesystemVersion(sessionsVersion);
-    const [events, items, eventsStat, snapshot] = await Promise.all([
-      this.services.control.events(runId),
-      this.listRuns(),
-      stat(join(this.services.runsRoot, runId, "events.jsonl")),
-      this.services.control.snapshot(runId),
-    ]);
-    const item = items.find((candidate) => candidate.runId === runId);
-    if (!item) throw new Error(`Run not found: ${runId}`);
-    const suffix = events.filter((event) => event.seq > afterSeq);
-    const reloadDetail = item.status === "PAUSED"
-      || ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(item.status)
-      || suffix.length > clientEventLimit
-      || (knownSessionVersion !== undefined && knownSessionVersion !== sessionVersionToken);
-    return {
-      runId,
-      lastSeq: item.lastSeq,
-      status: item.status,
-      phase: item.phase,
-      active: this.active.get(runId),
-      events: suffix.length > clientEventLimit ? suffix.slice(-clientEventLimit) : suffix,
-      counts: item.counts,
-      controlView: buildRunControlView(snapshot),
-      observationQueue: projectObservationQueue(events, snapshot),
-      updatedAt: eventsStat.mtime.toISOString(),
-      sessionVersion: sessionVersionToken,
-      reloadDetail,
-    };
+    const eventsPath = join(this.services.runsRoot, runId, "events.jsonl");
+    const sessionsRoot = join(this.services.runsRoot, runId, "pi-sessions");
+    let fallback: RunUpdates | undefined;
+    for (let attempt = 0; attempt < updateReadAttempts; attempt += 1) {
+      const before = await stat(eventsPath);
+      const [batch, snapshot, sessionsVersion] = await Promise.all([
+        this.services.control.eventsAfter(runId, afterSeq),
+        this.services.control.snapshot(runId),
+        filesystemVersion(sessionsRoot),
+      ]);
+      const after = await stat(eventsPath);
+      const sessionVersionToken = hashFilesystemVersion(sessionsVersion);
+      const stable = runDetailEventsVersion(before) === runDetailEventsVersion(after)
+        && snapshot.lastSeq === batch.lastSeq;
+      const contiguous = batch.lastSeq <= afterSeq
+        || (batch.events[0]?.seq === afterSeq + 1 && batch.events.at(-1)?.seq === batch.lastSeq);
+      const common = {
+        runId,
+        lastSeq: batch.lastSeq,
+        status: snapshot.status,
+        phase: snapshot.phase,
+        active: this.active.get(runId),
+        events: batch.events.length > clientEventLimit ? batch.events.slice(-clientEventLimit) : batch.events,
+        counts: {
+          evidence: Object.keys(snapshot.evidence).length,
+          artifacts: Object.keys(snapshot.artifacts).length,
+          effects: Object.keys(snapshot.effects).length,
+        },
+        controlView: buildRunControlView(snapshot),
+        updatedAt: after.mtime.toISOString(),
+        sessionVersion: sessionVersionToken,
+      } satisfies Omit<RunUpdates, "reloadDetail">;
+      fallback = { ...common, reloadDetail: true };
+      if (!stable || !contiguous) continue;
+
+      let observationQueue: RunUpdates["observationQueue"];
+      if (batch.events.some((event) => observationQueueEventTypes.has(event.type))) {
+        const events = await this.services.control.events(runId);
+        const finalStat = await stat(eventsPath);
+        if (runDetailEventsVersion(after) !== runDetailEventsVersion(finalStat)
+          || (events.at(-1)?.seq ?? 0) !== snapshot.lastSeq) continue;
+        observationQueue = projectObservationQueue(events, snapshot);
+      }
+      const reloadDetail = snapshot.status === "PAUSED"
+        || ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)
+        || batch.events.length > clientEventLimit
+        || afterSeq > batch.lastSeq
+        || (knownSessionVersion !== undefined && knownSessionVersion !== sessionVersionToken);
+      return {
+        ...common,
+        ...(observationQueue ? { observationQueue } : {}),
+        reloadDetail,
+      };
+    }
+    if (fallback) return fallback;
+    throw new Error(`Run not found: ${runId}`);
   }
 
   private async loadRunDetail(runId: string, eventsStat: Stats, eventsVersion: string, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
