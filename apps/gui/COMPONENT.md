@@ -47,6 +47,7 @@
 - “待处理观察”面板直接由 `ControlStore` 事件重建，不维护 GUI 私有队列；显示 Job/Provider/Verifier/Maintenance 的有界脱敏摘要、待消费和 urgent 数量、来源、事件序号、关联 Job/Request/Artifact/ref。Coding Lane 在安全点只注入本次确实展示的前 8 项，消费标记以 `observation_consumed` 事件持久化，重启后可重建且幂等。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
 - 普通 Coding 对话的名称保存在用户本地 workspace metadata；删除必须由服务端校验 Run 类型和活动状态后删除完整持久目录，并同步移除本地对话偏好。Fixture Run 不提供删除入口，避免破坏复盘材料。
+- 对话重命名只写入 `title`，不得传入解析后的 capability defaults；自动命名只保留一个调用入口，并携带其观察到的旧标题做条件更新。Workspace metadata 的写操作必须串行化，使稍后到达的用户手动重命名不会被陈旧自动请求覆盖。
 - GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
 - 工具调用默认折叠且每项独立展开；折叠摘要、展开输入/输出与检查器原始数据必须来自同一个 `ToolCallDebug` 投影。切换 Run 时关闭并重置检查器，防止旧 Run 的调用选择泄漏到新会话。

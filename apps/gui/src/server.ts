@@ -253,13 +253,14 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   }
   if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts.length === 3) {
     const runId = parts[2];
-    const capabilities = await capabilityCatalog();
-    const defaults = defaultPreferences(capabilities);
     const current = await data.getRun(runId);
     if (current.kind !== "chat") throw new Error("只能操作普通对话");
     if (method === "PUT") {
       const body = await readBody(request);
-      return sendJson(response, 200, await workspaceSettings.renameConversation(runId, string(body.title, "title"), defaults));
+      const options = Object.hasOwn(body, "expectedTitle")
+        ? { expectedTitle: body.expectedTitle === null ? null : string(body.expectedTitle, "expectedTitle") }
+        : {};
+      return sendJson(response, 200, await workspaceSettings.renameConversation(runId, string(body.title, "title"), options));
     }
     if (method === "DELETE") {
       await data.deleteConversation(runId);

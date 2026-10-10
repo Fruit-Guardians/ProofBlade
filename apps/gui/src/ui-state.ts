@@ -11,6 +11,14 @@ export function inspectorStateAfterRunChange(): { open: false; tab: "overview"; 
   return { open: false, tab: "overview", selectedToolId: undefined };
 }
 
+export function workspaceStateAfterRunSelection(runId: string): { runId: string; workspaceView: "conversation"; leftOpen: false } {
+  return { runId, workspaceView: "conversation", leftOpen: false };
+}
+
+export function conversationFolderPatch(selectedFolderId: string): { folderId: string | null } {
+  return { folderId: selectedFolderId || null };
+}
+
 export function conversationTitleFromPrompt(prompt: string, maxLength = 32): string {
   const normalized = prompt
     .replace(/```[\s\S]*?```/g, " 代码片段 ")

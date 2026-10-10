@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SIDEBAR_COLLAPSED_STORAGE_KEY, conversationTitleFromPrompt, inspectorStateAfterRunChange, shouldAutoNameConversation, sidebarCollapsedFromStorage } from "../src/ui-state.js";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, conversationFolderPatch, conversationTitleFromPrompt, inspectorStateAfterRunChange, shouldAutoNameConversation, sidebarCollapsedFromStorage, workspaceStateAfterRunSelection } from "../src/ui-state.js";
 
 test("sidebar collapse preference only accepts the persisted true value", () => {
   assert.equal(SIDEBAR_COLLAPSED_STORAGE_KEY, "proofblade.sidebarCollapsed");
@@ -16,6 +16,15 @@ test("switching Runs closes and resets the unified inspector", () => {
     tab: "overview",
     selectedToolId: undefined,
   });
+});
+
+test("selecting a Run always returns to the conversation workspace", () => {
+  assert.deepEqual(workspaceStateAfterRunSelection("CHAT-1"), { runId: "CHAT-1", workspaceView: "conversation", leftOpen: false });
+});
+
+test("the uncategorized folder selection is sent as an explicit clear", () => {
+  assert.deepEqual(conversationFolderPatch(""), { folderId: null });
+  assert.deepEqual(conversationFolderPatch("research"), { folderId: "research" });
 });
 
 test("conversation titles are derived from the first prompt without leaking markdown", () => {

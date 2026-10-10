@@ -69,12 +69,12 @@ export async function getConversationPreferences(runId: string): Promise<Convers
   return await request(`/api/conversations/${encodeURIComponent(runId)}/preferences`);
 }
 
-export async function updateConversationPreferences(runId: string, input: Partial<ConversationPreferences>): Promise<ConversationPreferences> {
+export async function updateConversationPreferences(runId: string, input: Omit<Partial<ConversationPreferences>, "folderId"> & { folderId?: string | null }): Promise<ConversationPreferences> {
   return await request(`/api/conversations/${encodeURIComponent(runId)}/preferences`, { method: "PUT", body: JSON.stringify(input) });
 }
 
-export async function renameConversation(runId: string, title: string): Promise<ConversationPreferences> {
-  return await request(`/api/conversations/${encodeURIComponent(runId)}`, { method: "PUT", body: JSON.stringify({ title }) });
+export async function renameConversation(runId: string, title: string, options: { expectedTitle?: string | null } = {}): Promise<{ renamed: boolean; conversation: Partial<ConversationPreferences> }> {
+  return await request(`/api/conversations/${encodeURIComponent(runId)}`, { method: "PUT", body: JSON.stringify({ title, ...options }) });
 }
 
 export async function deleteConversation(runId: string): Promise<void> {

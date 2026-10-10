@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { McpProjectRegistry, ProofBladeSkillRegistry } from "@proofblade/materials";
-import { addProjectMcpServer, createProjectSkill } from "../src/api.js";
+import { addProjectMcpServer, createProjectSkill, renameConversation, updateConversationPreferences } from "../src/api.js";
 import { CapabilityConfigStore } from "../src/capability-config.js";
 
-test("capability API helpers post the project configuration payloads", async () => {
+test("GUI API helpers preserve capability and conversation mutation payloads", async () => {
   const originalFetch = globalThis.fetch;
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   globalThis.fetch = (async (input, init) => {
@@ -20,12 +20,18 @@ test("capability API helpers post the project configuration payloads", async () 
   try {
     await createProjectSkill({ name: "review-helper", description: "Review changes", instructions: "Inspect the diff." });
     await addProjectMcpServer({ name: "local-tools", description: "Local tools", transport: "stdio", command: "node", args: ["server.mjs"], readOnly: true });
+    await updateConversationPreferences("CHAT /1", { folderId: null });
+    await renameConversation("CHAT /1", "自动标题", { expectedTitle: "新对话" });
     assert.equal(requests[0]?.url, "/api/capabilities/skills");
     assert.equal(requests[0]?.init?.method, "POST");
     assert.deepEqual(JSON.parse(String(requests[0]?.init?.body)), { name: "review-helper", description: "Review changes", instructions: "Inspect the diff." });
     assert.equal(requests[1]?.url, "/api/capabilities/mcp");
     assert.equal(requests[1]?.init?.method, "POST");
     assert.deepEqual(JSON.parse(String(requests[1]?.init?.body)), { name: "local-tools", description: "Local tools", transport: "stdio", command: "node", args: ["server.mjs"], readOnly: true });
+    assert.equal(requests[2]?.url, "/api/conversations/CHAT%20%2F1/preferences");
+    assert.deepEqual(JSON.parse(String(requests[2]?.init?.body)), { folderId: null });
+    assert.equal(requests[3]?.url, "/api/conversations/CHAT%20%2F1");
+    assert.deepEqual(JSON.parse(String(requests[3]?.init?.body)), { title: "自动标题", expectedTitle: "新对话" });
   } finally {
     globalThis.fetch = originalFetch;
   }

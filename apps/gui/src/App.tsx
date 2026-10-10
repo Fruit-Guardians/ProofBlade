@@ -15,7 +15,7 @@ import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolde
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
 import { ActivityDisclosure, activityName } from "./activity-disclosure.js";
-import { SIDEBAR_COLLAPSED_STORAGE_KEY, conversationTitleFromPrompt, inspectorStateAfterRunChange, shouldAutoNameConversation, sidebarCollapsedFromStorage, type InspectorTab, type WorkspaceView } from "./ui-state.js";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, conversationFolderPatch, conversationTitleFromPrompt, inspectorStateAfterRunChange, shouldAutoNameConversation, sidebarCollapsedFromStorage, workspaceStateAfterRunSelection, type InspectorTab, type WorkspaceView } from "./ui-state.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
@@ -207,15 +207,14 @@ export function App() {
     const generatedTitle = firstPrompt ? conversationTitleFromPrompt(firstPrompt) : "";
     if (!generatedTitle) return;
     autoTitleAttemptsRef.current.add(id);
-    setWorkspaceSettings((current) => current ? { ...current, conversations: { ...current.conversations, [id]: { ...current.conversations[id], title: generatedTitle } } } : current);
-    void renameConversation(id, generatedTitle)
-      .then(() => refreshRuns())
+    void renameConversation(id, generatedTitle, { expectedTitle: conversation?.title ?? null })
+      .then(() => refreshWorkspace())
       .catch(async (caught) => {
         autoTitleAttemptsRef.current.delete(id);
         setError(`自动生成对话名称失败：${message(caught)}`);
         await refreshWorkspace();
       });
-  }, [detail, refreshRuns, refreshWorkspace, workspaceSettings]);
+  }, [detail, refreshWorkspace, workspaceSettings]);
 
   useEffect(() => {
     if (!bootstrap) return;
@@ -307,7 +306,7 @@ export function App() {
       <div className="run-list">
         {filteredRuns.map((run) => {
           const title = workspaceSettings?.conversations[run.runId]?.title ?? run.objective;
-          return <button className={`run-item ${run.runId === runId ? "selected" : ""}`} title={`${title}\n${run.runId}`} key={run.runId} onClick={() => setRunId(run.runId)}>
+          return <button className={`run-item ${run.runId === runId ? "selected" : ""}`} title={`${title}\n${run.runId}`} key={run.runId} onClick={() => { const next = workspaceStateAfterRunSelection(run.runId); setWorkspaceView(next.workspaceView); setRunId(next.runId); setLeftOpen(next.leftOpen); }}>
             <span className="run-item-body"><strong>{title}</strong>{run.kind === "fixture" && <small>{run.objective}</small>}<em>{run.kind === "chat" ? relativeTime(run.updatedAt) : `${phaseLabels[run.phase] ?? run.phase} · ${relativeTime(run.updatedAt)}`}</em></span>
             {run.counts.tools !== undefined && <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>}
           </button>;
@@ -363,7 +362,7 @@ export function App() {
     {inspectorOpen && <RunInspector detail={detail} tab={inspectorTab} selectedToolId={selectedToolId} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} onTabChange={(next) => { setInspectorTab(next); if (next !== "debugger") setSelectedToolId(undefined); }} onClose={() => setInspectorOpen(false)} />}
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
     {developmentOpen && <DevelopmentHubModal onClose={() => setDevelopmentOpen(false)} onFixtures={() => openRunKind("fixture")} onFleet={() => { setWorkspaceView("fleet"); setInspectorOpen(false); setLeftOpen(false); }} onAblation={() => { setWorkspaceView("ablation"); setInspectorOpen(false); setLeftOpen(false); }} onTaskTemplate={() => setTaskTemplateOpen(true)} />}
-    {taskTemplateOpen && bootstrap && <TaskTemplateModal bootstrap={bootstrap} onClose={() => setTaskTemplateOpen(false)} onCreated={(id) => { setTaskTemplateOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
+    {taskTemplateOpen && bootstrap && <TaskTemplateModal bootstrap={bootstrap} onClose={() => setTaskTemplateOpen(false)} onCreated={(id) => { setTaskTemplateOpen(false); setRunKindFilter("fixture"); setWorkspaceView("conversation"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
     {renameOpen && detail?.kind === "chat" && <RenameConversationModal initialTitle={workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective} onClose={() => setRenameOpen(false)} onSaved={async (title) => { await renameConversation(detail.snapshot.runId, title); await refreshWorkspace(); setRenameOpen(false); setNotice("对话名称已更新"); }} />}
@@ -445,7 +444,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     return () => { active = false; };
   }, [detail.snapshot.runId, workspace]);
 
-  const savePreferences = async (patch: Partial<ConversationPreferences>) => {
+  const savePreferences = async (patch: Omit<Partial<ConversationPreferences>, "folderId"> & { folderId?: string | null }) => {
     // Send the edit, not the whole resolved preference object. `preferences`
     // holds the capability lists already resolved against the workspace catalog;
     // echoing them back would persist them server-side and freeze this
@@ -466,16 +465,6 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     setFailedUser(undefined);
     setTurnError(undefined);
     setSending(true);
-    const currentTitle = preferences?.title?.trim() ?? "";
-    if (detail.kind === "chat" && shouldAutoNameConversation(currentTitle)) {
-      const generatedTitle = conversationTitleFromPrompt(prompt);
-      if (generatedTitle) {
-        const next = preferences ? { ...preferences, title: generatedTitle } : undefined;
-        if (next) setPreferences(next);
-        if (workspace && next) onWorkspaceChange({ ...workspace, conversations: { ...workspace.conversations, [detail.snapshot.runId]: next } });
-        void renameConversation(detail.snapshot.runId, generatedTitle).catch((caught) => onError(`自动生成对话名称失败：${message(caught)}`));
-      }
-    }
     let streamError: string | undefined;
     let paused = false;
     let receivedTextDelta = false;
@@ -569,7 +558,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
               <button type="button" onClick={() => setPromptOpen(true)}><FileCode2 size={14} /><span><strong>项目提示词</strong><small>查看和编辑当前提示词</small></span></button>
               <button type="button" onClick={onCapabilities}><ListChecks size={14} /><span><strong>能力配置</strong><small>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length} 项已启用</small></span></button>
               <button type="button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} /><span><strong>工作目录</strong><small>{shortPath(preferences.workspacePath)}</small></span></button>
-              <label className="menu-select"><Folder size={14} /><span><strong>会话文件夹</strong><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></span></label>
+              <label className="menu-select"><Folder size={14} /><span><strong>会话文件夹</strong><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences(conversationFolderPatch(event.target.value))}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></span></label>
             </div></details>}
             {preferences && <details className="model-picker menu-popover"><summary title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}><Bot size={13} /><span>{displayedModel}</span><ChevronDown size={12} /></summary><div className="menu-panel model-menu">
               <label><span>Provider</span><select aria-label="本对话 Provider" value={preferences.profileId} onChange={(event) => { const next = providers?.profiles.find((item) => item.id === event.target.value); void savePreferences({ profileId: event.target.value, model: next?.model ?? preferences.model }); }}>{providers?.profiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name} · {profile.provider}</option>)}</select></label>
