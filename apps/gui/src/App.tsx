@@ -1,7 +1,7 @@
 import {
   Activity, Archive, Bot, Braces, BrainCircuit, Check, CheckCircle2, ChevronDown, ChevronRight,
   CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Folder, FolderOpen,
-  FolderPlus, Gauge, GitBranch, History, KeyRound, Layers3, Link2, ListChecks, Menu, MessageSquare, PanelRight, Pause,
+  FolderPlus, Gauge, GitBranch, History, KeyRound, Layers3, Link2, ListChecks, Menu, MessageSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRight, Pause,
   Pencil, Play, Plus, RefreshCw, RotateCcw, Search, Send, ServerCog, Settings, ShieldCheck, TerminalSquare, Trash2,
   UserRound, Wrench, X, Zap,
 } from "lucide-react";
@@ -11,25 +11,26 @@ import { activateProvider, cancelFleetChallenge, createCheckpoint, createConvers
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller, isContiguousEventUpdate, isPollingAllowed, shouldRefreshFullDetail } from "./polling.js";
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
+import { ActivityDisclosure } from "./activity-disclosure.js";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, inspectorStateAfterRunChange, sidebarCollapsedFromStorage, type InspectorTab, type WorkspaceView } from "./ui-state.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
-type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
 type OutputView = "json" | "table" | "text";
 
 const phases = ["intake", "reconnaissance", "target_model", "hypothesis", "experiment", "verification", "report"] as const;
 const phaseLabels: Record<string, string> = { intake: "接入", reconnaissance: "侦察", target_model: "目标建模", hypothesis: "假设", experiment: "实验", verification: "验证", report: "报告" };
-const tabItems: Array<{ id: MainTab; label: string; icon: typeof Activity }> = [
-  { id: "chat", label: "Agent 对话", icon: MessageSquare },
+const inspectorItems: Array<{ id: InspectorTab; label: string; icon: typeof Activity }> = [
   { id: "overview", label: "概览", icon: Gauge },
-  { id: "debugger", label: "Tool 调试器", icon: Braces },
-  { id: "timeline", label: "事件时间线", icon: History },
-  { id: "evidence", label: "证据账本", icon: ShieldCheck },
-  { id: "artifacts", label: "Artifacts", icon: Archive },
+  { id: "debugger", label: "调用", icon: Braces },
+  { id: "timeline", label: "时间线", icon: History },
+  { id: "evidence", label: "证据", icon: ShieldCheck },
+  { id: "artifacts", label: "产物", icon: Archive },
+  { id: "metrics", label: "指标", icon: Activity },
 ];
 
 const scriptPresets = {
@@ -65,9 +66,11 @@ export function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [runId, setRunId] = useState<string>();
   const [detail, setDetail] = useState<RunDetail>();
-  const [tab, setTab] = useState<MainTab>("chat");
-  const [fleetView, setFleetView] = useState(false);
-  const [ablationView, setAblationView] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("conversation");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("overview");
+  const [selectedToolId, setSelectedToolId] = useState<string>();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => sidebarCollapsedFromStorage(typeof window === "undefined" ? undefined : window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)));
   const [search, setSearch] = useState("");
   const [runKindFilter, setRunKindFilter] = useState<"chat" | "fixture">("chat");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -83,7 +86,6 @@ export function App() {
   const [folderOpen, setFolderOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
-  const [rightOpen, setRightOpen] = useState(false);
   const runIdRef = useRef(runId);
   runIdRef.current = runId;
   const detailRef = useRef(detail);
@@ -177,9 +179,11 @@ export function App() {
   useEffect(() => {
     if (!runId) return;
     localStorage.setItem("proofblade.runId", runId);
-    setFleetView(false);
-    setAblationView(false);
-    setTab("chat");
+    setWorkspaceView("conversation");
+    const nextInspector = inspectorStateAfterRunChange();
+    setInspectorOpen(nextInspector.open);
+    setInspectorTab(nextInspector.tab);
+    setSelectedToolId(nextInspector.selectedToolId);
     setDetail(undefined);
     setRefreshing(true);
     void refreshPoller.poll()
@@ -187,6 +191,10 @@ export function App() {
       .finally(() => { if (runIdRef.current === runId) setRefreshing(false); });
     setLeftOpen(false);
   }, [refreshPoller, runId]);
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!bootstrap) return;
@@ -203,12 +211,9 @@ export function App() {
     const title = workspaceSettings?.conversations[run.runId]?.title ?? run.objective;
     const matchesSearch = `${run.runId} ${title} ${run.objective} ${run.targetKind}`.toLowerCase().includes(search.toLowerCase());
     const conversationFolder = workspaceSettings?.conversations[run.runId]?.folderId;
-    const matchesFolder = folderFilter === "ALL" || (folderFilter === "UNCATEGORIZED" ? !conversationFolder : conversationFolder === folderFilter);
+    const matchesFolder = run.kind !== "chat" || folderFilter === "ALL" || (folderFilter === "UNCATEGORIZED" ? !conversationFolder : conversationFolder === folderFilter);
     return run.kind === runKindFilter && matchesSearch && matchesFolder && (runKindFilter === "chat" || statusFilter === "ALL" || run.status === statusFilter);
   }), [folderFilter, runKindFilter, runs, search, statusFilter, workspaceSettings]);
-  const visibleTabs = detail?.kind === "chat"
-    ? tabItems.filter((item) => item.id === "chat" || item.id === "debugger" || item.id === "timeline" || item.id === "evidence" || item.id === "artifacts")
-    : tabItems;
   const currentPreferences = detail ? workspaceSettings?.conversations[detail.snapshot.runId] : undefined;
   const currentProfile = providers?.profiles.find((profile) => profile.id === currentPreferences?.profileId);
   const currentProviderName = currentProfile?.provider ?? bootstrap?.model.provider ?? "provider";
@@ -236,15 +241,40 @@ export function App() {
     } catch (caught) { setError(message(caught)); } finally { setRefreshing(false); }
   };
 
-  return <div className="app-shell">
-    <div className={`mobile-backdrop ${leftOpen || rightOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
-    <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
-      <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
-      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="task-template-button" onClick={() => setTaskTemplateOpen(true)}><FlaskConical size={15} />安全任务模板</button></div>
-      <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setAblationView(false); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
-      <button className={`fleet-entry ${ablationView ? "active" : ""}`} onClick={() => { setAblationView(true); setFleetView(false); setDetail(undefined); setLeftOpen(false); }}><FlaskConical size={15} />消融实验</button>
+  const openRunKind = (kind: "chat" | "fixture") => {
+    setWorkspaceView("conversation");
+    setRunKindFilter(kind);
+    setInspectorOpen(false);
+    const current = runs.find((item) => item.runId === runId);
+    if (current?.kind !== kind) {
+      const candidate = runs.find((item) => item.kind === kind);
+      setRunId(candidate?.runId);
+      if (!candidate) setDetail(undefined);
+    }
+    setLeftOpen(false);
+  };
+
+  const openInspector = (nextTab: InspectorTab, toolId?: string) => {
+    setInspectorTab(nextTab);
+    setSelectedToolId(toolId);
+    setInspectorOpen(true);
+  };
+
+  const selectedTitle = detail ? workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective : undefined;
+  const workspaceTitle = workspaceView === "fleet" ? "并行解题" : workspaceView === "ablation" ? "消融实验" : selectedTitle ?? (loading ? "正在加载" : runKindFilter === "chat" ? "选择对话" : "选择 Fixture Run");
+  const workspaceSubtitle = workspaceView === "fleet" ? "批量运行与实时监督" : workspaceView === "ablation" ? "Provider、策略和结果比较" : detail ? `${detail.snapshot.runId} · ${detail.kind === "chat" ? currentModelName : phaseLabels[detail.snapshot.phase] ?? detail.snapshot.phase}` : "";
+
+  return <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorOpen ? "inspector-open" : ""}`}>
+    <div className={`mobile-backdrop ${leftOpen || inspectorOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setInspectorOpen(false); }} />
+    <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`} aria-label="会话导航">
+      <div className="brand-row">
+        <div className="blade-mark"><Zap size={17} /></div>
+        <div className="brand-copy"><strong>ProofBlade</strong><span>Agent workspace</span></div>
+        <button className="icon-button sidebar-collapse-button" title={sidebarCollapsed ? "展开侧栏" : "折叠侧栏"} aria-label={sidebarCollapsed ? "展开侧栏" : "折叠侧栏"} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+        <button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭会话列表"><X size={18} /></button>
+      </div>
+      <div className="new-run-actions"><button className="new-run-button" title="新建对话" onClick={() => setNewRunOpen(true)}><Plus size={16} /><span>新建对话</span></button></div>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
-      <div className="run-kind-switch segmented"><button className={runKindFilter === "chat" ? "active" : ""} onClick={() => setRunKindFilter("chat")}><MessageSquare size={12} />对话</button><button className={runKindFilter === "fixture" ? "active" : ""} onClick={() => setRunKindFilter("fixture")}><FlaskConical size={12} />Fixture</button></div>
       {runKindFilter === "fixture" && <div className="filter-row">
         {[["ALL", "全部"], ["RUNNING", "运行中"], ["SUCCEEDED", "成功"], ["FAILED", "异常"]].map(([value, label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}
       </div>}
@@ -252,61 +282,68 @@ export function App() {
         <button className={folderFilter === "ALL" ? "active" : ""} onClick={() => setFolderFilter("ALL")}><FolderOpen size={13} />全部对话<span>{runs.filter((run) => run.kind === "chat").length}</span></button>
         <button className={folderFilter === "UNCATEGORIZED" ? "active" : ""} onClick={() => setFolderFilter("UNCATEGORIZED")}><Folder size={13} />未分类<span>{runs.filter((run) => run.kind === "chat" && !workspaceSettings?.conversations[run.runId]?.folderId).length}</span></button>
         {workspaceSettings?.folders.map((folder) => <button key={folder.id} className={folderFilter === folder.id ? "active" : ""} onClick={() => setFolderFilter(folder.id)}><Folder size={13} />{folder.name}<span>{runs.filter((run) => run.kind === "chat" && workspaceSettings.conversations[run.runId]?.folderId === folder.id).length}</span></button>)}
-        <button className="folder-add" title="管理文件夹" aria-label="管理文件夹" onClick={() => setFolderOpen(true)}><FolderPlus size={14} /></button>
       </div>}
       <div className="run-list">
-        {filteredRuns.map((run) => <button className={`run-item ${run.runId === runId ? "selected" : ""}`} key={run.runId} onClick={() => setRunId(run.runId)}>
-          <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
-          <span className="run-item-body"><strong>{run.runId}</strong><small>{workspaceSettings?.conversations[run.runId]?.title ?? run.objective}</small><em>{run.kind === "chat" ? "普通对话" : phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
-          {run.counts.tools !== undefined && <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>}
-        </button>)}
+        {filteredRuns.map((run) => {
+          const title = workspaceSettings?.conversations[run.runId]?.title ?? run.objective;
+          return <button className={`run-item ${run.runId === runId ? "selected" : ""}`} title={`${title}\n${run.runId}`} key={run.runId} onClick={() => setRunId(run.runId)}>
+            <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
+            <span className="run-item-body"><strong>{title}</strong>{run.kind === "fixture" && <small>{run.objective}</small>}<em>{run.kind === "chat" ? relativeTime(run.updatedAt) : `${phaseLabels[run.phase] ?? run.phase} · ${relativeTime(run.updatedAt)}`}</em></span>
+            {run.counts.tools !== undefined && <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>}
+          </button>;
+        })}
         {!filteredRuns.length && !loading && <div className="empty-list">{runKindFilter === "chat" ? "还没有对话" : "没有匹配的 Fixture Run"}</div>}
       </div>
-      <div className="sidebar-footer"><Database size={13} /><span>{runs.length} runs</span><span>{bootstrap?.storage.runsDir ?? "runs"}</span></div>
+      <details className="sidebar-more menu-popover">
+        <summary title="更多工作区和设置"><MoreHorizontal size={17} /><span>更多</span></summary>
+        <div className="menu-panel sidebar-menu" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
+          <button onClick={() => openRunKind("chat")}><MessageSquare size={15} /><span><strong>对话</strong><small>普通 Agent 会话</small></span></button>
+          <button onClick={() => openRunKind("fixture")}><FlaskConical size={15} /><span><strong>Fixture Runs</strong><small>安全任务与复盘</small></span></button>
+          <button onClick={() => { setWorkspaceView("fleet"); setInspectorOpen(false); setLeftOpen(false); }}><Layers3 size={15} /><span><strong>并行解题</strong><small>Fleet 批量运行</small></span></button>
+          <button onClick={() => { setWorkspaceView("ablation"); setInspectorOpen(false); setLeftOpen(false); }}><GitBranch size={15} /><span><strong>消融实验</strong><small>策略与结果比较</small></span></button>
+          <hr />
+          <button onClick={() => setTaskTemplateOpen(true)}><Plus size={15} /><span><strong>安全任务模板</strong><small>创建 Fixture Run</small></span></button>
+          <button onClick={() => setProviderOpen(true)}><Settings size={15} /><span><strong>Provider 设置</strong><small>模型与并发配置</small></span></button>
+          <button onClick={() => setFolderOpen(true)}><FolderPlus size={15} /><span><strong>管理文件夹</strong><small>整理对话列表</small></span></button>
+        </div>
+      </details>
     </aside>
 
-    <main className={`workspace ${detail?.kind !== "fixture" ? "without-phase" : ""}`}>
+    <main className="workspace">
       <header className="workspace-header">
-        <button className="icon-button mobile-only" title="Run 列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
+        <button className="icon-button mobile-only" title="会话列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
-          <div><h1>{fleetView ? "并行解题 (Fleet)" : (detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run"))}</h1>{!fleetView && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
-          <p>{ablationView ? "Provider、策略 Variant、预检与结果比较" : fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.kind === "chat" ? (workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective) : (detail?.snapshot.task.objective ?? ""))}</p>
+          <div><h1>{workspaceTitle}</h1>{workspaceView === "conversation" && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
+          <p>{workspaceSubtitle}</p>
         </div>
         <div className="header-actions">
-          {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
-          {detail?.kind === "fixture" && <button className="command-button" title="创建机械 Checkpoint" disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>}
-          <button className="icon-button" title="Provider 设置" aria-label="Provider 设置" onClick={() => setProviderOpen(true)}><Settings size={17} /></button>
-          {detail?.kind === "chat" && <button className="icon-button" title="Tool、Skill、MCP" aria-label="Tool、Skill、MCP" onClick={() => setCapabilityOpen(true)}><ListChecks size={17} /></button>}
-          {detail?.kind === "chat" && <button className="icon-button" title="重命名对话" aria-label="重命名对话" onClick={() => setRenameOpen(true)}><Pencil size={17} /></button>}
-          {detail?.kind === "chat" && <button className="icon-button" title="删除对话" aria-label="删除对话" onClick={() => void removeSelectedConversation()}><Trash2 size={17} /></button>}
-          <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll().catch((caught) => setError(message(caught)))}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
-          <button className="icon-button right-toggle" title="运行指标" onClick={() => setRightOpen(true)}><PanelRight size={18} /></button>
+          {workspaceView === "conversation" && detail && <button className="run-status-control" title="查看运行指标" onClick={() => openInspector("metrics")}><span className="live-pulse" />{detail.active?.state === "running" ? "运行中" : detail.active?.state === "stopping" || detail.active?.state === "paused" ? "暂停中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "已同步"}</button>}
+          {workspaceView === "conversation" && detail && <button className={`icon-button inspector-toggle ${inspectorOpen ? "active" : ""}`} title={inspectorOpen ? "关闭检查器" : "打开检查器"} aria-label={inspectorOpen ? "关闭检查器" : "打开检查器"} onClick={() => setInspectorOpen((value) => !value)}><PanelRight size={18} /></button>}
+          {workspaceView === "conversation" && <details className="header-overflow menu-popover">
+            <summary className="icon-button" title="对话操作" aria-label="对话操作"><MoreHorizontal size={18} /></summary>
+            <div className="menu-panel header-menu" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
+              <button disabled={!detail || refreshing} onClick={() => void refreshAll().catch((caught) => setError(message(caught)))}><RefreshCw size={15} className={refreshing ? "spin" : ""} /><span><strong>立即刷新</strong><small>重新读取当前 Run</small></span></button>
+              {detail?.kind === "chat" && <button onClick={() => setCapabilityOpen(true)}><ListChecks size={15} /><span><strong>能力配置</strong><small>Tool、Skill、MCP</small></span></button>}
+              {detail?.kind === "chat" && <button onClick={() => setRenameOpen(true)}><Pencil size={15} /><span><strong>重命名</strong><small>修改对话标题</small></span></button>}
+              {detail?.kind === "fixture" && <button disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span><strong>恢复核对</strong><small>核对 Fixture 与 Lease</small></span></button>}
+              {detail?.kind === "fixture" && <button disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span><strong>Checkpoint</strong><small>创建机械检查点</small></span></button>}
+              {detail?.kind === "chat" && <><hr /><button className="danger" onClick={() => void removeSelectedConversation()}><Trash2 size={15} /><span><strong>删除对话</strong><small>删除持久记录</small></span></button></>}
+            </div>
+          </details>}
         </div>
       </header>
-
-      {!fleetView && !ablationView && detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
-      {!fleetView && !ablationView && <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>}
 
       <div className="content-area">
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
-        {ablationView && <AblationWorkspace providers={providers} onError={setError} onNotice={setNotice} />}
-        {fleetView && <FleetView onError={setError} />}
-        {!fleetView && !ablationView && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
-        {!fleetView && detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
-        {!fleetView && detail && tab === "overview" && <Overview detail={detail} />}
-        {!fleetView && detail && tab === "debugger" && <ToolDebugger detail={detail} />}
-        {!fleetView && detail && tab === "timeline" && <Timeline detail={detail} />}
-        {!fleetView && detail && tab === "evidence" && <EvidenceLedger detail={detail} />}
-        {!fleetView && detail && tab === "artifacts" && <Artifacts detail={detail} />}
+        {workspaceView === "ablation" && <AblationWorkspace providers={providers} onError={setError} onNotice={setNotice} />}
+        {workspaceView === "fleet" && <FleetView onError={setError} />}
+        {workspaceView === "conversation" && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
+        {workspaceView === "conversation" && detail && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} onInspectTool={(toolId) => openInspector("debugger", toolId)} onInspectObservations={() => openInspector("overview")} />}
       </div>
-      <footer className="status-bar"><span><span className="live-pulse" />{detail?.active?.state === "running" ? "实时执行" : detail?.active?.state === "stopping" || detail?.active?.state === "paused" ? "正在暂停" : "数据已同步"}</span><span>seq {detail?.snapshot.lastSeq ?? 0}</span><span>gen {detail?.snapshot.generation ?? 0}</span><span>{currentProviderName} / {currentModelName}</span><span className="status-spacer" /><span>{detail ? formatDate(detail.updatedAt) : "--"}</span></footer>
     </main>
 
-    <aside className={`metrics-sidebar ${rightOpen ? "drawer-open" : ""}`}>
-      <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
-      {detail ? <Metrics detail={detail} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} /> : <div className="empty-list">选择 Run 后显示</div>}
-    </aside>
+    {inspectorOpen && <RunInspector detail={detail} tab={inspectorTab} selectedToolId={selectedToolId} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} onTabChange={(next) => { setInspectorTab(next); if (next !== "debugger") setSelectedToolId(undefined); }} onClose={() => setInspectorOpen(false)} />}
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
     {taskTemplateOpen && bootstrap && <TaskTemplateModal bootstrap={bootstrap} onClose={() => setTaskTemplateOpen(false)} onCreated={(id) => { setTaskTemplateOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
@@ -342,7 +379,7 @@ interface LiveToolCall {
   result?: unknown;
 }
 
-function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefresh, onError, onNew, onCapabilities }: { detail: RunDetail; providers?: ProviderSettings; workspace?: WorkspaceSettings; onWorkspaceChange(value: WorkspaceSettings): void; onRefresh(): Promise<void>; onError(error: string): void; onNew(): void; onCapabilities(): void }) {
+function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefresh, onError, onNew, onCapabilities, onInspectTool, onInspectObservations }: { detail: RunDetail; providers?: ProviderSettings; workspace?: WorkspaceSettings; onWorkspaceChange(value: WorkspaceSettings): void; onRefresh(): Promise<void>; onError(error: string): void; onNew(): void; onCapabilities(): void; onInspectTool(toolId: string): void; onInspectObservations(): void }) {
   const preferred = detail.sessions.find((item) => item.metadata?.purpose === (detail.kind === "chat" ? "chat" : "solve")) ?? detail.sessions.at(-1);
   const [sessionId, setSessionId] = useState(preferred?.id ?? "");
   const session = detail.sessions.find((item) => item.id === sessionId) ?? preferred;
@@ -360,14 +397,13 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
   const [preferences, setPreferences] = useState<ConversationPreferences>();
-  const [selectedCallId, setSelectedCallId] = useState<string>();
-  const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
   const latestAssistant = session?.messages.slice().reverse().find((item) => item.role === "assistant");
   const thread = useRef<HTMLDivElement>(null);
   const terminal = ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(detail.snapshot.status);
   const runInFlight = isConversationInFlight(detail.active?.state, sending);
   const pausePending = stopping || detail.active?.state === "stopping" || detail.active?.state === "paused";
   const displayedModel = currentModelLabel(preferences?.model, latestAssistant?.model, detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness");
+  const composerInput = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!preferred) return;
@@ -377,6 +413,9 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     const element = thread.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [session?.messages.length, liveText, liveTools.length, pendingUser]);
+  useEffect(() => {
+    if (!draft && composerInput.current) composerInput.current.style.height = "auto";
+  }, [draft]);
   useEffect(() => {
     if (!failedUser || !session?.messages.some((item) => item.role === "user" && item.text === failedUser)) return;
     setFailedUser(undefined);
@@ -464,15 +503,10 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     }
   };
 
-  return <div className={`conversation-page ${selectedCall ? "inspector-open" : ""}`}>
+  return <div className="conversation-page">
     <div className="conversation-main">
-      <div className="conversation-toolbar">
-        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{pausePending ? "正在暂停" : runInFlight ? "生成中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "就绪"}</span></div>
-        {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
-        <span className="conversation-model" title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}>{displayedModel}</span>
-        <button type="button" className="icon-button" title="查看和编辑项目提示词" aria-label="查看和编辑项目提示词" onClick={() => setPromptOpen(true)}><FileCode2 size={16} /></button>
-      </div>
-      {detail.observationQueue.total > 0 && <ObservationQueuePanel detail={detail} />}
+      {detail.sessions.length > 1 && <div className="session-strip"><span>Session</span><select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select></div>}
+      {detail.observationQueue.total > 0 && <ObservationQueueNotice detail={detail} onClick={onInspectObservations} />}
       <div className="message-thread" ref={thread}>
         {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong>{detail.kind === "fixture" && <span>{detail.snapshot.task.target}</span>}</div>}
         {session?.messages.map((chat) => {
@@ -487,7 +521,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
               {chat.text && <MessageText text={chat.text} />}
               {verification?.status === "unverified" && <div className="claim-verification-note"><CircleAlert size={14} /><span><strong>本轮结论没有通过复现门</strong>{verification.reason ?? "缺少与最终候选直接对应的成功复现记录。"}</span></div>}
               {chat.error && <div className="message-error"><CircleAlert size={14} /><span>{chat.error}</span></div>}
-              {calls.length > 0 && <div className="message-tools">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} selected={selectedCallId === call.id} onInspect={() => setSelectedCallId(call.id)} />)}</div>}
+              {calls.length > 0 && <div className="message-tools">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} onInspect={() => onInspectTool(call.id)} />)}</div>}
             </div>
           </article>;
         })}
@@ -498,26 +532,40 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
       <div className="composer-wrap">
         {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
         {turnError && <div className="turn-error"><CircleAlert size={14} /><span>{turnError}</span><button title="关闭" aria-label="关闭发送错误" onClick={() => setTurnError(undefined)}><X size={13} /></button></div>}
-        {preferences && <div className="composer-context">
-          <label title="本对话使用的中转站"><ServerCog size={13} /><select aria-label="本对话 Provider" value={preferences.profileId} onChange={(event) => { const next = providers?.profiles.find((item) => item.id === event.target.value); void savePreferences({ profileId: event.target.value, model: next?.model ?? preferences.model }); }} >{providers?.profiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name} · {profile.provider}</option>)}</select></label>
-          <label title="本对话使用的模型"><Bot size={13} /><select aria-label="本对话模型" value={preferences.model} onChange={(event) => void savePreferences({ model: event.target.value })}>{modelOptions(providers, preferences).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
-          <label title="思考等级"><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
-          <button type="button" className="capability-button" onClick={onCapabilities}><ListChecks size={13} />能力 <span>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>
-           <button type="button" className="context-button" title="当前请求已用上下文、距离窗口上限和缓存命中率" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{detail.context ? `${formatNumber(detail.context.remainingTokens)} 剩余` : `${formatNumber(sessionTokenTotal(session))} tokens`} · {formatPercent(projectCacheUsage(session?.usage ?? emptySessionUsage()).hitRate)}</span></button>
-          <button type="button" className="workspace-button" title={preferences.workspacePath} onClick={() => setDirectoryOpen(true)}><FolderOpen size={13} />目录 <span>{shortPath(preferences.workspacePath)}</span></button>
-          <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
-        </div>}
         {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} context={detail.context} threshold={preferences?.contextCompactionThreshold ?? 40} onThreshold={(value) => void savePreferences({ contextCompactionThreshold: value })} />}
-        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={runInFlight || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><SessionUsageSummary session={session} kind={detail.kind} phase={detail.snapshot.phase} /><button type="button" className={`send-button ${runInFlight ? "stop-button" : ""}`} title={runInFlight ? "暂停运行" : "发送"} aria-label={runInFlight ? "暂停运行" : "发送"} disabled={terminal || (runInFlight ? pausePending : !draft.trim())} onClick={() => runInFlight ? void stop() : void submit()}>{runInFlight ? <Pause size={16} /> : <Send size={16} />}</button></div></div>
+        <div className="composer">
+          <textarea ref={composerInput} aria-label="发送消息" value={draft} disabled={runInFlight || terminal} rows={1} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onInput={(event) => { event.currentTarget.style.height = "auto"; event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 180)}px`; }} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
+          <div className="composer-footer">
+            {preferences && <details className="composer-menu menu-popover"><summary title="对话设置" aria-label="对话设置"><Plus size={15} /></summary><div className="menu-panel composer-menu-panel">
+              <button type="button" onClick={() => setPromptOpen(true)}><FileCode2 size={14} /><span><strong>项目提示词</strong><small>查看和编辑当前提示词</small></span></button>
+              <button type="button" onClick={onCapabilities}><ListChecks size={14} /><span><strong>能力配置</strong><small>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length} 项已启用</small></span></button>
+              <button type="button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} /><span><strong>工作目录</strong><small>{shortPath(preferences.workspacePath)}</small></span></button>
+              <label className="menu-select"><Folder size={14} /><span><strong>会话文件夹</strong><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></span></label>
+            </div></details>}
+            {preferences && <details className="model-picker menu-popover"><summary title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}><Bot size={13} /><span>{displayedModel}</span><ChevronDown size={12} /></summary><div className="menu-panel model-menu">
+              <label><span>Provider</span><select aria-label="本对话 Provider" value={preferences.profileId} onChange={(event) => { const next = providers?.profiles.find((item) => item.id === event.target.value); void savePreferences({ profileId: event.target.value, model: next?.model ?? preferences.model }); }}>{providers?.profiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name} · {profile.provider}</option>)}</select></label>
+              <label><span>模型</span><select aria-label="本对话模型" value={preferences.model} onChange={(event) => void savePreferences({ model: event.target.value })}>{modelOptions(providers, preferences).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
+              <label><span>思考等级</span><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
+            </div></details>}
+            {preferences && <button type="button" className="composer-pill capability-pill" onClick={onCapabilities}><ListChecks size={13} /><span>能力 {preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>}
+            <button type="button" className={`composer-pill context-button ${contextOpen ? "active" : ""}`} title="查看上下文用量" onClick={() => setContextOpen((value) => !value)}><Database size={13} /><span>{detail.context ? `${formatNumber(detail.context.remainingTokens)} 剩余` : `${formatNumber(sessionTokenTotal(session))} tokens`}</span></button>
+            <span className="composer-usage"><SessionUsageSummary session={session} kind={detail.kind} phase={detail.snapshot.phase} /></span>
+            <button type="button" className={`send-button ${runInFlight ? "stop-button" : ""}`} title={runInFlight ? "暂停运行" : "发送"} aria-label={runInFlight ? "暂停运行" : "发送"} disabled={terminal || (runInFlight ? pausePending : !draft.trim())} onClick={() => runInFlight ? void stop() : void submit()}>{runInFlight ? <Pause size={16} /> : <Send size={16} />}</button>
+          </div>
+        </div>
       </div>
     </div>
-    {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
     {directoryOpen && preferences && <DirectoryPickerModal initialPath={preferences.workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={async (path) => { try { await savePreferences({ workspacePath: path }); setDirectoryOpen(false); } catch (caught) { onError(message(caught)); } }} />}
     {promptOpen && preferences && <PromptModal runId={detail.snapshot.runId} projectPrompt={preferences.projectPrompt ?? ""} onClose={() => setPromptOpen(false)} onSave={async (projectPrompt) => { await savePreferences({ projectPrompt }); setPromptOpen(false); }} />}
   </div>;
 }
 
-function ObservationQueuePanel({ detail }: { detail: RunDetail }) {
+function ObservationQueueNotice({ detail, onClick }: { detail: RunDetail; onClick(): void }) {
+  const queue = detail.observationQueue;
+  return <button type="button" className="observation-queue-notice" onClick={onClick}><ListChecks size={14} /><span><strong>{queue.total} 项待处理观察</strong><small>{queue.urgent > 0 ? `${queue.urgent} 项紧急 · ` : ""}在运行检查器中查看</small></span><ChevronRight size={14} /></button>;
+}
+
+function ObservationQueueDetails({ detail }: { detail: RunDetail }) {
   const queue = detail.observationQueue;
   return <section className="observation-queue-panel" aria-label="待处理观察">
     <header><div><ListChecks size={14} /><strong>待处理观察</strong><span>{queue.total} 项 · urgent {queue.urgent}</span></div>{queue.hidden > 0 && <em>还有 {queue.hidden} 项</em>}</header>
@@ -536,27 +584,10 @@ type ToolCardValue = ToolCallDebug | LiveToolCall;
 
 function ToolExecutionCard({ call, selected = false, onInspect }: { call: ToolCardValue; selected?: boolean; onInspect?: () => void }) {
   const presentation = "presentation" in call ? call.presentation : toolPresentation(call.name, call.args ?? {}, call.result);
-  const status = call.status === "running" ? "pending" : call.status;
+  const status = call.status;
   const duration = "telemetry" in call && call.telemetry.result?.payload?.durationMs ? `${call.telemetry.result.payload.durationMs} ms` : statusLabel(status);
   const links = "links" in call ? call.links : undefined;
-  return <section className={`tool-execution-card tool-${status} ${selected ? "selected" : ""}`}>
-    <header><span className="tool-status-icon">{status === "success" ? <Check size={13} /> : status === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span><strong>{call.name}</strong><code>{presentation.summary}</code><em>{duration}</em>{onInspect && <button type="button" title="查看完整调用数据" onClick={onInspect}><Braces size={13} />完整数据</button>}</header>
-    <div className="tool-io-grid"><div><label>{presentation.inputLabel}</label><pre>{presentation.input}</pre></div><div><label>{presentation.outputLabel}</label><pre>{presentation.output}</pre></div></div>
-    {links && (links.artifacts.length > 0 || links.evidence.length > 0 || links.effects.length > 0) && <footer>{links.artifacts.map((item) => <span key={item.id} title={item.id}><Archive size={11} />{item.semantic?.name ?? shortId(item.id)}</span>)}{links.evidence.map((item) => <span key={item.id} title={item.id}><ShieldCheck size={11} />{item.name ?? shortId(item.id)}</span>)}{links.effects.map((item) => <span key={item.id} title={item.id}><Zap size={11} />{shortId(item.id)}</span>)}</footer>}
-  </section>;
-}
-
-function ConversationToolInspector({ call, onClose }: { call: ToolCallDebug; onClose(): void }) {
-  const [source, setSource] = useState<InspectorSource>("full");
-  const [view, setView] = useState<"tree" | "raw">("tree");
-  const inspected = inspectorValue(call, source);
-  return <aside className="conversation-inspector">
-    <div className="conversation-inspector-head"><div><Wrench size={15} /><span><strong>{call.name}</strong><code>{call.id}</code></span></div><button className="icon-button" title="关闭调试面板" onClick={onClose}><X size={15} /></button></div>
-    <div className="source-tabs">{([ ["arguments", "Arguments"], ["result", "Result"], ["pi-entry", "Pi Entry"], ["telemetry", "Telemetry"], ["full", "完整对象"] ] as Array<[InspectorSource, string]>).map(([id, label]) => <button key={id} className={source === id ? "active" : ""} onClick={() => setSource(id)}>{label}</button>)}</div>
-    <div className="conversation-inspector-tools"><StatusMini status={call.status} /><span>轮次 #{call.assistantOrdinal}</span><div className="view-switch"><button className={view === "tree" ? "active" : ""} onClick={() => setView("tree")}><Layers3 size={12} />树</button><button className={view === "raw" ? "active" : ""} onClick={() => setView("raw")}><FileJson2 size={12} />原文</button></div></div>
-    <div className="conversation-json">{view === "tree" ? <JsonTree key={`${call.id}:${source}`} value={inspected} /> : <RawJson value={inspected} />}</div>
-    <ScriptLab input={call} compact />
-  </aside>;
+  return <ActivityDisclosure callId={call.id} name={call.name} status={status} presentation={presentation} duration={duration} links={links} selected={selected} onInspect={onInspect} />;
 }
 
 function modelOptions(providers: ProviderSettings | undefined, preferences: ConversationPreferences): string[] {
@@ -622,21 +653,43 @@ function MessageText({ text }: { text: string }) {
   return <div className="message-text markdown-body" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function ToolDebugger({ detail }: { detail: RunDetail }) {
-  const [sessionId, setSessionId] = useState(detail.sessions[0]?.id ?? "");
+function RunInspector({ detail, tab, selectedToolId, provider, model, thinkingLevel, onTabChange, onClose }: { detail?: RunDetail; tab: InspectorTab; selectedToolId?: string; provider: string; model: string; thinkingLevel: string; onTabChange(tab: InspectorTab): void; onClose(): void }) {
+  return <aside className="run-inspector" aria-label="运行检查器">
+    <header className="run-inspector-head"><div><Gauge size={16} /><span><strong>运行检查器</strong>{detail && <code title={detail.snapshot.runId}>{detail.snapshot.runId}</code>}</span></div><button className="icon-button" title="关闭检查器" aria-label="关闭检查器" onClick={onClose}><X size={16} /></button></header>
+    <nav className="inspector-tabs" aria-label="检查器视图">{inspectorItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} title={item.label} aria-label={item.label} onClick={() => onTabChange(item.id)}><item.icon size={14} /><span>{item.label}</span>{item.id === "debugger" && detail && <em>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</em>}</button>)}</nav>
+    <div className="run-inspector-content">
+      {!detail && <EmptyPanel icon={<PanelRight size={22} />} title="选择 Run 后查看详情" />}
+      {detail && tab === "overview" && <><div className="inspector-overview-head"><StatusBadge status={detail.snapshot.status} /><span>seq {detail.snapshot.lastSeq}</span><span>gen {detail.snapshot.generation}</span><time>{formatDate(detail.updatedAt)}</time></div>{detail.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}{detail.observationQueue.total > 0 && <ObservationQueueDetails detail={detail} />}<Overview detail={detail} /></>}
+      {detail && tab === "debugger" && <ToolDebugger detail={detail} preferredCallId={selectedToolId} />}
+      {detail && tab === "timeline" && <Timeline detail={detail} />}
+      {detail && tab === "evidence" && <EvidenceLedger detail={detail} />}
+      {detail && tab === "artifacts" && <Artifacts detail={detail} />}
+      {detail && tab === "metrics" && <Metrics detail={detail} provider={provider} model={model} thinkingLevel={thinkingLevel} />}
+    </div>
+  </aside>;
+}
+
+function ToolDebugger({ detail, preferredCallId }: { detail: RunDetail; preferredCallId?: string }) {
+  const preferredSession = detail.sessions.find((item) => item.toolCalls.some((call) => call.id === preferredCallId));
+  const [sessionId, setSessionId] = useState(preferredSession?.id ?? detail.sessions[0]?.id ?? "");
   const session = detail.sessions.find((item) => item.id === sessionId) ?? detail.sessions[0];
   const [turnId, setTurnId] = useState(session?.assistantTurns[0]?.entryId ?? "ALL");
   const visibleCalls = session?.toolCalls.filter((call) => turnId === "ALL" || call.assistantEntryId === turnId) ?? [];
-  const [callId, setCallId] = useState(visibleCalls[0]?.id ?? "");
+  const [callId, setCallId] = useState(preferredCallId ?? visibleCalls[0]?.id ?? "");
   const selected = visibleCalls.find((item) => item.id === callId) ?? visibleCalls[0] ?? session?.toolCalls[0];
   const [source, setSource] = useState<InspectorSource>("arguments");
   const [view, setView] = useState<"tree" | "raw">("tree");
 
   useEffect(() => {
+    if (preferredSession && preferredSession.id !== sessionId) {
+      setSessionId(preferredSession.id);
+      setTurnId("ALL");
+      return;
+    }
     if (detail.sessions.some((item) => item.id === sessionId)) return;
     setSessionId(detail.sessions[0]?.id ?? "");
-  }, [detail.sessions, sessionId]);
-  useEffect(() => setCallId(visibleCalls[0]?.id ?? ""), [turnId, sessionId]);
+  }, [detail.sessions, preferredSession, sessionId]);
+  useEffect(() => setCallId(visibleCalls.some((call) => call.id === preferredCallId) ? preferredCallId ?? "" : visibleCalls[0]?.id ?? ""), [turnId, sessionId, preferredCallId, detail.sessionVersion]);
 
   const inspected = selected ? inspectorValue(selected, source) : undefined;
   if (!detail.sessions.length) return <EmptyPanel icon={<TerminalSquare size={22} />} title="此 Run 没有 Pi Session" />;
@@ -1345,7 +1398,6 @@ function inspectorValue(call: ToolCallDebug, source: InspectorSource): unknown {
   if (source === "telemetry") return call.telemetry;
   return call;
 }
-function chatTabLabel(id: MainTab, fallback: string): string { return id === "debugger" ? "工具记录" : id === "timeline" ? "执行轨迹" : id === "evidence" ? "证据与结果" : id === "artifacts" ? "产物" : fallback; }
 function statusLabel(status: string): string { return status === "success" ? "成功" : status === "error" ? "失败" : status === "pending" ? "执行中" : status; }
 function firstLine(value: string): string { return value.split(/\r?\n/, 1)[0]?.trim() ?? ""; }
 function shortPath(value: string): string { const normalized = value.replace(/[\\/]+$/, ""); const parts = normalized.split(/[\\/]/); return parts.at(-1) || value; }

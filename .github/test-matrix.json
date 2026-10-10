@@ -235,6 +235,12 @@
       "command": "node --import tsx --test apps/gui/tests/polling.test.ts"
     },
     {
+      "id": "gui-conversation-ui",
+      "sourceGlobs": ["apps/gui/src/activity-disclosure.tsx", "apps/gui/src/ui-state.ts"],
+      "testGlobs": ["apps/gui/tests/activity-disclosure.test.ts", "apps/gui/tests/ui-state.test.ts"],
+      "command": "node --import tsx --test apps/gui/tests/activity-disclosure.test.ts apps/gui/tests/ui-state.test.ts"
+    },
+    {
       "id": "gui-task-workspace",
       "sourceGlobs": ["apps/gui/src/task-workspace.ts"],
       "testGlobs": ["apps/gui/tests/debug-data.test.ts"],

@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.24",
+  "version": "0.7.25",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-09-21T13:00:00.000Z",
+  "updatedAt": "2026-10-10T07:40:35.165Z",
   "qualityAudit": {
-    "bugAuditCount": 24,
-    "securityAuditCount": 24,
-    "lastBugAuditAt": "2026-09-21T13:00:00.000Z",
-    "lastSecurityAuditAt": "2026-09-21T13:00:00.000Z",
-    "sourceHash": "d7f54673b06c79cc3c5912a3f18d64ad826d6b08d5253b620c3b5e369ed54aa5",
+    "bugAuditCount": 25,
+    "securityAuditCount": 25,
+    "lastBugAuditAt": "2026-10-10T07:40:35.165Z",
+    "lastSecurityAuditAt": "2026-10-10T07:40:35.165Z",
+    "sourceHash": "1928b5e74c15bb76a3f13307eb5f79b23f8cbb4d12e4934e92d137238e337e78",
     "result": "passed"
   }
 }
@@ -20,7 +20,7 @@
 
 ## 职责
 
-提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、上下文用量/剩余窗口/主动压缩阈值、Run 观测和 Tool 调试界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
+提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、上下文用量/剩余窗口/主动压缩阈值、Run 观测和 Tool 调试界面。界面采用会话优先外壳：工具调用在消息内以紧凑披露行展示，Overview、调用、Timeline、Evidence、Artifact 和指标复用同一按需检查器。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
 
 ## 入口与依赖
 
@@ -48,6 +48,8 @@
 - 普通 Coding 对话的名称保存在用户本地 workspace metadata；删除必须由服务端校验 Run 类型和活动状态后删除完整持久目录，并同步移除本地对话偏好。Fixture Run 不提供删除入口，避免破坏复盘材料。
 - GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
+- 工具调用默认折叠且每项独立展开；折叠摘要、展开输入/输出与检查器原始数据必须来自同一个 `ToolCallDebug` 投影。切换 Run 时关闭并重置检查器，防止旧 Run 的调用选择泄漏到新会话。
+- 左侧栏折叠、检查器分页、展开状态和“更多”工作区菜单都属于浏览器展示状态；不得因此新增 durable state 或改变 Chat、Fixture、Fleet、Ablation 的服务端入口。窄屏下左右栏使用覆盖抽屉，主会话和输入框保持可用。
 - 最终结论的 `verified/unverified` 状态来自 durable `assistant_message` 事件；已验证状态必须显示 Evidence 引用，缺少复现时必须给出醒目的未验证提示。
 - “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。没有推理树但已有 Evidence/Artifact reasoning node 时，必须展示尚未整理的图节点，不能只显示空的 Fact → Evidence → Artifact 兼容视图。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
