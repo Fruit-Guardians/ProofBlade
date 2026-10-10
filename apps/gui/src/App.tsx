@@ -15,7 +15,7 @@ import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolde
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
 import { ActivityDisclosure, activityName } from "./activity-disclosure.js";
-import { SIDEBAR_COLLAPSED_STORAGE_KEY, conversationFolderPatch, conversationTitleFromPrompt, inspectorStateAfterRunChange, shouldAutoNameConversation, sidebarCollapsedFromStorage, workspaceStateAfterRunSelection, type InspectorTab, type WorkspaceView } from "./ui-state.js";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, automaticConversationRename, conversationFolderPatch, inspectorStateAfterRunChange, sidebarCollapsedFromStorage, toolDebuggerTarget, workspaceStateAfterRunSelection, type InspectorTab, type WorkspaceView } from "./ui-state.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
@@ -92,7 +92,7 @@ export function App() {
   const detailRef = useRef(detail);
   detailRef.current = detail;
   const lastFullDetailRefreshAtRef = useRef(0);
-  const autoTitleAttemptsRef = useRef(new Set<string>());
+  const autoTitleInFlightRef = useRef(new Set<string>());
 
   const refreshRuns = useCallback(async (selectPreferred = false) => {
     const next = await getRuns();
@@ -202,18 +202,23 @@ export function App() {
     if (!detail || detail.kind !== "chat" || !workspaceSettings) return;
     const id = detail.snapshot.runId;
     const conversation = workspaceSettings.conversations[id];
-    if (!shouldAutoNameConversation(conversation?.title) || autoTitleAttemptsRef.current.has(id)) return;
     const firstPrompt = detail.sessions.flatMap((session) => session.messages).find((entry) => entry.role === "user" && entry.text.trim())?.text;
-    const generatedTitle = firstPrompt ? conversationTitleFromPrompt(firstPrompt) : "";
-    if (!generatedTitle) return;
-    autoTitleAttemptsRef.current.add(id);
-    void renameConversation(id, generatedTitle, { expectedTitle: conversation?.title ?? null })
-      .then(() => refreshWorkspace())
-      .catch(async (caught) => {
-        autoTitleAttemptsRef.current.delete(id);
-        setError(`自动生成对话名称失败：${message(caught)}`);
+    const request = automaticConversationRename(conversation, firstPrompt);
+    if (!request || autoTitleInFlightRef.current.has(id)) return;
+    autoTitleInFlightRef.current.add(id);
+    void renameConversation(id, request.title, { expectedTitle: request.expectedTitle })
+      .then(async ({ renamed }) => {
         await refreshWorkspace();
-      });
+        // A rejected compare-and-set is not a completed naming attempt. Once
+        // the refreshed record is visible, the effect may retry if it is still
+        // an automatic placeholder, or stop if a user supplied the new title.
+        if (!renamed) autoTitleInFlightRef.current.delete(id);
+      })
+      .catch(async (caught) => {
+        setError(`自动生成对话名称失败：${message(caught)}`);
+        await refreshWorkspace().catch(() => undefined);
+      })
+      .finally(() => autoTitleInFlightRef.current.delete(id));
   }, [detail, refreshWorkspace, workspaceSettings]);
 
   useEffect(() => {
@@ -688,26 +693,38 @@ function RunInspector({ detail, tab, selectedToolId, provider, model, thinkingLe
 }
 
 function ToolDebugger({ detail, preferredCallId }: { detail: RunDetail; preferredCallId?: string }) {
-  const preferredSession = detail.sessions.find((item) => item.toolCalls.some((call) => call.id === preferredCallId));
-  const [sessionId, setSessionId] = useState(preferredSession?.id ?? detail.sessions[0]?.id ?? "");
+  const preferredTarget = toolDebuggerTarget(detail.sessions, preferredCallId);
+  const [sessionId, setSessionId] = useState(preferredTarget.sessionId);
   const session = detail.sessions.find((item) => item.id === sessionId) ?? detail.sessions[0];
-  const [turnId, setTurnId] = useState(session?.assistantTurns[0]?.entryId ?? "ALL");
+  const [turnId, setTurnId] = useState(preferredTarget.turnId);
   const visibleCalls = session?.toolCalls.filter((call) => turnId === "ALL" || call.assistantEntryId === turnId) ?? [];
-  const [callId, setCallId] = useState(preferredCallId ?? visibleCalls[0]?.id ?? "");
+  const [callId, setCallId] = useState(preferredTarget.callId);
   const selected = visibleCalls.find((item) => item.id === callId) ?? visibleCalls[0] ?? session?.toolCalls[0];
   const [source, setSource] = useState<InspectorSource>("arguments");
   const [view, setView] = useState<"tree" | "raw">("tree");
 
   useEffect(() => {
-    if (preferredSession && preferredSession.id !== sessionId) {
-      setSessionId(preferredSession.id);
-      setTurnId("ALL");
+    if (!preferredCallId || preferredTarget.callId !== preferredCallId) return;
+    setSessionId(preferredTarget.sessionId);
+    setTurnId(preferredTarget.turnId);
+    setCallId(preferredTarget.callId);
+  }, [preferredCallId, preferredTarget.callId, preferredTarget.sessionId, preferredTarget.turnId]);
+  useEffect(() => {
+    if (detail.sessions.some((item) => item.id === sessionId)) return;
+    const fallback = toolDebuggerTarget(detail.sessions);
+    setSessionId(fallback.sessionId);
+    setTurnId(fallback.turnId);
+    setCallId(fallback.callId);
+  }, [detail.sessions, sessionId]);
+  useEffect(() => {
+    if (preferredCallId && preferredTarget.callId === preferredCallId && preferredTarget.sessionId === sessionId) {
+      // While the preferred turn is being applied, keep its call selected rather
+      // than briefly replacing it with the first call from the previous turn.
+      if (preferredTarget.turnId === turnId) setCallId(preferredTarget.callId);
       return;
     }
-    if (detail.sessions.some((item) => item.id === sessionId)) return;
-    setSessionId(detail.sessions[0]?.id ?? "");
-  }, [detail.sessions, preferredSession, sessionId]);
-  useEffect(() => setCallId(visibleCalls.some((call) => call.id === preferredCallId) ? preferredCallId ?? "" : visibleCalls[0]?.id ?? ""), [turnId, sessionId, preferredCallId, detail.sessionVersion]);
+    setCallId(visibleCalls[0]?.id ?? "");
+  }, [turnId, sessionId, preferredCallId, preferredTarget.callId, preferredTarget.sessionId, preferredTarget.turnId, detail.sessionVersion]);
 
   const inspected = selected ? inspectorValue(selected, source) : undefined;
   if (!detail.sessions.length) return <EmptyPanel icon={<TerminalSquare size={22} />} title="此 Run 没有 Pi Session" />;

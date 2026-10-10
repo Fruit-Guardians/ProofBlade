@@ -1,6 +1,12 @@
 export type InspectorTab = "overview" | "debugger" | "timeline" | "evidence" | "artifacts" | "metrics";
 export type WorkspaceView = "conversation" | "fleet" | "ablation";
 
+interface ToolDebuggerSessionState {
+  id: string;
+  assistantTurns: ReadonlyArray<{ entryId: string }>;
+  toolCalls: ReadonlyArray<{ id: string; assistantEntryId: string }>;
+}
+
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "proofblade.sidebarCollapsed";
 
 export function sidebarCollapsedFromStorage(value: string | null | undefined): boolean {
@@ -17,6 +23,31 @@ export function workspaceStateAfterRunSelection(runId: string): { runId: string;
 
 export function conversationFolderPatch(selectedFolderId: string): { folderId: string | null } {
   return { folderId: selectedFolderId || null };
+}
+
+export function automaticConversationRename(conversation: { title?: string } | undefined, firstPrompt: string | undefined): { title: string; expectedTitle: string | null } | undefined {
+  // A missing record means POST /api/conversations has persisted its metadata
+  // but the workspace refresh has not reached the browser yet. Waiting avoids
+  // comparing `null` with the stored placeholder title and suppressing the only
+  // automatic rename attempt.
+  if (!conversation || !shouldAutoNameConversation(conversation.title)) return undefined;
+  const title = firstPrompt ? conversationTitleFromPrompt(firstPrompt) : "";
+  return title ? { title, expectedTitle: conversation.title?.trim() || null } : undefined;
+}
+
+export function toolDebuggerTarget(sessions: readonly ToolDebuggerSessionState[], preferredCallId?: string): { sessionId: string; turnId: string; callId: string } {
+  if (preferredCallId) {
+    for (const session of sessions) {
+      const call = session.toolCalls.find((item) => item.id === preferredCallId);
+      if (call) return { sessionId: session.id, turnId: call.assistantEntryId, callId: call.id };
+    }
+  }
+  const session = sessions[0];
+  return {
+    sessionId: session?.id ?? "",
+    turnId: session?.assistantTurns[0]?.entryId ?? "ALL",
+    callId: session?.toolCalls[0]?.id ?? "",
+  };
 }
 
 export function conversationTitleFromPrompt(prompt: string, maxLength = 32): string {
