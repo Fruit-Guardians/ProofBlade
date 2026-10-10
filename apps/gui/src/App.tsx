@@ -14,7 +14,7 @@ import { SingleFlightPoller, isContiguousEventUpdate, isPollingAllowed, shouldRe
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
-import { ActivityDisclosure } from "./activity-disclosure.js";
+import { ActivityDisclosure, activityName } from "./activity-disclosure.js";
 import { SIDEBAR_COLLAPSED_STORAGE_KEY, inspectorStateAfterRunChange, sidebarCollapsedFromStorage, type InspectorTab, type WorkspaceView } from "./ui-state.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -262,7 +262,7 @@ export function App() {
 
   const selectedTitle = detail ? workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective : undefined;
   const workspaceTitle = workspaceView === "fleet" ? "并行解题" : workspaceView === "ablation" ? "消融实验" : selectedTitle ?? (loading ? "正在加载" : runKindFilter === "chat" ? "选择对话" : "选择 Fixture Run");
-  const workspaceSubtitle = workspaceView === "fleet" ? "批量运行与实时监督" : workspaceView === "ablation" ? "Provider、策略和结果比较" : detail ? `${detail.snapshot.runId} · ${detail.kind === "chat" ? currentModelName : phaseLabels[detail.snapshot.phase] ?? detail.snapshot.phase}` : "";
+  const workspaceSubtitle = workspaceView === "fleet" ? "批量运行与实时监督" : workspaceView === "ablation" ? "Provider、策略和结果比较" : detail ? `${detail.kind === "chat" ? currentModelName : phaseLabels[detail.snapshot.phase] ?? detail.snapshot.phase} · ${relativeTime(detail.updatedAt)}` : "";
 
   return <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorOpen ? "inspector-open" : ""}`}>
     <div className={`mobile-backdrop ${leftOpen || inspectorOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setInspectorOpen(false); }} />
@@ -338,7 +338,7 @@ export function App() {
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
         {workspaceView === "ablation" && <AblationWorkspace providers={providers} onError={setError} onNotice={setNotice} />}
         {workspaceView === "fleet" && <FleetView onError={setError} />}
-        {workspaceView === "conversation" && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
+        {workspaceView === "conversation" && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.some((run) => run.kind === runKindFilter)} kind={runKindFilter} onNew={() => runKindFilter === "chat" ? setNewRunOpen(true) : setTaskTemplateOpen(true)} />}
         {workspaceView === "conversation" && detail && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} onInspectTool={(toolId) => openInspector("debugger", toolId)} onInspectObservations={() => openInspector("overview")} />}
       </div>
     </main>
@@ -513,7 +513,8 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           const isPendingMessage = Boolean(pendingUser && chat.role === "user" && chat.text === pendingUser && chat.id === session.messages.slice().reverse().find((item) => item.role === "user")?.id);
           const calls = session.toolCalls.filter((call) => call.assistantEntryId === chat.entryId);
           const verification = chat.resultVerification ?? chat.claimVerification;
-          return <article className={`chat-message role-${chat.role}`} key={chat.id}>
+          const operationOnly = chat.role === "assistant" && calls.length > 0 && !chat.text && !chat.error && verification?.status !== "unverified";
+          return <article className={`chat-message role-${chat.role} ${operationOnly ? "operation-only" : ""}`} key={chat.id}>
             <div className="message-avatar">{chat.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
             <div className="message-content">
               <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && verification?.status === "verified" && <span className="claim-status verified" title={`Evidence ${verification.evidenceId ?? ""}`}><ShieldCheck size={11} />已验证{verification.evidenceId ? ` · ${verification.evidenceId}` : ""}</span>}{chat.role === "assistant" && verification?.status === "unverified" && <span className="claim-status unverified" title={verification.reason}><CircleAlert size={11} />未验证</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}{chat.role === "assistant" && chat.usage && <TurnCacheUsage usage={chat.usage} />}</div>
@@ -587,7 +588,7 @@ function ToolExecutionCard({ call, selected = false, onInspect }: { call: ToolCa
   const status = call.status;
   const duration = "telemetry" in call && call.telemetry.result?.payload?.durationMs ? `${call.telemetry.result.payload.durationMs} ms` : statusLabel(status);
   const links = "links" in call ? call.links : undefined;
-  return <ActivityDisclosure callId={call.id} name={call.name} status={status} presentation={presentation} duration={duration} links={links} selected={selected} onInspect={onInspect} />;
+  return <ActivityDisclosure callId={call.id} name={activityName(call.name)} status={status} presentation={presentation} duration={duration} links={links} selected={selected} onInspect={onInspect} />;
 }
 
 function modelOptions(providers: ProviderSettings | undefined, preferences: ConversationPreferences): string[] {
@@ -1324,7 +1325,15 @@ function HealthLine({ ok, label }: { ok: boolean; label: string }) { return <div
 function Stat({ label, value, icon }: { label: string; value: number; icon: ReactNode }) { return <div className="stat"><span>{icon}{label}</span><strong>{formatNumber(value)}</strong></div>; }
 function AlertBar({ children, kind, onClose }: { children: ReactNode; kind: "error" | "success"; onClose(): void }) { return <div className={`alert-bar ${kind}`}>{kind === "error" ? <CircleAlert size={15} /> : <CheckCircle2 size={15} />}<span>{children}</span><button className="icon-button" onClick={onClose}><X size={14} /></button></div>; }
 function EmptyPanel({ icon, title }: { icon: ReactNode; title: string }) { return <div className="empty-panel">{icon}<strong>{title}</strong></div>; }
-function LoadingState({ loading, hasRuns }: { loading: boolean; hasRuns: boolean }) { return <div className="loading-state">{loading ? <RefreshCw className="spin" size={22} /> : <Database size={22} />}<strong>{loading ? "正在读取 Control Store" : hasRuns ? "选择一个 Run" : "还没有 Run"}</strong></div>; }
+function LoadingState({ loading, hasRuns, kind, onNew }: { loading: boolean; hasRuns: boolean; kind: "chat" | "fixture"; onNew(): void }) {
+  if (loading) return <div className="loading-state"><RefreshCw className="spin" size={22} /><strong>正在载入工作区</strong></div>;
+  return <div className="conversation-landing">
+    <div className="landing-mark"><Zap size={24} /></div>
+    <strong>{hasRuns ? (kind === "chat" ? "选择一个对话" : "选择一个 Fixture Run") : (kind === "chat" ? "从一个问题开始" : "创建第一项安全任务")}</strong>
+    <span>{hasRuns ? "从左侧继续已有工作，或创建新的任务。" : kind === "chat" ? "ProofBlade 会保留操作、证据和产物，详细数据可随时在检查器中查看。" : "通过模板启动带阶段、检查点和验证状态的运行。"}</span>
+    <button type="button" onClick={onNew}><Plus size={16} />{kind === "chat" ? "新建对话" : "使用任务模板"}</button>
+  </div>;
+}
 
 function FleetView({ onError }: { onError(message: string): void }) {
   const [snapshot, setSnapshot] = useState<FleetSnapshot>();

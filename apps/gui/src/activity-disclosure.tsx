@@ -1,8 +1,20 @@
 import { Archive, Braces, Check, ChevronRight, CircleAlert, RefreshCw, ShieldCheck, Zap } from "lucide-react";
-import { useId, useState } from "react";
+import React, { useId, useState } from "react";
 import type { ToolCallDebug, ToolPresentation } from "./shared.js";
 
 export type ActivityStatus = "running" | "success" | "error" | "pending";
+
+const activityNames: Record<string, string> = {
+  bash: "运行命令",
+  read: "读取文件",
+  write: "写入文件",
+  edit: "编辑文件",
+  load_skill: "加载技能",
+  verify_claim: "验证结论",
+  verify_result: "验证结果",
+  evidence: "更新证据",
+  mcp_call: "调用 MCP",
+};
 
 export interface ActivityDisclosureProps {
   callId: string;
@@ -21,6 +33,10 @@ export function collapsedActivitySummary(status: ActivityStatus, presentation: T
   return error || presentation.summary;
 }
 
+export function activityName(name: string): string {
+  return activityNames[name] ?? name;
+}
+
 export function ActivityDisclosure({ callId, name, status, presentation, duration, links, selected = false, onInspect }: ActivityDisclosureProps) {
   const [expanded, setExpanded] = useState(false);
   const reactId = useId().replace(/:/g, "");
@@ -33,6 +49,7 @@ export function ActivityDisclosure({ callId, name, status, presentation, duratio
       <button type="button" className="activity-trigger" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded((value) => !value)}>
         <span className="activity-status" aria-hidden="true">{normalized === "success" ? <Check size={13} /> : normalized === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span>
         <strong>{name}</strong>
+        <span className="activity-separator" aria-hidden="true" />
         <code title={summary}>{summary}</code>
         <em>{duration}</em>
         <ChevronRight className="activity-chevron" size={14} aria-hidden="true" />

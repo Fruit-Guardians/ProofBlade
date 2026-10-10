@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ActivityDisclosure, collapsedActivitySummary } from "../src/activity-disclosure.js";
+import { ActivityDisclosure, activityName, collapsedActivitySummary } from "../src/activity-disclosure.js";
 
 const presentation = {
   summary: "npm run build --workspace=@proofblade/gui",
@@ -35,6 +35,12 @@ test("error disclosures expose the first error line in their collapsed summary",
     output: "TimeoutError: command exceeded 180 seconds\nremaining diagnostics",
   }), "TimeoutError: command exceeded 180 seconds");
   assert.equal(collapsedActivitySummary("success", presentation), presentation.summary);
+});
+
+test("common tool names use concise conversation-facing labels", () => {
+  assert.equal(activityName("bash"), "运行命令");
+  assert.equal(activityName("edit"), "编辑文件");
+  assert.equal(activityName("custom_tool"), "custom_tool");
 });
 
 test("separate activity disclosures own independent collapsed state", () => {
