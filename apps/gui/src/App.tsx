@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRunUpdates, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, addProjectMcpServer, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createProjectSkill, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRunUpdates, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller, isContiguousEventUpdate, isPollingAllowed, shouldRefreshFullDetail } from "./polling.js";
@@ -367,7 +367,7 @@ export function App() {
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
     {renameOpen && detail?.kind === "chat" && <RenameConversationModal initialTitle={workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective} onClose={() => setRenameOpen(false)} onSaved={async (title) => { await renameConversation(detail.snapshot.runId, title); await refreshWorkspace(); setRenameOpen(false); setNotice("对话名称已更新"); }} />}
-    {capabilityOpen && detail?.kind === "chat" && workspaceSettings && <CapabilityModal runId={detail.snapshot.runId} workspace={workspaceSettings} onClose={() => setCapabilityOpen(false)} onSaved={async () => { setWorkspaceSettings(await getWorkspaceSettings()); setNotice("本对话能力配置已保存"); }} />}
+    {capabilityOpen && detail?.kind === "chat" && workspaceSettings && <CapabilityModal runId={detail.snapshot.runId} workspace={workspaceSettings} onClose={() => setCapabilityOpen(false)} onCatalogChanged={setWorkspaceSettings} onSaved={async () => { setWorkspaceSettings(await getWorkspaceSettings()); setNotice("本对话能力配置已保存"); }} />}
   </div>;
 
   async function removeSelectedConversation(): Promise<void> {
@@ -1289,8 +1289,10 @@ function FolderManagerModal({ folders, onClose, onChanged }: { folders: Conversa
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal folder-modal"><header><div><Folder size={17} /><strong>对话文件夹</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<form className="folder-create" onSubmit={(event) => void add(event)}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="新文件夹名称" /><button className="primary-button" disabled={busy || !name.trim()}><FolderPlus size={14} />添加</button></form><div className="folder-manager-list">{folders.map((folder) => <div className="folder-manager-row" key={folder.id}><Folder size={15} /><strong>{folder.name}</strong><span className="status-spacer" /><button type="button" className="icon-button" title="重命名" aria-label={`重命名 ${folder.name}`} onClick={() => void rename(folder)}><Code2 size={14} /></button><button type="button" className="icon-button" title="删除" aria-label={`删除 ${folder.name}`} onClick={() => void remove(folder)}><X size={14} /></button></div>)}{!folders.length && <div className="empty-list">还没有文件夹</div>}</div><footer><button type="button" className="primary-button" onClick={onClose}>完成</button></footer></div></div>;
 }
 
-function CapabilityModal({ runId, workspace, onClose, onSaved }: { runId: string; workspace: WorkspaceSettings; onClose(): void; onSaved(): Promise<void> }) {
+function CapabilityModal({ runId, workspace, onClose, onSaved, onCatalogChanged }: { runId: string; workspace: WorkspaceSettings; onClose(): void; onSaved(): Promise<void>; onCatalogChanged(workspace: WorkspaceSettings): void }) {
   const [preferences, setPreferences] = useState<ConversationPreferences>();
+  const [catalog, setCatalog] = useState(workspace);
+  const [setup, setSetup] = useState<"skill" | "mcp">();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   useEffect(() => { void getConversationPreferences(runId).then(setPreferences).catch((caught) => setError(message(caught))); }, [runId]);
@@ -1299,8 +1301,80 @@ function CapabilityModal({ runId, workspace, onClose, onSaved }: { runId: string
     if (!preferences) return; setBusy(true); setError(undefined);
     try { await updateConversationPreferences(runId, preferences); await onSaved(); onClose(); } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
   };
-  const native = preferences ? workspace.capabilities.providerNative[preferences.profileId] ?? [] : [];
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal capability-modal"><header><div><ListChecks size={17} /><strong>本对话能力</strong><span className="modal-subtitle">只影响当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}{!preferences ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取能力</div> : <div className="capability-sections"><CapabilitySection title="Coding Tools" icon={<Wrench size={14} />} items={workspace.capabilities.tools.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: `${item.schemaChars} chars`, enabled: preferences.enabledTools.includes(item.name) }))} onToggle={(id) => toggle("enabledTools", id)} /><CapabilitySection title="Skills" icon={<Zap size={14} />} items={workspace.capabilities.skills.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.path, enabled: !item.disabled && preferences.enabledSkills.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledSkills", id)} /><CapabilitySection title="MCP Servers" icon={<ServerCog size={14} />} items={workspace.capabilities.mcpServers.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.toolchain ? `${item.status} · ${item.toolchain.kind} · ${item.toolchain.state}` : item.status, reason: item.toolchain?.reason, enabled: !item.disabled && preferences.enabledMcpServers.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledMcpServers", id)} /><ProviderNativeCapabilitySection items={native} /></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={busy || !preferences} onClick={() => void save()}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存能力</button></footer></div></div>;
+  const created = async (kind: "skill" | "mcp", name: string) => {
+    const next = await getWorkspaceSettings();
+    setCatalog(next);
+    onCatalogChanged(next);
+    setPreferences((current) => current ? {
+      ...current,
+      ...(kind === "skill" ? { enabledSkills: [...new Set([...current.enabledSkills, name])] } : { enabledMcpServers: [...new Set([...current.enabledMcpServers, name])] }),
+    } : current);
+    setSetup(undefined);
+  };
+  const native = preferences ? catalog.capabilities.providerNative[preferences.profileId] ?? [] : [];
+  return <>
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal capability-modal" role="dialog" aria-modal="true" aria-labelledby="capability-modal-title">
+        <header><div><ListChecks size={17} /><strong id="capability-modal-title">本对话能力</strong><span className="modal-subtitle">只影响当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>
+        {error && <div className="script-error">{error}</div>}
+        <div className="capability-toolbar"><span>项目能力目录</span><button type="button" className="command-button" onClick={() => setSetup("skill")}><Plus size={13} />添加 Skill</button><button type="button" className="command-button" onClick={() => setSetup("mcp")}><ServerCog size={13} />配置 MCP</button></div>
+        {!preferences ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取能力</div> : <div className="capability-sections">
+          <CapabilitySection title="Coding Tools" icon={<Wrench size={14} />} items={catalog.capabilities.tools.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: `${item.schemaChars} chars`, enabled: preferences.enabledTools.includes(item.name) }))} onToggle={(id) => toggle("enabledTools", id)} />
+          <CapabilitySection title="Skills" icon={<Zap size={14} />} items={catalog.capabilities.skills.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.path, enabled: !item.disabled && preferences.enabledSkills.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledSkills", id)} />
+          <CapabilitySection title="MCP Servers" icon={<ServerCog size={14} />} items={catalog.capabilities.mcpServers.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.toolchain ? `${item.status} · ${item.toolchain.kind} · ${item.toolchain.state}` : item.status, reason: item.toolchain?.reason, enabled: !item.disabled && preferences.enabledMcpServers.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledMcpServers", id)} />
+          <ProviderNativeCapabilitySection items={native} />
+        </div>}
+        <footer><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={busy || !preferences} onClick={() => void save()}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存能力</button></footer>
+      </div>
+    </div>
+    {setup && <CapabilitySetupModal kind={setup} onClose={() => setSetup(undefined)} onCreated={created} />}
+  </>;
+}
+
+function CapabilitySetupModal({ kind, onClose, onCreated }: { kind: "skill" | "mcp"; onClose(): void; onCreated(kind: "skill" | "mcp", name: string): Promise<void> }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [transport, setTransport] = useState<"http" | "stdio">("http");
+  const [endpoint, setEndpoint] = useState("");
+  const [args, setArgs] = useState("");
+  const [readOnly, setReadOnly] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const created = kind === "skill"
+        ? await createProjectSkill({ name, description, instructions })
+        : await addProjectMcpServer({ name, description, transport, ...(transport === "http" ? { url: endpoint } : { command: endpoint }), args: args.split(/\r?\n/).map((item) => item.trim()).filter(Boolean), readOnly });
+      await onCreated(kind, created.name);
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <div className="modal-backdrop capability-setup-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <form className="modal capability-setup-modal" onSubmit={(event) => void submit(event)} role="dialog" aria-modal="true" aria-labelledby="capability-setup-title">
+      <header><div>{kind === "skill" ? <Zap size={17} /> : <ServerCog size={17} />}<strong id="capability-setup-title">{kind === "skill" ? "添加项目 Skill" : "配置 MCP Server"}</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>
+      {error && <div className="script-error">{error}</div>}
+      <div className="capability-setup-fields">
+        <label><span>名称</span><input required maxLength={64} pattern={kind === "skill" ? "[a-z0-9][a-z0-9-]{0,63}" : "[a-z0-9][a-z0-9_-]{0,63}"} value={name} onChange={(event) => setName(event.target.value.toLowerCase())} placeholder={kind === "skill" ? "my-skill" : "my-mcp"} autoFocus /></label>
+        <label><span>说明</span><input required maxLength={kind === "skill" ? 500 : 1000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="说明何时使用以及提供什么能力" /></label>
+        {kind === "skill" ? <label><span>Skill 指令</span><textarea required rows={10} maxLength={20_000} value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder="写明执行步骤、约束和期望输出。保存后生成 skills/&lt;name&gt;/SKILL.md。" /></label> : <>
+          <label><span>连接方式</span><select value={transport} onChange={(event) => { setTransport(event.target.value as "http" | "stdio"); setEndpoint(""); }}><option value="http">HTTP URL</option><option value="stdio">本地 stdio 命令</option></select></label>
+          <label><span>{transport === "http" ? "服务 URL" : "启动命令"}</span><input required value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder={transport === "http" ? "http://127.0.0.1:3000/mcp" : "npx"} /></label>
+          {transport === "stdio" && <label><span>命令参数（每行一个）</span><textarea rows={5} value={args} onChange={(event) => setArgs(event.target.value)} placeholder={"-y\n@modelcontextprotocol/server-filesystem\nD:/workspace"} /></label>}
+          <label className="capability-readonly"><input type="checkbox" checked={readOnly} onChange={(event) => setReadOnly(event.target.checked)} /><span><strong>声明为只读 Server</strong><small>仅在确认全部 Tool 都不会修改外部状态时启用</small></span></label>
+          <p className="capability-config-note">保存到项目根目录的 <code>.mcp.json</code>。环境变量、Tool 过滤和安全策略等高级字段仍可直接编辑该文件。</p>
+        </>}
+      </div>
+      <footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !name.trim() || !description.trim() || (kind === "skill" ? !instructions.trim() : !endpoint.trim())}>{busy ? <RefreshCw size={14} className="spin" /> : <Plus size={14} />}{kind === "skill" ? "添加 Skill" : "保存 MCP"}</button></footer>
+    </form>
+  </div>;
 }
 
 function ProviderNativeCapabilitySection({ items }: { items: ProviderNativeCapabilityStatus[] }) {

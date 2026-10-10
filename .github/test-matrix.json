@@ -241,6 +241,12 @@
       "command": "node --import tsx --test apps/gui/tests/activity-disclosure.test.ts apps/gui/tests/ui-state.test.ts"
     },
     {
+      "id": "gui-capability-config",
+      "sourceGlobs": ["apps/gui/src/api.ts", "apps/gui/src/capability-config.ts"],
+      "testGlobs": ["apps/gui/tests/capability-config.test.ts"],
+      "command": "node --import tsx --test apps/gui/tests/capability-config.test.ts"
+    },
+    {
       "id": "gui-task-workspace",
       "sourceGlobs": ["apps/gui/src/task-workspace.ts"],
       "testGlobs": ["apps/gui/tests/debug-data.test.ts"],

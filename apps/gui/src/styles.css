@@ -587,9 +587,13 @@ select { min-width: 0; padding: 0 27px 0 8px; }
 .folder-manager-list { min-height: 170px; max-height: 360px; padding: 8px 14px; overflow: auto; }
 .folder-manager-row { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 6px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
 .folder-manager-row strong { color: var(--text); font-size: 10px; }
-.capability-modal { width: min(720px, calc(100vw - 28px)); }
-.capability-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.capability-section { min-width: 0; border: 1px solid var(--line); background: #101611; }
+.capability-modal { display: flex; width: min(820px, calc(100vw - 28px)); max-height: calc(100dvh - 28px); flex-direction: column; overflow: hidden; }
+.capability-modal > header, .capability-modal > footer { flex: none; }
+.capability-toolbar { display: flex; align-items: center; gap: 7px; padding: 9px 14px; border-top: 1px solid var(--line-soft); }
+.capability-toolbar > span { margin-right: auto; color: var(--faint); font-size: 10px; }
+.capability-toolbar .command-button { min-height: 30px; }
+.capability-sections { display: grid; min-height: 0; flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 14px; overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.capability-section { min-width: 0; align-self: start; border: 1px solid var(--line); background: #101611; }
 .capability-section .section-head { min-height: 31px; padding: 0 8px; border-bottom: 1px solid var(--line); }
 .capability-section .section-head > div { display: flex; align-items: center; gap: 6px; }
 .capability-section .section-head span { color: var(--faint); font-size: 8px; }
@@ -602,6 +606,17 @@ select { min-width: 0; padding: 0 27px 0 8px; }
 .capability-row strong { color: var(--text); font-size: 9px; }
 .capability-row small { margin-top: 3px; color: var(--muted); font-size: 8px; }
 .capability-row em { margin-top: 4px; color: var(--faint); font-size: 7px; font-style: normal; }
+.capability-setup-backdrop { z-index: 60; }
+.capability-setup-modal { display: flex; width: min(560px, calc(100vw - 28px)); max-height: calc(100dvh - 28px); flex-direction: column; overflow: hidden; }
+.capability-setup-fields { min-height: 0; padding: 12px 14px; overflow: auto; }
+.capability-setup-fields > label { margin-bottom: 11px; }
+.capability-setup-fields > label:last-child { margin-bottom: 0; }
+.capability-setup-fields .capability-readonly { flex-direction: row; align-items: flex-start; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.capability-readonly input { width: 14px; height: 14px; flex: none; margin: 2px 0 0; accent-color: #8d9cff; }
+.capability-readonly > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.capability-readonly strong { color: var(--text); font-size: 11px; }
+.capability-readonly small { color: var(--muted); font-size: 9px; line-height: 14px; }
+.capability-config-note { margin: 0; padding: 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--panel-2); font-size: 9px; line-height: 15px; }
 
 .directory-input, .directory-location { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
 .directory-input .command-button, .directory-location .command-button { height: 29px; white-space: nowrap; }
@@ -791,7 +806,7 @@ select { min-width: 0; padding: 0 27px 0 8px; }
   .provider-layout { grid-template-columns: 1fr; }
   .provider-list { max-height: 155px; border-right: 0; border-bottom: 1px solid var(--line); overflow: auto; }
   .provider-list-item { display: inline-flex; width: calc(50% - 4px); margin: 2px; }
-  .capability-sections { grid-template-columns: 1fr; max-height: 56vh; overflow: auto; }
+  .capability-sections { grid-template-columns: 1fr; }
   .conversation-model { max-width: 150px; }
   .debug-selectors { align-items: stretch; flex-wrap: wrap; }
   .debug-selectors > label { flex: 1; min-width: 130px; }
@@ -1275,6 +1290,8 @@ details > summary::-webkit-details-marker { display: none; }
 }
 
 @media (max-width: 520px) {
+  .capability-toolbar { flex-wrap: wrap; }
+  .capability-toolbar > span { width: 100%; }
   .run-heading p { max-width: 42vw; }
   .conversation-title-button { max-width: 43vw; }
   .activity-row { min-height: 40px; }

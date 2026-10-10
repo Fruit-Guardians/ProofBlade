@@ -20,12 +20,12 @@
 
 ## 职责
 
-提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、上下文用量/剩余窗口/主动压缩阈值、Run 观测和 Tool 调试界面。界面采用会话优先外壳：工具调用在消息内以紧凑披露行展示，Overview、调用、Timeline、Evidence、Artifact 和指标复用同一按需检查器。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
+提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、项目 Skill/MCP 配置、上下文用量/剩余窗口/主动压缩阈值、Run 观测和 Tool 调试界面。界面采用会话优先外壳：工具调用在消息内以紧凑披露行展示，Overview、调用、Timeline、Evidence、Artifact 和指标复用同一按需检查器。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
 
 ## 入口与依赖
 
 - 服务入口：`src/server.ts`；浏览器入口：`src/main.tsx`；主界面：`src/App.tsx`。
-- 数据投影：`debug-data.ts`；Tool 可读投影：`tool-presentation.ts`；目录适配：`directory-browser.ts`；本地配置：`provider-settings.ts`、`workspace-settings.ts`。
+- 数据投影：`debug-data.ts`；Tool 可读投影：`tool-presentation.ts`；目录适配：`directory-browser.ts`；本地配置：`provider-settings.ts`、`workspace-settings.ts`；项目能力写入：`capability-config.ts`。
 - 依赖 Materials 公共 API、React 和 Lucide，不创建第三套 durable state。
 
 ## 开发规则
@@ -40,6 +40,7 @@
 - 运行中状态以服务端 `active` 投影为准，页面切换或组件重挂载不得恢复为可发送状态；暂停确认前按钮保持可见并禁用重复暂停。
 - 模型标签和右侧配置必须显示当前对话下一轮使用的 Provider/Model/Thinking；最近一条响应的模型仅作为历史元数据，不得覆盖当前选择。
 - Provider Profile 必须显示并保存实际 wire protocol；模型发现按 OpenAI Bearer 或 Anthropic `x-api-key`/版本头发送。能力面板按本对话 Profile 显示 Provider Native 状态：协议候选未接入时不可勾选，和受控 workspace 工具语义重合时显示被接管原因，不能把产品内置工具误展示为 ProofBlade 可执行能力。
+- 能力面板新建 Skill 时只能写入项目 `skills/<name>/SKILL.md`，名称必须经过路径安全校验，并由生产 Skill registry 重新发现后才算成功。新增 MCP Server 必须合并而非覆盖 `.mcp.json` 中的既有配置，并由生产 MCP registry 校验；浏览器表单只覆盖基础 HTTP/stdio、参数和只读声明，高级安全字段继续由项目配置文件维护。
 - Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 4）；默认值允许同一 Provider/model 的多个 GUI 会话并行，超过配置值仍由共享 FIFO 队列背压，32 是硬上限。普通对话与 Fixture Solver 共用槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
 - 上下文面板显示最近一次真实 Provider 请求的已用 tokens、窗口上限、剩余 tokens 和利用率；对话可选择 20%-80% 的主动压缩阈值，该偏好由服务端传入现有 Coding Lane 维护链，不能在 GUI 另建压缩流程。

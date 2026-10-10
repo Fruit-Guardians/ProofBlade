@@ -53,6 +53,14 @@ export async function getWorkspaceSettings(): Promise<WorkspaceSettings> {
   return await request("/api/workspace");
 }
 
+export async function createProjectSkill(input: { name: string; description: string; instructions: string }): Promise<{ name: string; path: string }> {
+  return await request("/api/capabilities/skills", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function addProjectMcpServer(input: { name: string; description: string; transport: "http" | "stdio"; url?: string; command?: string; args: string[]; readOnly: boolean }): Promise<{ name: string; path: string }> {
+  return await request("/api/capabilities/mcp", { method: "POST", body: JSON.stringify(input) });
+}
+
 export async function getDirectories(path?: string): Promise<DirectoryListing> {
   return await request(`/api/directories${path ? `?path=${encodeURIComponent(path)}` : ""}`);
 }
