@@ -80,6 +80,7 @@ export function App() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [newRunOpen, setNewRunOpen] = useState(false);
+  const [developmentOpen, setDevelopmentOpen] = useState(false);
   const [taskTemplateOpen, setTaskTemplateOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const [capabilityOpen, setCapabilityOpen] = useState(false);
@@ -317,11 +318,8 @@ export function App() {
         <summary title="更多工作区和设置"><MoreHorizontal size={17} /><span>更多</span></summary>
         <div className="menu-panel sidebar-menu" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
           <button onClick={() => openRunKind("chat")}><MessageSquare size={15} /><span><strong>对话</strong><small>普通 Agent 会话</small></span></button>
-          <button onClick={() => openRunKind("fixture")}><FlaskConical size={15} /><span><strong>Fixture Runs</strong><small>安全任务与复盘</small></span></button>
-          <button onClick={() => { setWorkspaceView("fleet"); setInspectorOpen(false); setLeftOpen(false); }}><Layers3 size={15} /><span><strong>并行解题</strong><small>Fleet 批量运行</small></span></button>
-          <button onClick={() => { setWorkspaceView("ablation"); setInspectorOpen(false); setLeftOpen(false); }}><GitBranch size={15} /><span><strong>消融实验</strong><small>策略与结果比较</small></span></button>
           <hr />
-          <button onClick={() => setTaskTemplateOpen(true)}><Plus size={15} /><span><strong>安全任务模板</strong><small>创建 Fixture Run</small></span></button>
+          <button onClick={() => setDevelopmentOpen(true)}><FlaskConical size={15} /><span><strong>开发与评测</strong><small>受控任务、并行运行与策略对比</small></span></button>
           <button onClick={() => setProviderOpen(true)}><Settings size={15} /><span><strong>Provider 设置</strong><small>模型与并发配置</small></span></button>
           <button onClick={() => setFolderOpen(true)}><FolderPlus size={15} /><span><strong>管理文件夹</strong><small>整理对话列表</small></span></button>
         </div>
@@ -364,6 +362,7 @@ export function App() {
 
     {inspectorOpen && <RunInspector detail={detail} tab={inspectorTab} selectedToolId={selectedToolId} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} onTabChange={(next) => { setInspectorTab(next); if (next !== "debugger") setSelectedToolId(undefined); }} onClose={() => setInspectorOpen(false)} />}
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
+    {developmentOpen && <DevelopmentHubModal onClose={() => setDevelopmentOpen(false)} onFixtures={() => openRunKind("fixture")} onFleet={() => { setWorkspaceView("fleet"); setInspectorOpen(false); setLeftOpen(false); }} onAblation={() => { setWorkspaceView("ablation"); setInspectorOpen(false); setLeftOpen(false); }} onTaskTemplate={() => setTaskTemplateOpen(true)} />}
     {taskTemplateOpen && bootstrap && <TaskTemplateModal bootstrap={bootstrap} onClose={() => setTaskTemplateOpen(false)} onCreated={(id) => { setTaskTemplateOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
@@ -1060,6 +1059,26 @@ function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
     <section><div className="metrics-title"><ListChecks size={14} />观察队列</div><MetricLine label="待处理" value={String(detail.observationQueue.total)} /><MetricLine label="Urgent" value={String(detail.observationQueue.urgent)} /><MetricLine label="已展示" value={String(detail.observationQueue.visible)} /><MetricLine label="已隐藏" value={String(detail.observationQueue.hidden)} /><MetricLine label="状态" value={detail.observationQueue.total > 0 ? "待消费" : "已清空"} /></section>
     <section><div className="metrics-title"><FlaskConical size={14} />当前对话配置</div><MetricLine label="Provider" value={provider} /><MetricLine label="Model" value={model} /><MetricLine label="Thinking" value={thinkingLevel} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
+  </div>;
+}
+
+function DevelopmentHubModal({ onClose, onFixtures, onFleet, onAblation, onTaskTemplate }: { onClose(): void; onFixtures(): void; onFleet(): void; onAblation(): void; onTaskTemplate(): void }) {
+  const launch = (action: () => void) => {
+    onClose();
+    action();
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="modal development-modal" role="dialog" aria-modal="true" aria-labelledby="development-hub-title">
+      <header><div><FlaskConical size={17} /><strong id="development-hub-title">开发与评测</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>
+      <p className="development-hub-copy">这些工具用于受控任务、批量执行和 Agent 策略评测，不影响普通对话。</p>
+      <div className="development-launch-grid">
+        <button type="button" onClick={() => launch(onFixtures)}><FlaskConical size={18} /><span><strong>受控任务</strong><small>查看 Fixture Runs、验证状态与恢复记录</small></span><ChevronRight size={15} /></button>
+        <button type="button" onClick={() => launch(onTaskTemplate)}><Plus size={18} /><span><strong>新建受控任务</strong><small>从安全任务模板创建 Fixture Run</small></span><ChevronRight size={15} /></button>
+        <button type="button" onClick={() => launch(onFleet)}><Layers3 size={18} /><span><strong>批量运行</strong><small>使用 Fleet 并行执行多个任务</small></span><ChevronRight size={15} /></button>
+        <button type="button" onClick={() => launch(onAblation)}><GitBranch size={18} /><span><strong>策略对比</strong><small>创建和查看消融实验及结果报告</small></span><ChevronRight size={15} /></button>
+      </div>
+      <footer><button type="button" className="command-button" onClick={onClose}>关闭</button></footer>
+    </div>
   </div>;
 }
 

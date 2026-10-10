@@ -493,6 +493,16 @@ select { min-width: 0; padding: 0 27px 0 8px; }
 .modal label { display: flex; flex-direction: column; gap: 5px; }
 .modal input, .modal select, .modal textarea { width: 100%; padding: 0 8px; }
 .modal textarea { resize: vertical; border: 1px solid #354039; border-radius: 4px; outline: 0; padding: 7px 8px; color: var(--text); background: #0f1411; font-size: 10px; line-height: 16px; }
+.development-modal { width: min(640px, 100%); }
+.development-hub-copy { margin: 0; padding: 14px 16px 4px; color: var(--muted); font-size: 12px; line-height: 18px; }
+.development-launch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 14px 16px; }
+.development-launch-grid > button { display: grid; grid-template-columns: 22px minmax(0, 1fr) 15px; gap: 10px; align-items: start; min-height: 76px; padding: 13px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; color: var(--muted); text-align: left; background: #222226; cursor: pointer; }
+.development-launch-grid > button:hover { border-color: rgba(141,156,255,.38); color: #b9c1ff; background: #292a35; }
+.development-launch-grid > button > svg:first-child { margin-top: 1px; color: #a7b1ff; }
+.development-launch-grid > button > svg:last-child { align-self: center; color: var(--faint); }
+.development-launch-grid > button span { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.development-launch-grid > button strong { color: var(--text); font-size: 13px; font-weight: 600; }
+.development-launch-grid > button small { color: var(--muted); font-size: 11px; line-height: 16px; }
 .launch-switch { margin: 12px 14px; }
 .launch-switch button { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .modal-row { display: grid; grid-template-columns: 1fr 130px; gap: 10px; }
@@ -1285,6 +1295,7 @@ details > summary::-webkit-details-marker { display: none; }
   .chat-message { padding: 14px 10px; }
   .role-user .message-content { max-width: 88%; }
   .conversation-landing > strong { font-size: 22px; }
+  .development-launch-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
