@@ -63,15 +63,9 @@ code, pre { font-family: "SFMono-Regular", "Cascadia Code", Consolas, "PingFang 
 .filter-row button { height: 27px; padding: 0 4px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 10px; cursor: pointer; white-space: nowrap; }
 .filter-row button:hover, .filter-row button.active { color: var(--text); background: var(--panel-3); }
 .run-list { flex: 1; min-height: 0; overflow: auto; padding: 6px; }
-.run-item { position: relative; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 8px; align-items: start; width: 100%; min-height: 75px; margin-bottom: 2px; padding: 10px 9px; border: 1px solid transparent; border-radius: 5px; text-align: left; background: transparent; cursor: pointer; }
+.run-item { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; width: 100%; min-height: 75px; margin-bottom: 2px; padding: 10px 9px; border: 1px solid transparent; border-radius: 5px; text-align: left; background: transparent; cursor: pointer; }
 .run-item:hover { background: #171d19; }
 .run-item.selected { border-color: #315d49; background: #18231d; box-shadow: inset 2px 0 var(--green); }
-.status-dot { width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: var(--muted); }
-.status-dot.status-succeeded { background: var(--green); }
-.status-dot.status-running, .status-dot.status-verifying { background: var(--cyan); box-shadow: 0 0 0 3px rgba(88,182,208,.12); }
-.status-dot.status-failed, .status-dot.status-exhausted { background: var(--red); }
-.status-dot.status-paused, .status-dot.status-need_human { background: var(--amber); }
-.status-dot.status-chat { background: var(--green); box-shadow: 0 0 0 3px rgba(66,197,138,.1); }
 .run-item-body { display: flex; min-width: 0; flex-direction: column; }
 .run-item-body strong { overflow: hidden; color: var(--text); font: 600 11px/16px "Cascadia Code", monospace; text-overflow: ellipsis; white-space: nowrap; }
 .run-item-body small { display: -webkit-box; overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 14px; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -949,7 +943,6 @@ details > summary::-webkit-details-marker { display: none; }
 .run-item { min-height: 46px; margin-bottom: 2px; padding: 7px 9px; border-radius: 8px; align-items: center; }
 .run-item:hover { background: #242427; }
 .run-item.selected { border-color: transparent; background: #303034; box-shadow: none; }
-.run-item.selected .status-dot { background: var(--green); }
 .run-item-body strong { color: #ececef; font: 500 13px/18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .run-item-body small { margin-top: 1px; font-size: 11px; line-height: 14px; -webkit-line-clamp: 1; }
 .run-item-body em { margin-top: 2px; color: var(--faint); font-size: 11px; text-transform: none; }
@@ -1146,7 +1139,7 @@ details > summary::-webkit-details-marker { display: none; }
 .folder-filter button:hover, .folder-filter button.active { color: var(--text); background: #292a35; }
 .folder-filter button.active svg, .folder-filter button.active span { color: #a7b1ff; }
 .status-badge.status-chat { border-color: rgba(141,156,255,.32); color: #b8c0ff; background: rgba(92,109,214,.14); }
-.status-dot.status-chat, .live-pulse, .model-live i, .streaming-label i { background: var(--green); box-shadow: 0 0 0 3px rgba(141,156,255,.12); }
+.live-pulse, .model-live i, .streaming-label i { background: var(--green); box-shadow: 0 0 0 3px rgba(141,156,255,.12); }
 .activity-disclosure.selected { border-color: rgba(141,156,255,.46); }
 .run-inspector-head > div > svg { color: #aab4ff; }
 

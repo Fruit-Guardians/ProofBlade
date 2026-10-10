@@ -307,7 +307,6 @@ export function App() {
         {filteredRuns.map((run) => {
           const title = workspaceSettings?.conversations[run.runId]?.title ?? run.objective;
           return <button className={`run-item ${run.runId === runId ? "selected" : ""}`} title={`${title}\n${run.runId}`} key={run.runId} onClick={() => setRunId(run.runId)}>
-            <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
             <span className="run-item-body"><strong>{title}</strong>{run.kind === "fixture" && <small>{run.objective}</small>}<em>{run.kind === "chat" ? relativeTime(run.updatedAt) : `${phaseLabels[run.phase] ?? run.phase} · ${relativeTime(run.updatedAt)}`}</em></span>
             {run.counts.tools !== undefined && <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>}
           </button>;
