@@ -10,3 +10,18 @@ export function sidebarCollapsedFromStorage(value: string | null | undefined): b
 export function inspectorStateAfterRunChange(): { open: false; tab: "overview"; selectedToolId: undefined } {
   return { open: false, tab: "overview", selectedToolId: undefined };
 }
+
+export function conversationTitleFromPrompt(prompt: string, maxLength = 32): string {
+  const normalized = prompt
+    .replace(/```[\s\S]*?```/g, " 代码片段 ")
+    .replace(/[`#>*_~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const sentence = normalized.split(/(?<=[。！？!?])\s|[\r\n]+/u)[0]?.trim() ?? "";
+  const characters = Array.from(sentence || normalized);
+  return characters.length > maxLength ? `${characters.slice(0, maxLength).join("")}…` : characters.join("");
+}
+
+export function shouldAutoNameConversation(title: string | undefined): boolean {
+  return !title?.trim() || title.trim() === "新对话";
+}

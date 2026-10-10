@@ -15,7 +15,7 @@ import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolde
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
 import { ActivityDisclosure, activityName } from "./activity-disclosure.js";
-import { SIDEBAR_COLLAPSED_STORAGE_KEY, inspectorStateAfterRunChange, sidebarCollapsedFromStorage, type InspectorTab, type WorkspaceView } from "./ui-state.js";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, conversationTitleFromPrompt, inspectorStateAfterRunChange, shouldAutoNameConversation, sidebarCollapsedFromStorage, type InspectorTab, type WorkspaceView } from "./ui-state.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
@@ -91,6 +91,7 @@ export function App() {
   const detailRef = useRef(detail);
   detailRef.current = detail;
   const lastFullDetailRefreshAtRef = useRef(0);
+  const autoTitleAttemptsRef = useRef(new Set<string>());
 
   const refreshRuns = useCallback(async (selectPreferred = false) => {
     const next = await getRuns();
@@ -195,6 +196,25 @@ export function App() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (!detail || detail.kind !== "chat" || !workspaceSettings) return;
+    const id = detail.snapshot.runId;
+    const conversation = workspaceSettings.conversations[id];
+    if (!shouldAutoNameConversation(conversation?.title) || autoTitleAttemptsRef.current.has(id)) return;
+    const firstPrompt = detail.sessions.flatMap((session) => session.messages).find((entry) => entry.role === "user" && entry.text.trim())?.text;
+    const generatedTitle = firstPrompt ? conversationTitleFromPrompt(firstPrompt) : "";
+    if (!generatedTitle) return;
+    autoTitleAttemptsRef.current.add(id);
+    setWorkspaceSettings((current) => current ? { ...current, conversations: { ...current.conversations, [id]: { ...current.conversations[id], title: generatedTitle } } } : current);
+    void renameConversation(id, generatedTitle)
+      .then(() => refreshRuns())
+      .catch(async (caught) => {
+        autoTitleAttemptsRef.current.delete(id);
+        setError(`自动生成对话名称失败：${message(caught)}`);
+        await refreshWorkspace();
+      });
+  }, [detail, refreshRuns, refreshWorkspace, workspaceSettings]);
 
   useEffect(() => {
     if (!bootstrap) return;
@@ -313,7 +333,7 @@ export function App() {
       <header className="workspace-header">
         <button className="icon-button mobile-only" title="会话列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
-          <div><h1>{workspaceTitle}</h1>{workspaceView === "conversation" && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
+          <div>{workspaceView === "conversation" && detail?.kind === "chat" ? <button type="button" className="conversation-title-button" title="修改对话名称" onClick={() => setRenameOpen(true)}><span>{workspaceTitle}</span><Pencil size={12} /></button> : <h1>{workspaceTitle}</h1>}{workspaceView === "conversation" && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
           <p>{workspaceSubtitle}</p>
         </div>
         <div className="header-actions">
@@ -448,6 +468,16 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     setFailedUser(undefined);
     setTurnError(undefined);
     setSending(true);
+    const currentTitle = preferences?.title?.trim() ?? "";
+    if (detail.kind === "chat" && shouldAutoNameConversation(currentTitle)) {
+      const generatedTitle = conversationTitleFromPrompt(prompt);
+      if (generatedTitle) {
+        const next = preferences ? { ...preferences, title: generatedTitle } : undefined;
+        if (next) setPreferences(next);
+        if (workspace && next) onWorkspaceChange({ ...workspace, conversations: { ...workspace.conversations, [detail.snapshot.runId]: next } });
+        void renameConversation(detail.snapshot.runId, generatedTitle).catch((caught) => onError(`自动生成对话名称失败：${message(caught)}`));
+      }
+    }
     let streamError: string | undefined;
     let paused = false;
     let receivedTextDelta = false;
@@ -658,7 +688,7 @@ function RunInspector({ detail, tab, selectedToolId, provider, model, thinkingLe
   return <aside className="run-inspector" aria-label="运行检查器">
     <header className="run-inspector-head"><div><Gauge size={16} /><span><strong>运行检查器</strong>{detail && <code title={detail.snapshot.runId}>{detail.snapshot.runId}</code>}</span></div><button className="icon-button" title="关闭检查器" aria-label="关闭检查器" onClick={onClose}><X size={16} /></button></header>
     <nav className="inspector-tabs" aria-label="检查器视图">{inspectorItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} title={item.label} aria-label={item.label} onClick={() => onTabChange(item.id)}><item.icon size={14} /><span>{item.label}</span>{item.id === "debugger" && detail && <em>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</em>}</button>)}</nav>
-    <div className="run-inspector-content">
+    <div className={`run-inspector-content inspector-content-${tab}`}>
       {!detail && <EmptyPanel icon={<PanelRight size={22} />} title="选择 Run 后查看详情" />}
       {detail && tab === "overview" && <><div className="inspector-overview-head"><StatusBadge status={detail.snapshot.status} /><span>seq {detail.snapshot.lastSeq}</span><span>gen {detail.snapshot.generation}</span><time>{formatDate(detail.updatedAt)}</time></div>{detail.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}{detail.observationQueue.total > 0 && <ObservationQueueDetails detail={detail} />}<Overview detail={detail} /></>}
       {detail && tab === "debugger" && <ToolDebugger detail={detail} preferredCallId={selectedToolId} />}
@@ -946,15 +976,20 @@ function evidenceArtifactIds(evidence: RunDetail["snapshot"]["evidence"][string]
 }
 
 function Artifacts({ detail }: { detail: RunDetail }) {
-  const artifacts = Object.values(detail.snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id));
+  const artifacts = Object.values(detail.snapshot.artifacts).sort((a, b) => (b.semantic?.updatedSeq ?? 0) - (a.semantic?.updatedSeq ?? 0) || a.id.localeCompare(b.id));
   const [selectedId, setSelectedId] = useState(artifacts[0]?.id ?? "");
   const [content, setContent] = useState<ArtifactContent>();
   const [error, setError] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   useEffect(() => {
+    if (!selectedId || !artifacts.some((item) => item.id === selectedId)) setSelectedId(artifacts[0]?.id ?? "");
+  }, [artifacts, selectedId]);
+  useEffect(() => {
     if (!selectedId) return;
+    let active = true;
     setContent(undefined); setError(undefined);
-    void getArtifact(detail.snapshot.runId, selectedId).then(setContent).catch((caught) => setError(message(caught)));
+    void getArtifact(detail.snapshot.runId, selectedId).then((next) => { if (active) setContent(next); }).catch((caught) => { if (active) setError(message(caught)); });
+    return () => { active = false; };
   }, [detail.snapshot.runId, selectedId]);
   const loadMore = async () => {
     if (!content || !content.truncated || loadingMore) return;
@@ -962,7 +997,12 @@ function Artifacts({ detail }: { detail: RunDetail }) {
     setLoadingMore(true);
     try { const next = await getArtifact(detail.snapshot.runId, artifactId, nextArtifactPreviewOffset(content)); setContent((current) => current?.artifact.id === artifactId ? appendArtifactPreview(current, next) : current); } catch (caught) { setError(message(caught)); } finally { setLoadingMore(false); }
   };
-  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <ArtifactPreview content={content} loadingMore={loadingMore} onLoadMore={() => void loadMore()} /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
+  const groups = [
+    { id: "important", label: "关键结果", items: artifacts.filter((item) => ["supporting", "result"].includes(artifactInfo(detail, item).role)) },
+    { id: "intermediate", label: "过程产物", items: artifacts.filter((item) => artifactInfo(detail, item).role === "intermediate") },
+    { id: "debug", label: "调试归档", items: artifacts.filter((item) => artifactInfo(detail, item).role === "debug") },
+  ].filter((group) => group.items.length > 0);
+  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><div><strong>产物</strong><span>{artifacts.length}</span></div><small>按用途归类</small></div><div className="artifact-list-scroll">{groups.map((group) => <div className="artifact-list-group" key={group.id}><div className="artifact-list-group-title"><strong>{group.label}</strong><span>{group.items.length}</span></div>{group.items.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} title={`${info.name}\n${info.summary}\n${item.id}`} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={15} /><span><strong>{info.name}</strong><small>{info.summary}</small></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}</div>)}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</div></section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{formatBytes(content.artifact.bytes)}</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <ArtifactPreview content={content} loadingMore={loadingMore} onLoadMore={() => void loadMore()} /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
 }
 
 function ArtifactPreview({ content, loadingMore, onLoadMore }: { content: ArtifactContent; loadingMore: boolean; onLoadMore(): void }) {
@@ -1269,7 +1309,7 @@ function RenameConversationModal({ initialTitle, onClose, onSaved }: { initialTi
 
 function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }: { folders: ConversationFolder[]; defaultWorkspace: string; onClose(): void; onCreated(id: string): void }) {
   const [runId, setRunId] = useState(`CHAT-${Date.now()}`);
-  const [title, setTitle] = useState("新对话");
+  const [title, setTitle] = useState("");
   const [folderId, setFolderId] = useState("");
   const [workspacePath, setWorkspacePath] = useState(defaultWorkspace);
   const [verificationCommand, setVerificationCommand] = useState("");
@@ -1278,9 +1318,9 @@ function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }:
   const [error, setError] = useState<string>();
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
-    try { await createConversation({ runId, title, folderId: folderId || undefined, workspacePath, ...(verificationCommand.trim() ? { verificationCommand: verificationCommand.trim() } : {}) }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
+    try { await createConversation({ runId, title: title.trim() || "新对话", folderId: folderId || undefined, workspacePath, ...(verificationCommand.trim() ? { verificationCommand: verificationCommand.trim() } : {}) }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><label><span>任务验证命令（可选；填写后使用同一受信复现链）</span><textarea rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：node solve.mjs" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称（可选）</span><input maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="留空后根据第一条消息自动生成" autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><label><span>任务验证命令（可选；填写后使用同一受信复现链）</span><textarea rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：node solve.mjs" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
 }
 
 function DirectoryPickerModal({ initialPath, onClose, onSelect }: { initialPath: string; onClose(): void; onSelect(path: string): void | Promise<void> }) {
