@@ -12,6 +12,7 @@ import { listDirectories, requireDirectory } from "./directory-browser.js";
 import { closeGuiResources } from "./shutdown.js";
 import { AblationService } from "./ablation-service.js";
 import { conversationPreferencesInput, stringArray } from "./conversation-preferences.js";
+import { CapabilityConfigStore } from "./capability-config.js";
 import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -23,6 +24,7 @@ const config = await loadConfig(projectRoot, configPath);
 const providerSettings = await ProviderSettingsStore.create(config);
 config.modelProfiles.executor = providerSettings.modelProfile();
 const workspaceSettings = await WorkspaceSettingsStore.create();
+const capabilityConfig = new CapabilityConfigStore(projectRoot);
 const data = new DebugDataService(projectRoot, config, configPath);
 const runtimeShape = data.assertRuntimeShape();
 console.log(`Materials runtime: ${runtimeShape.specifier} -> ${runtimeShape.resolvedPath ?? "unresolved"}`);
@@ -142,6 +144,32 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const capabilities = await capabilityCatalog();
     return sendJson(response, 200, workspaceSettings.publicSettings(capabilities, defaultPreferences(capabilities)));
   }
+  if (method === "POST" && url.pathname === "/api/capabilities/skills") {
+    const body = await readBody(request);
+    const created = await capabilityConfig.createSkill({
+      name: string(body.name, "name"),
+      description: string(body.description, "description"),
+      instructions: string(body.instructions, "instructions"),
+    });
+    projectCapabilitiesPromise = undefined;
+    return sendJson(response, 201, created);
+  }
+  if (method === "POST" && url.pathname === "/api/capabilities/mcp") {
+    const body = await readBody(request);
+    const transport = string(body.transport, "transport");
+    if (transport !== "http" && transport !== "stdio") throw new Error("transport must be http or stdio");
+    const created = await capabilityConfig.addMcpServer({
+      name: string(body.name, "name"),
+      description: string(body.description, "description"),
+      transport,
+      url: optionalString(body.url),
+      command: optionalString(body.command),
+      args: stringArray(body.args),
+      readOnly: optionalBoolean(body.readOnly, "readOnly") ?? false,
+    });
+    projectCapabilitiesPromise = undefined;
+    return sendJson(response, 201, created);
+  }
   if (method === "GET" && url.pathname === "/api/directories") {
     return sendJson(response, 200, await listDirectories(projectRoot, url.searchParams.get("path") ?? undefined));
   }
@@ -225,13 +253,14 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   }
   if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts.length === 3) {
     const runId = parts[2];
-    const capabilities = await capabilityCatalog();
-    const defaults = defaultPreferences(capabilities);
     const current = await data.getRun(runId);
     if (current.kind !== "chat") throw new Error("只能操作普通对话");
     if (method === "PUT") {
       const body = await readBody(request);
-      return sendJson(response, 200, await workspaceSettings.renameConversation(runId, string(body.title, "title"), defaults));
+      const options = Object.hasOwn(body, "expectedTitle")
+        ? { expectedTitle: body.expectedTitle === null ? null : string(body.expectedTitle, "expectedTitle") }
+        : {};
+      return sendJson(response, 200, await workspaceSettings.renameConversation(runId, string(body.title, "title"), options));
     }
     if (method === "DELETE") {
       await data.deleteConversation(runId);

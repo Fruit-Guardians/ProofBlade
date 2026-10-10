@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import type { ConversationPreferences, WorkspaceSettings } from "../src/shared.js";
@@ -117,6 +118,45 @@ test("creating a conversation without capability defaults leaves the capability 
 
     // Folder validation does not depend on capability defaults.
     await assert.rejects(() => store.saveConversation("CHAT-NOSCAN-2", { folderId: "missing" }), /文件夹不存在/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("renaming does not materialize capability defaults and stale automatic names cannot win", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-workspace-rename-"));
+  const path = join(dir, "gui-workspace.json");
+  try {
+    const store = await WorkspaceSettingsStore.create(path);
+    const runId = "CHAT-RENAME-1";
+    await store.saveConversation(runId, { title: "新对话", workspacePath: "D:/cases/a" });
+
+    const manual = await store.renameConversation(runId, "用户设置的标题");
+    assert.equal(manual.renamed, true);
+    const staleAutomatic = await store.renameConversation(runId, "自动标题", { expectedTitle: "新对话" });
+    assert.equal(staleAutomatic.renamed, false);
+    assert.equal(store.storedConversation(runId).title, "用户设置的标题");
+
+    const concurrentRunId = "CHAT-RENAME-2";
+    await store.saveConversation(concurrentRunId, { title: "新对话", workspacePath: "D:/cases/b" });
+    const [automatic, concurrentManual] = await Promise.all([
+      store.renameConversation(concurrentRunId, "自动标题", { expectedTitle: "新对话" }),
+      store.renameConversation(concurrentRunId, "并发手动标题"),
+    ]);
+    assert.equal(automatic.renamed, true);
+    assert.equal(concurrentManual.renamed, true);
+    assert.equal(store.storedConversation(concurrentRunId).title, "并发手动标题");
+
+    const raw = JSON.parse(await readFile(path, "utf8")) as { conversations: Record<string, Record<string, unknown>> };
+    const stored = raw.conversations[runId]!;
+    assert.equal("enabledTools" in stored, false);
+    assert.equal("enabledSkills" in stored, false);
+    assert.equal("enabledMcpServers" in stored, false);
+
+    const grown = { ...defaults, enabledTools: [...defaults.enabledTools, "grep"], enabledSkills: [...defaults.enabledSkills, "new-skill"], enabledMcpServers: ["local"] };
+    assert.deepEqual(store.preferences(runId, grown).enabledTools, grown.enabledTools);
+    assert.deepEqual(store.preferences(runId, grown).enabledSkills, grown.enabledSkills);
+    assert.deepEqual(store.preferences(runId, grown).enabledMcpServers, grown.enabledMcpServers);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

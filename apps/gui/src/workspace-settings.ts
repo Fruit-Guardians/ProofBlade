@@ -26,6 +26,7 @@ interface LocalWorkspaceFile {
 export class WorkspaceSettingsStore {
   private folders: ConversationFolder[] = [];
   private conversations: Record<string, StoredConversationPreferences> = {};
+  private mutation: Promise<void> = Promise.resolve();
 
   private constructor(private readonly path: string) {}
 
@@ -75,6 +76,10 @@ export class WorkspaceSettingsStore {
    * @returns the stored preferences, with no capability-derived list invented.
    */
   public async saveConversation(runId: string, input: Partial<ConversationPreferences>, defaults?: ConversationPreferences): Promise<Partial<ConversationPreferences>> {
+    return await this.mutate(async () => await this.saveConversationUnlocked(runId, input, defaults));
+  }
+
+  private async saveConversationUnlocked(runId: string, input: Partial<ConversationPreferences>, defaults?: ConversationPreferences): Promise<Partial<ConversationPreferences>> {
     const current: Partial<ConversationPreferences> = defaults === undefined
       ? this.storedConversation(runId)
       : this.preferences(runId, defaults);
@@ -99,38 +104,54 @@ export class WorkspaceSettingsStore {
     return next;
   }
 
-  public async renameConversation(runId: string, title: string, defaults: ConversationPreferences): Promise<ConversationPreferences> {
-    const stored = await this.saveConversation(runId, { title: required(title, "对话名称") }, defaults);
-    return this.resolve(stored as StoredConversationPreferences, defaults);
+  public async renameConversation(runId: string, title: string, options: { expectedTitle?: string | null } = {}): Promise<{ renamed: boolean; conversation: Partial<ConversationPreferences> }> {
+    return await this.mutate(async () => {
+      const current = this.storedConversation(runId);
+      if (Object.hasOwn(options, "expectedTitle")) {
+        const actualTitle = current.title?.trim() || null;
+        const expectedTitle = options.expectedTitle?.trim() || null;
+        if (actualTitle !== expectedTitle) return { renamed: false, conversation: current };
+      }
+      const conversation = await this.saveConversationUnlocked(runId, { title: required(title, "对话名称") });
+      return { renamed: true, conversation };
+    });
   }
 
   public async removeConversation(runId: string): Promise<void> {
-    if (!(runId in this.conversations)) return;
-    delete this.conversations[runId];
-    await this.persist();
+    await this.mutate(async () => {
+      if (!(runId in this.conversations)) return;
+      delete this.conversations[runId];
+      await this.persist();
+    });
   }
 
   public async createFolder(name: string): Promise<ConversationFolder> {
-    const normalized = required(name, "文件夹名称");
-    const used = new Set(this.folders.map((folder) => folder.id));
-    const folder = { id: uniqueId(normalized, used), name: normalized };
-    this.folders.push(folder);
-    await this.persist();
-    return folder;
+    return await this.mutate(async () => {
+      const normalized = required(name, "文件夹名称");
+      const used = new Set(this.folders.map((folder) => folder.id));
+      const folder = { id: uniqueId(normalized, used), name: normalized };
+      this.folders.push(folder);
+      await this.persist();
+      return folder;
+    });
   }
 
   public async renameFolder(folderId: string, name: string): Promise<ConversationFolder> {
-    const folder = this.requireFolder(folderId);
-    folder.name = required(name, "文件夹名称");
-    await this.persist();
-    return { ...folder };
+    return await this.mutate(async () => {
+      const folder = this.requireFolder(folderId);
+      folder.name = required(name, "文件夹名称");
+      await this.persist();
+      return { ...folder };
+    });
   }
 
   public async removeFolder(folderId: string): Promise<void> {
-    this.requireFolder(folderId);
-    this.folders = this.folders.filter((folder) => folder.id !== folderId);
-    for (const settings of Object.values(this.conversations)) if (settings.folderId === folderId) delete settings.folderId;
-    await this.persist();
+    await this.mutate(async () => {
+      this.requireFolder(folderId);
+      this.folders = this.folders.filter((folder) => folder.id !== folderId);
+      for (const settings of Object.values(this.conversations)) if (settings.folderId === folderId) delete settings.folderId;
+      await this.persist();
+    });
   }
 
   private resolve(stored: StoredConversationPreferences, defaults: ConversationPreferences): ConversationPreferences {
@@ -170,6 +191,12 @@ export class WorkspaceSettingsStore {
     const local: LocalWorkspaceFile = { schemaVersion: 1, folders: this.folders, conversations: this.conversations };
     await mkdir(dirname(this.path), { recursive: true });
     await writeFile(this.path, `${JSON.stringify(local, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  }
+
+  private async mutate<T>(operation: () => Promise<T>): Promise<T> {
+    const task = this.mutation.then(operation, operation);
+    this.mutation = task.then(() => undefined, () => undefined);
+    return await task;
   }
 }
 
