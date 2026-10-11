@@ -740,6 +740,10 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     relatedTreeIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
     status: Type.Optional(Type.String({ enum: ["ACTIVE", "SUPPORTED", "CONTESTED", "ARCHIVED"] })),
   }, { additionalProperties: false }),
+  // The legacy schema is intentionally a flat union for compatibility with
+  // older providers. Normalize that union before execution so a provider that
+  // sends fields from several operations does not fail an otherwise valid call.
+  prepareArguments: prepareLegacyEvidenceArguments,
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as {
@@ -858,6 +862,15 @@ const EVIDENCE_OPERATION_ALLOWED_FIELDS: Readonly<Record<string, string[]>> = {
   create_tree: ["operation", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"],
   update_tree: ["operation", "treeId", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"],
 };
+
+function prepareLegacyEvidenceArguments(raw: unknown): Record<string, unknown> {
+  if (!isRecord(raw) || typeof raw.operation !== "string") return isRecord(raw) ? raw : {};
+  const allowed = EVIDENCE_OPERATION_ALLOWED_FIELDS[raw.operation];
+  if (!allowed) return raw;
+  return Object.fromEntries(allowed
+    .filter((key) => raw[key] !== undefined)
+    .map((key) => [key, raw[key]]));
+}
 
 function throwLegacyEvidenceError(input: Record<string, unknown>, message: string): never {
   const operation = typeof input.operation === "string" ? input.operation : "unknown";
