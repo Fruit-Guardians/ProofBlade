@@ -59,6 +59,7 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
   assert.deepEqual(withoutResources, ["read", "bash", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
+  assert.equal(codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [], verificationEnabled: false }).includes("verify_result"), false);
   // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
   const genericExternalTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], externalSubmissionEnabled: true });
