@@ -11,7 +11,7 @@ import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import { solverToolContractHash } from "./solver-tools.js";
 
 export const PROOFBLADE_RUNTIME_VERSION = "0.1.0";
-export const CODING_PROMPT_VERSION = "coding-main@2";
+export const CODING_PROMPT_VERSION = "coding-main@3";
 export const TOOL_CONTRACT_VERSION = "tools@2";
 export const ROUTER_POLICY_VERSION = "capability-router@1";
 export const CODING_PROTOCOL_INSTRUCTIONS = [
