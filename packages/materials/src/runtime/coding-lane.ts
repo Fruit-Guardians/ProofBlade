@@ -19,6 +19,7 @@ import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
+import { verificationBindsRule } from "../domain/phase-gate.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { ObserverDiagnostics } from "../observability/observer-diagnostics.js";
 import type { ModelContextItem } from "../context/model-context-frame.js";
@@ -553,6 +554,7 @@ export class PiCodingLane implements AgentLanePort {
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
         webReproductionEnabled: Boolean(webReproducer || browserReproducer),
         webSessionEnabled: Boolean(webSession),
+        verificationEnabled: verificationBindsRule(snapshot.task),
       }),
       ...activeMcpTools.map((tool) => tool.name),
     ];
