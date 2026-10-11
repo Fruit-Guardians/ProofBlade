@@ -463,6 +463,43 @@ test("evidence_record has an exact write contract and legacy record calls are no
   }
 });
 
+test("evidence record reports artifact id type conflicts and nearby current ids", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-evidence-reference-diagnostics-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "EVIDENCE-REFERENCE-DIAGNOSTICS";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const artifact = await services.artifacts.putText(runId, "known artifact\n", { filename: "known.txt" });
+  const context = {
+    controlStore: services.control,
+    outputRewrite: { runId },
+    evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
+  } as unknown as CodingResourceContext;
+  const typo = `${artifact.id.slice(0, -1)}x`;
+  try {
+    await assert.rejects(
+      () => executeTool("evidence_record", { artifactIds: ["TREE-not-an-artifact", typo], summary: "bad references" }, context),
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const details = JSON.parse(message.replace(/^\[ProofBlade evidence error\] /, "")) as Record<string, any>;
+        assert.equal(details.code, "invalid_artifact_reference");
+        assert.deepEqual(details.diagnostics.invalidArtifactIds, ["TREE-not-an-artifact", typo]);
+        assert.deepEqual(details.diagnostics.typeConflicts, [{ artifactId: "TREE-not-an-artifact", suppliedType: "tree", expectedType: "artifact (A-*)" }]);
+        assert.deepEqual(details.diagnostics.suggestions[typo], [artifact.id]);
+        return true;
+      },
+    );
+  } finally {
+    await services.sandbox.close();
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test("real AgentHarness projects evidence_record schema failures into structured details", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-evidence-record-harness-"));
   const env = new NodeExecutionEnv({ cwd: root });

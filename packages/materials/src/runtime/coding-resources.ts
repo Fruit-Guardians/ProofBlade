@@ -911,6 +911,7 @@ function evidenceContractError(details: {
   receivedFields: string[];
   invalidFields?: string[];
   missingFields?: string[];
+  diagnostics?: Record<string, unknown>;
   allowedFields: string[];
   suggestedArguments: Record<string, unknown>;
   nextAction: string;
@@ -920,6 +921,7 @@ function evidenceContractError(details: {
     ...details,
     invalidFields: details.invalidFields ?? [],
     missingFields: details.missingFields ?? [],
+    ...(details.diagnostics ? { diagnostics: details.diagnostics } : {}),
   };
   throw new Error(`[ProofBlade evidence error] ${JSON.stringify(payload)}`);
 }
@@ -1113,6 +1115,9 @@ async function executeEvidenceRecord(raw: Record<string, unknown>, context: Codi
     const reason = error instanceof Error ? error.message : String(error);
     const artifactFailure = /Unknown artifacts?|current-generation artifacts/i.test(reason);
     const dependencyFailure = /Unknown evidence|dependencies must be from the current generation/i.test(reason);
+    const artifactDiagnostics = artifactFailure
+      ? await evidenceArtifactReferenceDiagnostics(context, normalized.input.artifactIds)
+      : undefined;
     evidenceContractError({
       tool: source,
       operation: "record",
@@ -1120,6 +1125,7 @@ async function executeEvidenceRecord(raw: Record<string, unknown>, context: Codi
       retryable: artifactFailure || dependencyFailure,
       receivedFields: Object.keys(raw).filter((key) => raw[key] !== undefined),
       invalidFields: artifactFailure ? ["artifactIds"] : dependencyFailure ? ["dependsOn"] : [],
+      ...(artifactDiagnostics ? { diagnostics: artifactDiagnostics } : {}),
       allowedFields: source === "evidence" ? ["operation", ...EVIDENCE_RECORD_ALLOWED_FIELDS] : [...EVIDENCE_RECORD_ALLOWED_FIELDS],
       suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
       nextAction: artifactFailure
@@ -1134,6 +1140,68 @@ async function executeEvidenceRecord(raw: Record<string, unknown>, context: Codi
     ...(normalized.normalization.ignoredFields || normalized.normalization.derivedName ? { normalization: normalized.normalization } : {}),
     curation: await context.evidenceCurationGate?.inspect(),
   });
+}
+
+async function evidenceArtifactReferenceDiagnostics(
+  context: CodingResourceContext,
+  artifactIds: string[],
+): Promise<Record<string, unknown> | undefined> {
+  const runId = context.outputRewrite?.runId ?? context.runtime?.runId;
+  if (!runId) return undefined;
+  try {
+    const snapshot = await context.controlStore.snapshot(runId);
+    const missing = artifactIds.filter((artifactId) => snapshot.artifacts[artifactId] === undefined);
+    if (missing.length === 0) return undefined;
+    const currentArtifactIds = Object.values(snapshot.artifacts)
+      .filter((artifact) => artifact.runId === snapshot.runId && artifact.generation === snapshot.generation)
+      .map((artifact) => artifact.id)
+      .slice(0, 256);
+    const typeConflicts = missing
+      .map((artifactId) => ({ artifactId, suppliedType: idType(artifactId) }))
+      .filter((item) => item.suppliedType !== "unknown" && item.suppliedType !== "artifact")
+      .map((item) => ({ ...item, expectedType: "artifact (A-*)" }));
+    const suggestions = Object.fromEntries(missing.flatMap((artifactId) => {
+      const nearest = currentArtifactIds
+        .map((candidate) => ({ candidate, distance: editDistance(artifactId, candidate) }))
+        .sort((left, right) => left.distance - right.distance || left.candidate.localeCompare(right.candidate))
+        .slice(0, 3)
+        .filter((item) => item.distance <= Math.max(3, Math.floor(Math.max(artifactId.length, item.candidate.length) * 0.35)))
+        .map((item) => item.candidate);
+      return nearest.length > 0 ? [[artifactId, nearest] as const] : [];
+    }));
+    return {
+      invalidArtifactIds: missing,
+      expectedIdPattern: "A-*",
+      ...(typeConflicts.length > 0 ? { typeConflicts } : {}),
+      ...(Object.keys(suggestions).length > 0 ? { suggestions } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function idType(value: string): "artifact" | "evidence" | "tree" | "fact" | "unknown" {
+  if (value.startsWith("A-")) return "artifact";
+  if (value.startsWith("EV-")) return "evidence";
+  if (value.startsWith("TREE-")) return "tree";
+  if (value.startsWith("F-")) return "fact";
+  return "unknown";
+}
+
+function editDistance(left: string, right: string): number {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    let diagonal = previous[0]!;
+    previous[0] = row;
+    for (let column = 1; column <= right.length; column += 1) {
+      const above = previous[column]!;
+      previous[column] = left[row - 1] === right[column - 1]
+        ? diagonal
+        : Math.min(diagonal + 1, above + 1, previous[column - 1]! + 1);
+      diagonal = above;
+    }
+  }
+  return previous[right.length]!;
 }
 
 /**
