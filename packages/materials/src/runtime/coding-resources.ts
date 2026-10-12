@@ -651,6 +651,10 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
+const MAX_ARTIFACT_ID_LENGTH = 256;
+const MAX_DIAGNOSTIC_ID_CHARS = 8_192;
+const MAX_DIAGNOSTIC_CANDIDATES = 256;
+const MAX_SUGGESTION_DISTANCE = 32;
 const EVIDENCE_RECORD_ALLOWED_FIELDS = ["artifactIds", "summary", "name", "tags", "claim", "dependsOn"] as const;
 const EVIDENCE_LEGACY_FIELDS = new Set([
   "operation", "treeId", "query", "artifactId", "artifactIds", "name", "summary", "tags", "role", "relatedIds", "dependsOn", "claim",
@@ -682,7 +686,7 @@ const evidenceRecordTool: AgentHarnessTool<CodingResourceContext> = {
   label: "evidence_record",
   description: "Promote one or more existing Artifact ids into durable Evidence. Required: artifactIds (A-* ids) and summary. Optional: name, tags, claim, dependsOn. If name is omitted, ProofBlade derives a deterministic short name from the first summary line. Use this only for a durable conclusion; ordinary Tool output is already archived as an Artifact/Observation.",
   parameters: Type.Object({
-    artifactIds: Type.Array(Type.String({ minLength: 1, description: "Stable A-* ids returned by read/bash or evidence search; file paths are not artifact ids." }), { minItems: 1, maxItems: 16 }),
+    artifactIds: Type.Array(Type.String({ minLength: 1, maxLength: MAX_ARTIFACT_ID_LENGTH, description: "Stable A-* ids returned by read/bash or evidence search; file paths are not artifact ids." }), { minItems: 1, maxItems: 16 }),
     summary: Type.String({ minLength: 1, maxLength: 1_000, description: "Concise durable observation grounded in the referenced Artifacts." }),
     name: Type.Optional(Type.String({ minLength: 1, maxLength: 160, description: "Short display name. Omit to derive it deterministically from summary." })),
     tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
@@ -710,8 +714,8 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }),
     treeId: Type.Optional(Type.String({ minLength: 1 })),
     query: Type.Optional(Type.String({ maxLength: 200 })),
-    artifactId: Type.Optional(Type.String({ minLength: 1 })),
-    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1, description: "Stable A-* ids returned by read/bash or evidence search; file paths are not artifact ids." }), { minItems: 1, maxItems: 16 })),
+    artifactId: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_ARTIFACT_ID_LENGTH })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: MAX_ARTIFACT_ID_LENGTH, description: "Stable A-* ids returned by read/bash or evidence search; file paths are not artifact ids." }), { minItems: 1, maxItems: 16 })),
     name: Type.Optional(Type.String({ minLength: 1, maxLength: 160 })),
     summary: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
     tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
@@ -966,7 +970,7 @@ function normalizeEvidenceRecordInput(
   }
   const invalidFields: string[] = [];
   const artifactIds = raw.artifactIds;
-  if (!Array.isArray(artifactIds) || artifactIds.length < 1 || artifactIds.length > 16 || artifactIds.some((value) => typeof value !== "string" || value.trim().length === 0)) invalidFields.push("artifactIds");
+  if (!Array.isArray(artifactIds) || artifactIds.length < 1 || artifactIds.length > 16 || artifactIds.some((value) => typeof value !== "string" || value.trim().length === 0 || value.trim().length > MAX_ARTIFACT_ID_LENGTH)) invalidFields.push("artifactIds");
   const summary = raw.summary;
   if (typeof summary !== "string" || summary.trim().length === 0 || summary.trim().length > 1_000) invalidFields.push("summary");
   if (raw.name !== undefined && (typeof raw.name !== "string" || raw.name.trim().length === 0 || raw.name.trim().length > 160)) invalidFields.push("name");
@@ -1150,30 +1154,52 @@ async function evidenceArtifactReferenceDiagnostics(
   if (!runId) return undefined;
   try {
     const snapshot = await context.controlStore.snapshot(runId);
-    const missing = artifactIds.filter((artifactId) => snapshot.artifacts[artifactId] === undefined);
-    if (missing.length === 0) return undefined;
+    const invalid = artifactIds.filter((artifactId) => {
+      const artifact = snapshot.artifacts[artifactId];
+      return artifact === undefined || artifact.runId !== snapshot.runId || artifact.generation !== snapshot.generation;
+    });
+    const stale = invalid.filter((artifactId) => {
+      const artifact = snapshot.artifacts[artifactId];
+      return artifact !== undefined && (artifact.runId !== snapshot.runId || artifact.generation !== snapshot.generation);
+    });
     const currentArtifactIds = Object.values(snapshot.artifacts)
       .filter((artifact) => artifact.runId === snapshot.runId && artifact.generation === snapshot.generation)
       .map((artifact) => artifact.id)
-      .slice(0, 256);
-    const typeConflicts = missing
+      .sort()
+      .slice(0, MAX_DIAGNOSTIC_CANDIDATES);
+    const typeConflicts = invalid
       .map((artifactId) => ({ artifactId, suppliedType: idType(artifactId) }))
       .filter((item) => item.suppliedType !== "unknown" && item.suppliedType !== "artifact")
       .map((item) => ({ ...item, expectedType: "artifact (A-*)" }));
-    const suggestions = Object.fromEntries(missing.flatMap((artifactId) => {
-      const nearest = currentArtifactIds
-        .map((candidate) => ({ candidate, distance: editDistance(artifactId, candidate) }))
-        .sort((left, right) => left.distance - right.distance || left.candidate.localeCompare(right.candidate))
-        .slice(0, 3)
-        .filter((item) => item.distance <= Math.max(3, Math.floor(Math.max(artifactId.length, item.candidate.length) * 0.35)))
-        .map((item) => item.candidate);
-      return nearest.length > 0 ? [[artifactId, nearest] as const] : [];
-    }));
+    const suggestions: Record<string, string[]> = {};
+    let comparedChars = 0;
+    let comparisonTruncated = false;
+    for (const artifactId of invalid) {
+      const nearest: Array<{ candidate: string; distance: number }> = [];
+      const maxDistance = Math.min(MAX_SUGGESTION_DISTANCE, Math.max(3, Math.floor(Math.max(artifactId.length, 1) * 0.35)));
+      for (const candidate of currentArtifactIds) {
+        if (comparedChars + candidate.length > MAX_DIAGNOSTIC_ID_CHARS) {
+          comparisonTruncated = true;
+          break;
+        }
+        comparedChars += candidate.length;
+        const distance = editDistanceWithin(artifactId, candidate, maxDistance);
+        if (distance > maxDistance) continue;
+        nearest.push({ candidate, distance });
+        nearest.sort((left, right) => left.distance - right.distance || left.candidate.localeCompare(right.candidate));
+        if (nearest.length > 3) nearest.pop();
+      }
+      if (nearest.length > 0) suggestions[artifactId] = nearest.map((item) => item.candidate);
+      if (comparisonTruncated) break;
+    }
     return {
-      invalidArtifactIds: missing,
+      invalidArtifactIds: invalid,
       expectedIdPattern: "A-*",
+      expectedGeneration: snapshot.generation,
+      ...(stale.length > 0 ? { staleArtifactIds: stale } : {}),
       ...(typeConflicts.length > 0 ? { typeConflicts } : {}),
       ...(Object.keys(suggestions).length > 0 ? { suggestions } : {}),
+      ...(comparisonTruncated ? { comparisonTruncated: true } : {}),
     };
   } catch {
     return undefined;
@@ -1188,18 +1214,22 @@ function idType(value: string): "artifact" | "evidence" | "tree" | "fact" | "unk
   return "unknown";
 }
 
-function editDistance(left: string, right: string): number {
-  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+function editDistanceWithin(left: string, right: string, limit: number): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
   for (let row = 1; row <= left.length; row += 1) {
-    let diagonal = previous[0]!;
-    previous[0] = row;
-    for (let column = 1; column <= right.length; column += 1) {
-      const above = previous[column]!;
-      previous[column] = left[row - 1] === right[column - 1]
-        ? diagonal
-        : Math.min(diagonal + 1, above + 1, previous[column - 1]! + 1);
-      diagonal = above;
+    const start = Math.max(1, row - limit);
+    const end = Math.min(right.length, row + limit);
+    const current = Array.from({ length: right.length + 1 }, () => limit + 1);
+    current[0] = row <= limit ? row : limit + 1;
+    let rowMinimum = current[0]!;
+    for (let column = start; column <= end; column += 1) {
+      current[column] = left[row - 1] === right[column - 1]
+        ? previous[column - 1]!
+        : Math.min(previous[column - 1]! + 1, previous[column]! + 1, current[column - 1]! + 1);
+      rowMinimum = Math.min(rowMinimum, current[column]!);
     }
+    if (rowMinimum > limit) return limit + 1;
+    previous = current;
   }
   return previous[right.length]!;
 }

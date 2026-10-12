@@ -41,7 +41,7 @@ import { join, resolve } from "node:path";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "c7784c019d3541f30e65db1cb38d7c83bc2f76a8172290300b3a7be0c174b9e3";
+const CODING_TOOL_CONTRACT_HASH = "6df01f28b43cd78e45362b3c375aa79cd36f348568c89287e18d676690a37719";
 
 test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
   assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
@@ -491,6 +491,79 @@ test("evidence record reports artifact id type conflicts and nearby current ids"
         assert.deepEqual(details.diagnostics.invalidArtifactIds, ["TREE-not-an-artifact", typo]);
         assert.deepEqual(details.diagnostics.typeConflicts, [{ artifactId: "TREE-not-an-artifact", suppliedType: "tree", expectedType: "artifact (A-*)" }]);
         assert.deepEqual(details.diagnostics.suggestions[typo], [artifact.id]);
+        return true;
+      },
+    );
+  } finally {
+    await services.sandbox.close();
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
+test("evidence record bounds oversized artifact ids before diagnostics", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-evidence-reference-bounds-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "EVIDENCE-REFERENCE-BOUNDS";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const oversized = `A-${"x".repeat(10_000)}`;
+  const context = {
+    controlStore: services.control,
+    outputRewrite: { runId },
+    evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
+  } as unknown as CodingResourceContext;
+  try {
+    await assert.rejects(
+      () => executeTool("evidence_record", { artifactIds: [oversized], summary: "oversized reference" }, context),
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.ok(!message.includes(oversized));
+        const details = JSON.parse(message.replace(/^\[ProofBlade evidence error\] /, "")) as Record<string, any>;
+        assert.equal(details.code, "invalid_field_type_or_bounds");
+        assert.deepEqual(details.invalidFields, ["artifactIds"]);
+        return true;
+      },
+    );
+  } finally {
+    await services.sandbox.close();
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
+test("evidence record diagnoses an Artifact left behind by fixture reset", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-evidence-reference-generation-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "EVIDENCE-REFERENCE-GENERATION";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const artifact = await services.artifacts.putText(runId, "old generation\n", { filename: "old.txt" });
+  await services.fixtureControl.reset(runId, 1);
+  const context = {
+    controlStore: services.control,
+    outputRewrite: { runId },
+    evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
+  } as unknown as CodingResourceContext;
+  try {
+    await assert.rejects(
+      () => executeTool("evidence_record", { artifactIds: [artifact.id], summary: "stale reference" }, context),
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const details = JSON.parse(message.replace(/^\[ProofBlade evidence error\] /, "")) as Record<string, any>;
+        assert.equal(details.code, "invalid_artifact_reference");
+        assert.ok(details.diagnostics, message);
+        assert.deepEqual(details.diagnostics.invalidArtifactIds, [artifact.id]);
+        assert.deepEqual(details.diagnostics.staleArtifactIds, [artifact.id]);
+        assert.equal(details.diagnostics.expectedGeneration, 1);
         return true;
       },
     );
