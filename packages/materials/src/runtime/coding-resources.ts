@@ -867,9 +867,11 @@ function prepareLegacyEvidenceArguments(raw: unknown): Record<string, unknown> {
   if (!isRecord(raw) || typeof raw.operation !== "string") return isRecord(raw) ? raw : {};
   const allowed = EVIDENCE_OPERATION_ALLOWED_FIELDS[raw.operation];
   if (!allowed) return raw;
-  return Object.fromEntries(allowed
-    .filter((key) => raw[key] !== undefined)
-    .map((key) => [key, raw[key]]));
+  const unknownFields = Object.keys(raw).filter((key) => raw[key] !== undefined && !EVIDENCE_LEGACY_FIELDS.has(key));
+  if (unknownFields.length > 0) return raw;
+  const allowedFields = new Set(allowed);
+  return Object.fromEntries(Object.entries(raw)
+    .filter(([key, value]) => value !== undefined && (allowedFields.has(key) || !EVIDENCE_LEGACY_FIELDS.has(key))));
 }
 
 function throwLegacyEvidenceError(input: Record<string, unknown>, message: string): never {

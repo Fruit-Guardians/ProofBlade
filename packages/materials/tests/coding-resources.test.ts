@@ -545,6 +545,11 @@ test("real AgentHarness strips cross-operation fields from legacy evidence calls
         maxChars: 512,
         relation: "supports",
       }, { id: "legacy-evidence-read" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("evidence", {
+        operation: "search_uri",
+        query: "legacy evidence",
+        include_stale: true,
+      }, { id: "legacy-evidence-unknown" }), { stopReason: "toolUse" }),
       fauxAssistantMessage("读取完成。"),
     ]);
     const evidence = createCodingTools().find((tool) => tool.name === "evidence");
@@ -566,10 +571,13 @@ test("real AgentHarness strips cross-operation fields from legacy evidence calls
     await harness.prompt("Read the archived artifact.");
 
     const toolResults = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "toolResult");
-    assert.equal(toolResults.length, 1);
+    assert.equal(toolResults.length, 2);
     const result = toolResults[0]!.message;
     assert.equal(result.isError, false);
     assert.match(result.content[0]?.text ?? "", /legacy evidence payload/);
+    const unknownResult = toolResults[1]!.message;
+    assert.equal(unknownResult.isError, true);
+    assert.match(unknownResult.content[0]?.text ?? "", /include_stale/);
   } finally {
     await services.sandbox.close();
     await env.cleanup();
