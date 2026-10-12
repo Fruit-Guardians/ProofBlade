@@ -1645,10 +1645,10 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; verificationEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
-  active.push(...CODING_PROXY_TOOL_NAMES);
+  active.push(...CODING_PROXY_TOOL_NAMES.filter((name) => name !== "verify_result" || input.verificationEnabled !== false));
   // Only expose the tube tools when a Docker-backed pwn container or durable
   // session-runtime broker is attached, so a GUI chat run does not advertise
   // seven tools that would fail closed.
