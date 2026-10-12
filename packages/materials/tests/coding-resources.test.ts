@@ -517,6 +517,75 @@ test("real AgentHarness projects evidence_record schema failures into structured
   }
 });
 
+test("real AgentHarness strips cross-operation fields from legacy evidence calls", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-evidence-legacy-harness-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(root, config);
+  const runId = "EVIDENCE-LEGACY-HARNESS";
+  await services.control.createRun(runId, demoTask(runId, root, config));
+  const artifact = await services.artifacts.putText(runId, "legacy evidence payload\n", { filename: "legacy.txt" });
+  try {
+    const sessionRepo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await sessionRepo.create({ id: "EVIDENCE-LEGACY-001", cwd: root, metadata: { runId, lane: "main" } });
+    const faux = fauxProvider({ provider: "faux-evidence-legacy-harness" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence", {
+        operation: "read",
+        artifactId: artifact.id,
+        artifactIds: [artifact.id],
+        claim: "cross-operation field",
+        treeId: "TREE-ignored",
+        maxChars: 512,
+        relation: "supports",
+      }, { id: "legacy-evidence-read" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("evidence", {
+        operation: "search_uri",
+        query: "legacy evidence",
+        include_stale: true,
+      }, { id: "legacy-evidence-unknown" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("读取完成。"),
+    ]);
+    const evidence = createCodingTools().find((tool) => tool.name === "evidence");
+    assert.ok(evidence);
+    const harness = new AgentHarness({
+      session,
+      models,
+      model: faux.getModel(),
+      tools: [evidence],
+      activeToolNames: ["evidence"],
+      toolContext: {
+        evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
+        enabledSkills: new Set<string>(),
+        enabledMcpServers: new Set<string>(),
+      } as unknown as CodingResourceContext,
+      systemPrompt: "Exercise the legacy Evidence read contract.",
+    });
+
+    await harness.prompt("Read the archived artifact.");
+
+    const toolResults = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "toolResult");
+    assert.equal(toolResults.length, 2);
+    const result = toolResults[0]!.message;
+    assert.equal(result.isError, false);
+    assert.match(result.content[0]?.text ?? "", /legacy evidence payload/);
+    const unknownResult = toolResults[1]!.message;
+    assert.equal(unknownResult.isError, true);
+    assert.match(unknownResult.content[0]?.text ?? "", /include_stale/);
+  } finally {
+    await services.sandbox.close();
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test("[contract:evidence-inspect-forest-max-chars] generic result verification rejects decoys and persists a matching reproduction", async () => {
   assert.equal(requiresClaimVerification("完成这道题，并得到flag"), true);
   assert.equal(requiresClaimVerification("分析这些文件", "结果是 flag{derived}"), true);
