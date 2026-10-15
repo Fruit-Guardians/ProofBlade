@@ -340,6 +340,19 @@ test("an observer.started that throws does not block the provider terminal event
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-started-throw")?.active ?? 0, 0);
 });
 
+test("generic service failures are retried at the stream boundary", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
+  let attempts = 0;
+  const source: ProviderStreams = {
+    stream: () => { attempts += 1; return attempts < 3 ? erroringStream("The model service could not complete this request. Please retry later or contact support.") : delayedStream(1); },
+    streamSimple: () => delayedStream(1),
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-service-error", maxConcurrentRequests: 1 });
+  const result = await collect(wrapped.stream(model, { messages: [] }));
+  assert.equal(result.stopReason, "stop");
+  assert.equal(attempts, 3);
+});
+
 test("provider stream telemetry records first event/token and cannot block stall recovery", async () => {
   const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 20, maxRetries: 0 });
   const observed: string[] = [];

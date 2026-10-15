@@ -15,6 +15,7 @@ export interface FailurePolicy {
 }
 
 const POLICIES: Readonly<Record<PrimaryFailureCategory, FailurePolicy>> = {
+  provider_error: { category: "provider_error", disposition: "retry", retryable: true },
   model_no_tool_call: { category: "model_no_tool_call", disposition: "replan", retryable: true },
   bad_tool_args: { category: "bad_tool_args", disposition: "replan", retryable: true },
   tool_timeout: { category: "tool_timeout", disposition: "retry", retryable: true },

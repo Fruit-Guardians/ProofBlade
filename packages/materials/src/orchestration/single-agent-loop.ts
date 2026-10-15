@@ -273,6 +273,13 @@ export class SingleAgentLoop {
           }
           continue;
         }
+        if (agentOutcome.stopReason === "error" || agentOutcome.stopReason === "aborted") {
+          const reason = agentOutcome.errorMessage?.trim() || `Provider request ended with ${agentOutcome.stopReason}.`;
+          await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, `Provider request failed; retry from the next chat turn. ${reason}`, "provider_error");
+          activeWorkItemId = undefined;
+          await this.services.control.dispatch(options.runId, { type: "pause", reason: "Provider request failed; the next chat turn can retry it." });
+          break;
+        }
         const after = await this.services.control.snapshot(options.runId);
         if (after.status === "PAUSED") break;
         const acceptedClaim = latestAcceptedVerification(after, options.task);
@@ -337,6 +344,14 @@ export class SingleAgentLoop {
         }
       }
     } catch (error) {
+      if (isProviderFailure(error)) {
+        const reason = providerFailureReason(error);
+        await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, `Provider request failed; retry from the next chat turn. ${reason}`, "provider_error").catch(() => undefined);
+        activeWorkItemId = undefined;
+        await this.services.control.dispatch(options.runId, { type: "pause", reason: "Provider request failed; the next chat turn can retry it." }).catch(() => undefined);
+        snapshot = await this.services.control.snapshot(options.runId);
+        return outcome(snapshot, mode, turns, verification);
+      }
       await coordinator.fail(options.runId, activeWorkItemId, "Coding lane failed before returning a turn outcome.").catch(() => undefined);
       const paused = await this.services.control.snapshot(options.runId);
       if (paused.status === "PAUSED") {
@@ -563,6 +578,15 @@ export class SingleAgentLoop {
       if ((await this.services.control.snapshot(runId)).status !== "PAUSED") throw error;
     }
   }
+}
+
+function providerFailureReason(error: unknown): string {
+  if (error instanceof AggregateError) return error.errors.map((item) => providerFailureReason(item)).filter(Boolean).join("; ") || error.message;
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isProviderFailure(error: unknown): boolean {
+  return /(?:OpenAI API error|provider request|model service could not complete|retry later|temporarily unavailable|502 status code|503 status code|504 status code)/i.test(providerFailureReason(error));
 }
 
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
