@@ -157,6 +157,7 @@ export type RunStatus =
   | "NEED_HUMAN";
 
 export type PrimaryFailureCategory =
+  | "provider_error"
   | "model_no_tool_call"
   | "bad_tool_args"
   | "tool_timeout"

@@ -207,7 +207,7 @@ export class ProviderRequestScheduler {
         // synthetic one from an idle stall / iterator throw).
         const errorMessage = outcome.kind === "error" ? outcome.event.error : outcome.kind === "threw" ? errorEvent(model, outcome.error).error : undefined;
         const retryable = errorMessage !== undefined && attempt < this.maxRetries && !options?.signal?.aborted
-          && (isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage));
+          && (isRetryableAssistantError(errorMessage) || isTransientServiceError(errorMessage) || isIdleProviderError(errorMessage));
         if (retryable) {
           attempt += 1;
           const delayMs = this.retryBaseDelayMs * 2 ** (attempt - 1);
@@ -224,7 +224,7 @@ export class ProviderRequestScheduler {
           continue; // discard this attempt's buffer, re-issue
         }
         const requestAborted = outcome.kind === "threw" && outcome.error instanceof ProviderRequestQueueAbortedError;
-        if (errorMessage && !requestAborted && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage))) {
+        if (errorMessage && !requestAborted && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isTransientServiceError(errorMessage) || isIdleProviderError(errorMessage))) {
           await notifyObserver(() => observer?.recoveryRequired?.(requestId, {
             ...scope,
             attempts: attempt + 1,
@@ -411,6 +411,11 @@ export class ProviderRequestScheduler {
 
 function isIdleProviderError(message: { errorMessage?: string }): boolean {
   return /provider stream idle for more than \d+ms/i.test(message.errorMessage ?? "");
+}
+
+function isTransientServiceError(message: AssistantMessage): boolean {
+  if (message.stopReason !== "error" || !message.errorMessage) return false;
+  return /could not complete this request|retry later|temporarily unavailable|service temporarily unavailable|contact support/i.test(message.errorMessage);
 }
 
 /** Outcome of one buffered provider-stream attempt (see drainAttempt). */
